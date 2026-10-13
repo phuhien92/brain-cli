@@ -119,8 +119,8 @@ it** — those edits are not in the log yet. To capture the curation and re-expo
 
 ```sh
 brain log import learning ~/firstmate/data/learnings.md
-# Adds new bullets and lists logged entries missing from the file as candidates.
-# Review each candidate, then confirm removals explicitly:
+# Adds new bullets and lists active logged entries not present in the file.
+# Absence alone does not prove /stow removed one; review each before retiring it:
 brain log retire log/learning/<entry-id>.md --reason "removed by /stow"
 brain export --force
 ```

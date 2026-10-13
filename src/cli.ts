@@ -22,9 +22,9 @@ import {
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
-import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
+import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
-import { addEntry, exportView, importFile, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
+import { addEntry, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
@@ -550,9 +550,9 @@ async function run(argv: string[]): Promise<number> {
             if (!result.retirementCandidates.length) return summary;
             return [
               summary,
-              `${result.retirementCandidates.length} logged entries are missing from the file; review and retire them explicitly:`,
+              `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
               ...result.retirementCandidates.map((candidate) =>
-                `  brain log retire ${JSON.stringify(candidate.path)} --reason "removed from imported file"  # ${candidate.title}`,
+                `  brain log retire ${JSON.stringify(candidate.path)}  # ${candidate.title}`,
               ),
             ].join("\n");
           });

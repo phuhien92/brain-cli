@@ -31,7 +31,7 @@ export interface NewEntry {
 }
 
 export const RETIRE_ACTION = "retire";
-const LIFECYCLE_KIND = "lifecycle";
+export const LIFECYCLE_KIND = "lifecycle";
 
 export interface RetirementCandidate {
   path: string;

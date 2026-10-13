@@ -18,6 +18,13 @@ function brain(args: string[], env: Record<string, string> = {}) {
   });
   return { code: r.status, body: JSON.parse(r.stdout) };
 }
+function brainText(args: string[], env: Record<string, string> = {}) {
+  return spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, ...args], {
+    cwd: vault,
+    env: { ...process.env, BRAIN_VAULT: vault, BRAIN_CONFIG: join(vault, "..", "none.json"), BRAIN_MACHINE: "mini", BRAIN_AS: "", BRAIN_TODAY: "2026-10-13", ...env },
+    encoding: "utf8",
+  });
+}
 function write(rel: string, content: string) {
   mkdirSync(dirname(join(vault, rel)), { recursive: true });
   writeFileSync(join(vault, rel), content);
@@ -102,6 +109,18 @@ test("log retire and replace append lifecycle events while views omit retired en
   const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
   assert.deepEqual(active.map((entry: { title: string }) => entry.title), ["Clear wording"]);
   assert.equal(readdirSync(join(vault, "log/lifecycle")).length, 2);
+});
+
+test("import does not claim an absent active entry was removed", () => {
+  brain(["log", "add", "learning", "Never exported"]);
+  const imported = join(vault, "learnings.md");
+  writeFileSync(imported, "- Curated entry\n");
+
+  const result = brainText(["log", "import", "learning", imported]);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /active logged entries are not present in this file/);
+  assert.match(result.stdout, /brain log retire "log\/learning\//);
+  assert.doesNotMatch(result.stdout, /--reason|removed from imported file/);
 });
 
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {
