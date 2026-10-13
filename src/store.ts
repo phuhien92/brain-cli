@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
-import { isExtensionEnablementNote } from "./extensions.js";
+import { extensionEnablementName, extensionEnablementNoteDirectory, isExtensionEnablementNote } from "./extensions.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 
@@ -142,6 +142,7 @@ export class Store {
     const started = performance.now();
     const stats: RefreshStats = { added: 0, updated: 0, removed: 0, unchanged: 0, offline: 0, ms: 0 };
     const offline = new Set<string>();
+    const enablementDirectory = extensionEnablementNoteDirectory(this.vault);
 
     const known = new Map<string, { mtime: number; size: number; hash: string }>();
     for (const r of this.db.prepare("SELECT path, mtime, size, hash FROM notes").all() as {
@@ -167,11 +168,23 @@ export class Store {
         seen.add(rel);
         const st = statSync(abs);
         const prev = known.get(rel);
+        let content: string | undefined;
+        if (extensionEnablementName(enablementDirectory, rel) !== null) {
+          content = readFileSync(abs, "utf8");
+          const note = parseNote(rel, content);
+          if (isExtensionEnablementNote(enablementDirectory, rel, note.frontmatter)) {
+            if (prev) {
+              this.remove(rel);
+              stats.removed++;
+            }
+            continue;
+          }
+        }
         if (!opts.verify && prev && prev.mtime === st.mtimeMs && prev.size === st.size) {
           stats.unchanged++;
           continue;
         }
-        const content = readFileSync(abs, "utf8");
+        content ??= readFileSync(abs, "utf8");
         const hash = createHash("sha256").update(content).digest("hex");
         if (prev && prev.hash === hash) {
           // Touched but not edited (git checkout, sync tools): no re-parse.
@@ -179,7 +192,7 @@ export class Store {
           stats.unchanged++;
           continue;
         }
-        const indexed = this.write(rel, content, hash, st.mtimeMs, st.size);
+        const indexed = this.write(rel, content, hash, st.mtimeMs, st.size, enablementDirectory);
         if (!indexed) {
           if (prev) stats.removed++;
           continue;
@@ -217,9 +230,9 @@ export class Store {
     this.db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
   }
 
-  private write(path: string, content: string, hash: string, mtime: number, size: number): boolean {
+  private write(path: string, content: string, hash: string, mtime: number, size: number, enablementDirectory: string): boolean {
     const note = parseNote(path, content);
-    if (isExtensionEnablementNote(this.vault, path, note.frontmatter)) {
+    if (isExtensionEnablementNote(enablementDirectory, path, note.frontmatter)) {
       this.remove(path);
       return false;
     }

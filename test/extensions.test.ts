@@ -176,6 +176,16 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(json(second, ["search", "echoer"]).body.data.results.length, 0, "custom log directories hide enablement markers too");
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
+  const reclassifiedVault = join(f.root, "reclassified-vault");
+  mkdirSync(join(reclassifiedVault, ".obsidian"), { recursive: true });
+  mkdirSync(join(reclassifiedVault, "memory", "extensions"), { recursive: true });
+  writeFileSync(join(reclassifiedVault, "memory", "extensions", "echoer.md"), "---\nkind: extension\nextension: echoer\n---\n# Echoer\n");
+  const reclassified = { ...f, vault: reclassifiedVault };
+  assert.equal(json(reclassified, ["search", "echoer"]).body.data.results.length, 1);
+  writeFileSync(join(reclassifiedVault, "brain.json"), '{\n  "log": { "dir": "memory" }\n}\n');
+  assert.equal(json(reclassified, ["search", "echoer"]).body.data.results.length, 0, "changing log.dir reclassifies unchanged enablement markers");
+  assert.equal(json(reclassified, ["get", "memory/extensions/echoer.md"]).code, 3);
+
   const collisionVault = join(f.root, "collision-vault");
   mkdirSync(join(collisionVault, ".obsidian"), { recursive: true });
   mkdirSync(join(collisionVault, "log", "extensions"), { recursive: true });
@@ -519,6 +529,8 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
     ["context"],
     ["log", "add", "event", "forbidden"],
     ["log", "import", "event", "secrets.md"],
+    ["log", "retire", "event-id"],
+    ["log", "replace", "event-id", "--text", "replacement"],
     ["lifecycle", "set", "Allowed/visible.md"],
     ["lifecycle", "review", "Allowed/visible.md"],
     ["lifecycle", "archive", "Allowed/visible.md"],

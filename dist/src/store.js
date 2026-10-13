@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote } from "./note.js";
-import { isExtensionEnablementNote } from "./extensions.js";
+import { extensionEnablementName, extensionEnablementNoteDirectory, isExtensionEnablementNote } from "./extensions.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 const SCHEMA_VERSION = 3;
@@ -92,6 +92,7 @@ export class Store {
         const started = performance.now();
         const stats = { added: 0, updated: 0, removed: 0, unchanged: 0, offline: 0, ms: 0 };
         const offline = new Set();
+        const enablementDirectory = extensionEnablementNoteDirectory(this.vault);
         const known = new Map();
         for (const r of this.db.prepare("SELECT path, mtime, size, hash FROM notes").all()) {
             known.set(r.path, { mtime: r.mtime, size: r.size, hash: r.hash });
@@ -109,11 +110,23 @@ export class Store {
                 seen.add(rel);
                 const st = statSync(abs);
                 const prev = known.get(rel);
+                let content;
+                if (extensionEnablementName(enablementDirectory, rel) !== null) {
+                    content = readFileSync(abs, "utf8");
+                    const note = parseNote(rel, content);
+                    if (isExtensionEnablementNote(enablementDirectory, rel, note.frontmatter)) {
+                        if (prev) {
+                            this.remove(rel);
+                            stats.removed++;
+                        }
+                        continue;
+                    }
+                }
                 if (!opts.verify && prev && prev.mtime === st.mtimeMs && prev.size === st.size) {
                     stats.unchanged++;
                     continue;
                 }
-                const content = readFileSync(abs, "utf8");
+                content ??= readFileSync(abs, "utf8");
                 const hash = createHash("sha256").update(content).digest("hex");
                 if (prev && prev.hash === hash) {
                     // Touched but not edited (git checkout, sync tools): no re-parse.
@@ -121,7 +134,7 @@ export class Store {
                     stats.unchanged++;
                     continue;
                 }
-                const indexed = this.write(rel, content, hash, st.mtimeMs, st.size);
+                const indexed = this.write(rel, content, hash, st.mtimeMs, st.size, enablementDirectory);
                 if (!indexed) {
                     if (prev)
                         stats.removed++;
@@ -162,9 +175,9 @@ export class Store {
         this.db.prepare("DELETE FROM links WHERE src = ?").run(path);
         this.db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
     }
-    write(path, content, hash, mtime, size) {
+    write(path, content, hash, mtime, size, enablementDirectory) {
         const note = parseNote(path, content);
-        if (isExtensionEnablementNote(this.vault, path, note.frontmatter)) {
+        if (isExtensionEnablementNote(enablementDirectory, path, note.frontmatter)) {
             this.remove(path);
             return false;
         }

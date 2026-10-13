@@ -257,14 +257,28 @@ export function enabledExtensionNames(vault: string): string[] {
     .sort();
 }
 
-export function isExtensionEnablementNote(vault: string, notePath: string, frontmatter: Frontmatter): boolean {
-  const directory = relative(vault, enablementDirectory(vault)).replace(/\\/g, "/");
+export function extensionEnablementNoteDirectory(vault: string): string {
+  const cfg = readVaultJson(vault);
+  const raw = (cfg.log === undefined ? {} : object(cfg.log, "brain.json: log")).dir ?? "log";
+  const logDir = String(raw).replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
+  if (!logDir || logDir.startsWith(".") || logDir.split("/").includes("..")) {
+    throw new ExtensionError("config", `brain.json: log.dir '${logDir}' must be a plain folder inside the vault`);
+  }
+  return `${logDir}/extensions`;
+}
+
+export function extensionEnablementName(directory: string, notePath: string): string | null {
   const normalized = notePath.replace(/\\/g, "/");
-  if (!normalized.startsWith(`${directory}/`)) return false;
+  if (!normalized.startsWith(`${directory}/`)) return null;
   const file = normalized.slice(directory.length + 1);
-  if (file.includes("/") || !file.endsWith(".md")) return false;
+  if (file.includes("/") || !file.endsWith(".md")) return null;
   const name = file.slice(0, -3);
-  return slug(name) === name && frontmatter.kind === "extension" && frontmatter.extension === name;
+  return slug(name) === name ? name : null;
+}
+
+export function isExtensionEnablementNote(directory: string, notePath: string, frontmatter: Frontmatter): boolean {
+  const name = extensionEnablementName(directory, notePath);
+  return name !== null && frontmatter.kind === "extension" && frontmatter.extension === name;
 }
 
 function isEnablementMarker(path: string, name: string): boolean {
@@ -277,13 +291,7 @@ function isEnablementMarker(path: string, name: string): boolean {
 }
 
 function enablementDirectory(vault: string): string {
-  const cfg = readVaultJson(vault);
-  const raw = (cfg.log === undefined ? {} : object(cfg.log, "brain.json: log")).dir ?? "log";
-  const logDir = String(raw).replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
-  if (!logDir || logDir.startsWith(".") || logDir.split("/").includes("..")) {
-    throw new ExtensionError("config", `brain.json: log.dir '${logDir}' must be a plain folder inside the vault`);
-  }
-  return join(vault, ...logDir.split("/"), "extensions");
+  return join(vault, ...extensionEnablementNoteDirectory(vault).split("/"));
 }
 
 function enable(vault: string, name: string): void {

@@ -220,7 +220,7 @@ export function telemetryName(command: string, sub: string | undefined): string 
 
 function extensionChildCommandAllowed(command: string, sub: string | undefined): boolean {
   if (!EXTENSION_CHILD_COMMANDS.has(command)) return false;
-  if (command === "log") return sub !== "import";
+  if (command === "log") return !["import", "retire", "replace"].includes(sub ?? "");
   if (command === "lifecycle") return !["set", "review", "archive", "restore"].includes(sub ?? "");
   return true;
 }

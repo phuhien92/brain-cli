@@ -187,7 +187,7 @@ function extensionChildCommandAllowed(command, sub) {
     if (!EXTENSION_CHILD_COMMANDS.has(command))
         return false;
     if (command === "log")
-        return sub !== "import";
+        return !["import", "retire", "replace"].includes(sub ?? "");
     if (command === "lifecycle")
         return !["set", "review", "archive", "restore"].includes(sub ?? "");
     return true;
