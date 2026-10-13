@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
@@ -11,6 +11,27 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 function run(command: string, args: string[], cwd: string): string {
   return execFileSync(command, args, { cwd, encoding: "utf8" });
 }
+
+test("the committed dist/src is exactly what src compiles to", () => {
+  const out = mkdtempSync(join(tmpdir(), "brain-dist-drift-"));
+  try {
+    execFileSync(process.execPath, [join(ROOT, "node_modules", "typescript", "bin", "tsc"), "-p", ROOT, "--outDir", out], { cwd: ROOT });
+    const compiledRoot = join(out, "src");
+    const compiled = readdirSync(compiledRoot, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => relative(out, join(entry.parentPath, entry.name)))
+      .map((file) => `dist/${file.split(sep).join("/")}`)
+      .sort();
+    const committed = run("git", ["ls-files", "--", "dist/src"], ROOT).trim().split("\n").filter(Boolean).sort();
+    assert.deepEqual(committed, compiled, "rebuild and commit dist/src with every src change");
+    for (const file of committed) {
+      const tracked = execFileSync("git", ["show", `:${file}`], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 });
+      assert.ok(tracked.equals(readFileSync(join(out, file.slice("dist/".length)))), `${file} is stale: rebuild and commit dist/src`);
+    }
+  } finally {
+    rmSync(out, { recursive: true, force: true });
+  }
+});
 
 test("a clean package artifact globally installs without build tools and includes a runnable brain executable", () => {
   const scratch = mkdtempSync(join(tmpdir(), "brain-git-install-"));
