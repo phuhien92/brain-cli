@@ -93,8 +93,9 @@ narrow a caller but cannot widen it. Inputs an extension sends through `brain lo
 through core redaction before the new note is created. To retain a sanitized HTTP(S) source URL,
 remove credentials, query, and fragment, encode its canonical UTF-8 bytes as base64url, and place it inside
 `<!-- brain-protected-url:<BRAIN_EXT_REDACT_TOKEN>:<encoded-url> -->`. Core rejects other protected values.
-Use `brain log add … --source-id <sha256>` for exact create-only source deduplication.
-The hash selects one machine-independent path with stable metadata: identical imports on separate
+Use `brain log add … --source-id <sha256> --source-created <canonical-ISO-timestamp>` for exact
+create-only source deduplication. The timestamp preserves source chronology, while provenance is
+the extension name (`source` for direct calls). The hash selects one machine-independent path: identical imports on separate
 machines merge as the same file, while different content for one source ID produces a sync conflict
 instead of a second source record.
 

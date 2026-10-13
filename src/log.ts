@@ -56,45 +56,57 @@ export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   }
 }
 
-export function addEntryOnce(store: Store, cfg: Config, input: NewEntry, sourceId: string): { path: string; added: boolean } {
+export function addEntryOnce(
+  store: Store,
+  cfg: Config,
+  input: NewEntry,
+  sourceId: string,
+  created: Date,
+  machine: string,
+): { path: string; added: boolean; machine: string } {
   if (!/^[0-9a-f]{64}$/.test(sourceId)) throw new Error("source ID must be a SHA-256 hash");
   const kind = slug(input.kind);
   const prefix = `${cfg.logDir}/${kind}/`.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
   const indexed = store.db.prepare(
-    `SELECT path FROM notes
+    `SELECT path, json_extract(frontmatter, '$.machine') AS machine FROM notes
       WHERE path LIKE ? ESCAPE '\\'
         AND json_extract(frontmatter, '$.kind') = ?
         AND json_extract(frontmatter, '$.source-id') = ?
       ORDER BY path LIMIT 1`,
-  ).get(prefix, kind, sourceId) as { path: string } | undefined;
-  if (indexed) return { path: indexed.path, added: false };
+  ).get(prefix, kind, sourceId) as { path: string; machine: string } | undefined;
+  if (indexed) return { path: indexed.path, added: false, machine: indexed.machine };
   const withSource = { ...input, fields: { ...input.fields, "source-id": sourceId } };
-  const { dir, content } = prepareEntry(store.vault, cfg, withSource, true);
+  const { dir, content } = prepareEntry(store.vault, cfg, withSource, { created, machine });
   const relativePath = `${cfg.logDir}/${kind}/source-${sourceId}.md`;
   const file = join(dir, `source-${sourceId}.md`);
   try {
     writeFileSync(file, content, { flag: "wx" });
-    return { path: relativePath, added: true };
+    return { path: relativePath, added: true, machine };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     const existing = parseNote(relativePath, readFileSync(file, "utf8"));
     if (existing.frontmatter.kind !== kind || existing.frontmatter["source-id"] !== sourceId) {
       throw new Error(`source ID path '${relativePath}' is occupied by a different entry`);
     }
-    return { path: relativePath, added: false };
+    return { path: relativePath, added: false, machine: String(existing.frontmatter.machine ?? "") };
   }
 }
 
-function prepareEntry(vault: string, cfg: Config, input: NewEntry, stableSource = false): { dir: string; name: string; content: string } {
+function prepareEntry(
+  vault: string,
+  cfg: Config,
+  input: NewEntry,
+  origin?: { created: Date; machine: string },
+): { dir: string; name: string; content: string } {
   const kind = slug(input.kind);
   if (!kind) throw new Error("an entry needs a kind, e.g. 'learning'");
   const title = input.title.replace(/\s+/g, " ").trim();
   if (!title) throw new Error("an entry needs a title");
 
-  const created = stableSource ? new Date(0) : input.created ?? new Date();
+  const created = origin?.created ?? input.created ?? new Date();
   const iso = created.toISOString(); // millisecond precision: the view's order is creation order
   const day = iso.slice(0, 10);
-  const machine = stableSource ? "source" : cfg.machine;
+  const machine = origin?.machine ?? cfg.machine;
   const name = `${day}-${machine}-${slug(title) || "entry"}`;
   const dir = join(vault, ...cfg.logDir.split("/"), kind);
   mkdirSync(dir, { recursive: true });

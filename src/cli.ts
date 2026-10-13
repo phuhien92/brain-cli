@@ -81,7 +81,8 @@ COMMANDS
       --title <title>          Source title (default: the input file name)
       --tag <tag>             Tag the source (repeatable)
 
-  log add <kind> <title>      Record an entry; --source-id <sha256> makes source imports create-only idempotent
+  log add <kind> <title>      Record an entry; --source-id <sha256> with --source-created <ISO time>
+                               makes source imports create-only idempotent
       --body <text|->         Entry body (- reads stdin)
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
@@ -285,6 +286,7 @@ async function run(argv: string[]): Promise<number> {
         lines: { type: "string" },
         body: { type: "string" },
         "source-id": { type: "string" },
+        "source-created": { type: "string" },
         tag: { type: "string", multiple: true },
         kind: { type: "string" },
         force: { type: "boolean", default: false },
@@ -578,7 +580,7 @@ async function run(argv: string[]): Promise<number> {
         if (sub === "add") {
           const [kind = "", ...titleWords] = rest;
           let title = titleWords.join(" ").trim();
-          if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t] [--source-id <sha256>]', 2);
+          if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t] [--source-id <sha256> --source-created <ISO time>]', 2);
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
           let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           if (process.env.BRAIN_EXT_REDACT === "1") {
@@ -619,14 +621,26 @@ async function run(argv: string[]): Promise<number> {
           }
           const input = { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag };
           const sourceId = flags["source-id"];
+          const sourceCreated = flags["source-created"];
           if (sourceId !== undefined && !/^[0-9a-f]{64}$/.test(sourceId)) {
             throw new CliError("usage", "--source-id must be a SHA-256 hash", 2);
           }
+          if ((sourceId === undefined) !== (sourceCreated === undefined)) {
+            throw new CliError("usage", "--source-id and --source-created must be used together", 2);
+          }
+          let sourceDate: Date | undefined;
+          if (sourceCreated !== undefined) {
+            sourceDate = new Date(sourceCreated);
+            if (Number.isNaN(sourceDate.getTime()) || sourceDate.toISOString() !== sourceCreated) {
+              throw new CliError("usage", "--source-created must be a canonical ISO timestamp", 2);
+            }
+          }
+          const sourceMachine = process.env.BRAIN_EXTENSION_SCOPE || "source";
           const result = sourceId === undefined
-            ? { path: addEntry(vault, cfg, input), added: true }
-            : addEntryOnce(store, cfg, input, sourceId);
+            ? { path: addEntry(vault, cfg, input), added: true, machine: cfg.machine }
+            : addEntryOnce(store, cfg, input, sourceId, sourceDate!, sourceMachine);
           index = store.refresh();
-          print(out, "log.add", { ...result, kind: slug(kind), machine: cfg.machine }, { vault, index }, () =>
+          print(out, "log.add", { ...result, kind: slug(kind) }, { vault, index }, () =>
             result.added ? result.path : `already recorded: ${result.path}`,
           );
           return 0;

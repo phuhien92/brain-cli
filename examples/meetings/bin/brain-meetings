@@ -71,11 +71,22 @@ function sourceUrl(value) {
   }
 }
 
+function sourceCreated(value) {
+  const raw = oneLine(value);
+  if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(raw)) return "";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "";
+  const canonical = date.toISOString();
+  if (raw.length === 10 && canonical.slice(0, 10) !== raw) return "";
+  return canonical;
+}
+
 function validateMeeting(value, index) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`meetings[${index}] must be an object`);
   if (typeof value.id !== "string" || !oneLine(value.id)) throw new Error(`meetings[${index}].id must be a non-empty string`);
   if (typeof value.title !== "string" || !oneLine(value.title)) throw new Error(`meetings[${index}].title must be a non-empty string`);
-  for (const field of ["date", "summary", "url"]) {
+  if (typeof value.date !== "string" || !sourceCreated(value.date)) throw new Error(`meetings[${index}].date must be an ISO date or timestamp`);
+  for (const field of ["summary", "url"]) {
     if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`meetings[${index}].${field} must be a string`);
   }
   for (const field of ["attendees", "actionItems"]) {
@@ -143,7 +154,12 @@ async function main() {
   let skipped = 0;
   for (const meeting of meetings) {
     const key = marker(meeting.id);
-    const result = brain(["log", "add", "meeting", oneLine(meeting.title), "--source-id", key, "--body", "-"], bodyFor(meeting));
+    const result = brain([
+      "log", "add", "meeting", oneLine(meeting.title),
+      "--source-id", key,
+      "--source-created", sourceCreated(meeting.date),
+      "--body", "-",
+    ], bodyFor(meeting));
     if (!result.added) {
       skipped++;
       continue;

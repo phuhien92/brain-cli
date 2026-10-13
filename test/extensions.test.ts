@@ -369,7 +369,8 @@ test("source IDs converge across machines and reject unrelated path collisions",
   const first = fixture(t);
   const second = fixture(t);
   const sourceId = createHash("sha256").update("shared-source").digest("hex");
-  const args = ["log", "add", "meeting", "Shared meeting", "--source-id", sourceId, "--body", "Same source body"];
+  const sourceCreated = "2026-10-13T02:00:00.000Z";
+  const args = ["log", "add", "meeting", "Shared meeting", "--source-id", sourceId, "--source-created", sourceCreated, "--body", "Same source body"];
   const a = json(first, args, { BRAIN_MACHINE: "machine-a" });
   const b = json(second, args, { BRAIN_MACHINE: "machine-b" });
   assert.equal(a.code, 0, a.stderr);
@@ -378,6 +379,19 @@ test("source IDs converge across machines and reject unrelated path collisions",
   const aNote = readFileSync(join(first.vault, ...a.body.data.path.split("/")), "utf8");
   const bNote = readFileSync(join(second.vault, ...b.body.data.path.split("/")), "utf8");
   assert.equal(aNote, bNote, "the same source produces merge-identical records on every machine");
+  assert.equal(a.body.data.machine, "source");
+  assert.match(aNote, /created: 2026-10-13T02:00:00\.000Z/);
+  assert.match(aNote, /machine: source/);
+  const listed = json(first, ["log", "1", "--kind", "meeting"]);
+  assert.equal(listed.body.data.entries[0].created, sourceCreated);
+  assert.equal(listed.body.data.entries[0].machine, "source");
+
+  const missingCreated = json(fixture(t), ["log", "add", "meeting", "Missing time", "--source-id", sourceId]);
+  assert.equal(missingCreated.code, 2);
+  assert.match(missingCreated.body.error.message, /must be used together/);
+  const invalidCreated = json(fixture(t), ["log", "add", "meeting", "Invalid time", "--source-id", sourceId, "--source-created", "yesterday"]);
+  assert.equal(invalidCreated.code, 2);
+  assert.match(invalidCreated.body.error.message, /canonical ISO timestamp/);
 
   const collision = fixture(t);
   const collisionPath = join(collision.vault, ...a.body.data.path.split("/"));
@@ -447,6 +461,8 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const note = readFileSync(join(meetingDir, files[0]!), "utf8");
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
+  assert.match(note, /created: 2026-10-13T00:00:00\.000Z/);
+  assert.match(note, /machine: meetings/);
   assert.match(note, /email=<email>&id=<number>/);
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
@@ -505,6 +521,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
     ["id", null],
     ["title", {}],
     ["date", {}],
+    ["date", "2026-02-31"],
     ["attendees", [{}]],
     ["summary", {}],
     ["actionItems", [{}]],
