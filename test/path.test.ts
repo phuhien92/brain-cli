@@ -37,6 +37,7 @@ test("every name prints one bare absolute path, so $(brain path log) works", () 
   const expected: Record<string, string> = {
     vault,
     log: join(vault, "memory"),
+    sources: join(vault, "sources"),
     config: join(vault, "brain.json"),
     "user-config": join(root, "machine.json"),
     state: indexDir(vault, join(root, "state")),

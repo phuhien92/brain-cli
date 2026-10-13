@@ -4,11 +4,12 @@ brain is a short-lived command, not a service. Each call reads your markdown vau
 brings a per-machine index up to date, answers, and exits. Everything below follows from
 three decisions:
 
-1. **The vault holds only markdown, and is the source of truth.** Anything else brain
-   keeps (the index, export bookkeeping) is a per-machine cache that can be deleted.
-2. **brain never edits a note.** Its only writes into the vault are *new files* under
-   `log/`. That is what makes the vault safe to sync by any means — git, iCloud,
-   Dropbox — between machines.
+1. **The vault is the source of truth.** It holds markdown notes plus immutable originals
+   under `sources/`. Anything else brain keeps (the index, export bookkeeping) is a
+   per-machine cache that can be deleted.
+2. **brain never edits a note or source.** Its only writes into the vault are *new files*
+   under `log/` and `sources/`, all created exclusively. That is what makes the vault safe
+   to sync by any means — git, iCloud, Dropbox — between machines.
 3. **The JSON envelope is the API.** Agents, scripts and future extensions talk to brain
    through `brain … --json` and exit codes, never through its internals.
 
@@ -29,7 +30,7 @@ flowchart LR
     ARGS["args + BRAIN_AS scope"] --> REFRESH["refresh: stat, hash, re-parse changed notes"]
     REFRESH --> CMD{"command"}
     CMD --> READ["search / get / context"]
-    CMD --> WRITE["log add / lifecycle"]
+    CMD --> WRITE["log add / lifecycle / ingest"]
     CMD --> MOVE["sync / export"]
     CMD --> CHECK["lint / doctor"]
   end
@@ -37,6 +38,7 @@ flowchart LR
   subgraph Vault["Vault: synced by git, iCloud, Dropbox or anything"]
     NOTES[("markdown notes")]
     LOG[("log/: one file per entry")]
+    SOURCES[("sources/: immutable originals + sidecars")]
     BJ["brain.json"]
   end
 
@@ -51,7 +53,8 @@ flowchart LR
   REFRESH -- reads --> LOG
   REFRESH -- writes --> IDX
   READ -- BM25 query --> IDX
-  WRITE -- "creates a new file, never edits" --> LOG
+  WRITE -- "creates new files, never edits" --> LOG
+  WRITE -- "wx original + sidecar" --> SOURCES
   MOVE -- "git / none / command" --> Vault
   MOVE -- "regular file, drift-checked" --> VIEWS
   ARGS -. config .-> BJ
@@ -91,6 +94,7 @@ sequenceDiagram
 | --- | --- | --- | --- |
 | Notes | the vault | yes, by your sync | they are yours; brain only reads them |
 | Memory entries, lifecycle changes | `<vault>/log/<kind>/<date>-<machine>-<slug>.md` | yes | one new file each, so two machines never write the same file |
+| Immutable sources and metadata | `<vault>/sources/<date>-<machine>-<slug>.<ext>` and `.source.md` | yes | originals remain checkable; sidecars carry searchable provenance |
 | Vault config: integrations, sync mode, lifecycle windows, lint limits | `<vault>/brain.json` | yes | the same on every machine |
 | The index | `~/.local/state/brain/<vault>-<id>/index.db` | **never** | a live SQLite database corrupts when a sync service copies it; each machine builds its own |
 | Machine config: machine name, view paths, sync override | `~/.config/brain/config.json` | **never** | it names paths that exist only on this machine |
@@ -105,9 +109,10 @@ sequenceDiagram
 | [`src/paths.ts`](../src/paths.ts) | Where brain keeps things; one resolver for `brain path`, `doctor`, the index and telemetry |
 | [`src/config.ts`](../src/config.ts) | `brain.json` + machine config: sync mode, integrations, `BRAIN_AS` scope |
 | [`src/log.ts`](../src/log.ts) | Memory entries: add, list, import, render a view, export with drift check |
+| [`src/source.ts`](../src/source.ts) | SHA-256 source ingest, exclusive creates, metadata sidecars and idempotency |
 | [`src/lifecycle.ts`](../src/lifecycle.ts) | Categories, review windows, lifecycle events, each note's state |
 | [`src/lint.ts`](../src/lint.ts) | Read-only health rules |
-| [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log, pull --rebase, push), none, command |
+| [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log and ingested source pairs, pull --rebase, push), none, command |
 | [`src/agent.ts`](../src/agent.ts) | Session primer (`brain context`) and per-harness install |
 | [`src/telemetry.ts`](../src/telemetry.ts) | Anonymous usage events: fixed fields, local queue, daily background send |
 | [`src/feedback.ts`](../src/feedback.ts) | Feedback drafts, redaction, issue links, permission-gated posting |
@@ -124,7 +129,7 @@ process and its failure is invisible to commands.
 | Guarantee | Held by | Tested in |
 | --- | --- | --- |
 | The index is never stale when read | refresh before every command | `test/store.test.ts` |
-| Two machines never conflict on brain's own writes | new files only, opened with `wx` | `test/sync.test.ts` (two machines, one remote) |
+| Two machines never conflict on brain's own writes | log entries and source pairs are new files only, opened with `wx` | `test/sync.test.ts` (two machines, one remote) |
 | An exported file is never overwritten after someone edited it | hash of the last export, compared before writing | `test/log.test.ts` |
 | A scoped agent cannot see outside its folders through brain | filters inside the SQL query; out of scope is "not found" | `test/integrations.test.ts` |
 | A hook can never break the agent that runs it | `brain context` prints nothing and exits 0 on any error | `test/agent.test.ts`, `scripts/verify-pi.sh` |

@@ -1,16 +1,22 @@
-// `brain sync`: commit new log entries, pull, push. Plain git, no service.
+// `brain sync`: commit new log entries and sources, pull, push. Plain git, no service.
 //
-// It commits only what brain owns — the log folder and brain.json — so it never
+// It commits only what brain owns — the log folder, ingested source pairs in sources/ and brain.json — so it never
 // sweeps a half-written note into a commit behind the user's back. Pulls rebase
-// with --autostash, so other uncommitted edits survive. Because log entries are
-// always new files, two machines syncing never conflict on them; a conflict can
-// only come from notes a person edited on both machines, and then sync stops
+// with --autostash, so other uncommitted edits survive. Because log entries and
+// source pairs are always new machine-named files, two machines syncing never
+// conflict on them; a conflict can only come from notes a person edited on both machines, and then sync stops
 // and says which files, rather than guessing.
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "./config.js";
+import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
+
+// Only sources not yet committed go on git's command line. A sync whose
+// longest git command would not fit under Windows' 32,767-character limit
+// (quotes and separators included) refuses rather than failing to spawn.
+const MAX_COMMAND_CHARS = 30_000;
 
 export interface SyncResult {
   mode: "git" | "none" | "command";
@@ -71,7 +77,20 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
     throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote, or set "sync": "none" in brain.json`);
   }
 
-  const owned = [cfg.logDir, "brain.json"].filter((p) => existsSync(join(vault, p)));
+  const managed = new Set(sourceSidecars(vault).flatMap((sidecar) => [sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length), sidecar]));
+  const pending = [
+    ...git("ls-files", "-z", "--others", "--modified", "--exclude-standard", "--", SOURCES_DIR).split("\0"),
+    ...git("diff", "--cached", "--name-only", "--relative", "-z", "--", SOURCES_DIR).split("\0"),
+  ];
+  const sources = [...new Set(pending)].filter((p) => managed.has(p) && existsSync(join(vault, p)));
+  const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
+  const longest = ["git", "-C", vault, "commit", "--quiet", "-m", `brain: ${owned.length} owned files from ${cfg.machine}`, "--", ...owned];
+  if (longest.reduce((n, arg) => n + arg.length + 3, 0) > MAX_COMMAND_CHARS) {
+    throw new SyncError(
+      "git_failed",
+      `${sources.length} new source files are too many to commit in one sync; commit them in ${SOURCES_DIR}/ with git, then run brain sync again`,
+    );
+  }
   let committed = 0;
   if (owned.length) {
     git("add", "--", ...owned);
@@ -79,7 +98,11 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
       .split("\n")
       .filter(Boolean);
     if (staged.length) {
-      git("commit", "--quiet", "-m", `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`, "--", ...owned);
+      const onlyLog = staged.every((path) => path.startsWith(`${cfg.logDir}/`));
+      const message = onlyLog
+        ? `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`
+        : `brain: ${staged.length} owned ${staged.length === 1 ? "file" : "files"} from ${cfg.machine}`;
+      git("commit", "--quiet", "-m", message, "--", ...owned);
       committed = staged.length;
     }
   }

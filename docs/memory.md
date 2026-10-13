@@ -19,8 +19,8 @@ The single-file shape that existing tools expect is *generated* from the log, so
 never edited by two machines either. Each entry records which machine wrote it.
 
 - **`brain sync`** follows the vault's `"sync"` mode, because files reach other machines
-  in many ways: `git` (any remote) commits only the log folder and `brain.json` — never a
-  note you are halfway through — then pulls with rebase and pushes, stopping with exit 5
+  in many ways: `git` (any remote) commits only the log folder, ingested `sources/` pairs and
+  `brain.json` — never a note you are halfway through — then pulls with rebase and pushes, stopping with exit 5
   and the file names if a *note* was edited on both machines; `none` leaves moving files
   to iCloud, Dropbox, Syncthing or Obsidian Sync; `{ "command": … }` runs yours. `auto`
   (the default) picks git when the vault is a git repository.

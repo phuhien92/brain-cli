@@ -56,7 +56,7 @@ test("never replaces a file brain did not write, unless forced; --dry-run writes
 test("context: primer with recent memory titles, newest first, duplicates across machines shown once", () => {
   const vault = join(home, "vault");
   mkdirSync(vault);
-  const cfg = (machine: string): Config => ({ logDir: "log", machine, exports: [], userConfigPath: "", sync: "none", integrations: {}, as: null, lifecycleWindows: {}, lintMaxLines: {} });
+  const cfg = (machine: string): Config => ({ logDir: "log", machine, exports: [], userConfigPath: "", sync: "none", integrations: {}, as: null, lifecycleWindows: {}, lintMaxLines: {}, lintUnsourced: [] });
   addEntry(vault, cfg("mini"), { kind: "learning", title: "Shared lesson", created: new Date("2026-01-01T00:00:00Z") });
   addEntry(vault, cfg("laptop"), { kind: "learning", title: "Shared lesson", created: new Date("2026-01-02T00:00:00Z") });
   addEntry(vault, cfg("mini"), { kind: "decision", title: "Use brain", created: new Date("2026-01-03T00:00:00Z") });

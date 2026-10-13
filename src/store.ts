@@ -18,8 +18,9 @@ import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
+import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // Folders that are never notes. Dot-folders (.git, .obsidian, .trash, .brain)
 // are skipped wholesale.
@@ -410,6 +411,10 @@ function* walk(dir: string, offline: Set<string>, root = dir): Generator<string>
     if (e.isDirectory()) {
       if (!SKIP_DIRS.has(e.name)) yield* walk(full, offline, root);
     } else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) {
+      const rel = toPosix(relative(root, full));
+      // Ingested markdown is an immutable original, not a note. Its
+      // `<name>.source.md` sidecar carries the searchable metadata.
+      if (rel.startsWith(`${SOURCES_DIR}/`) && existsSync(full + SOURCE_SIDECAR_SUFFIX)) continue;
       yield full;
     }
   }

@@ -36,6 +36,7 @@ and a reason.
 `brain lint` reports, without changing anything: broken links (a link that names an
 existing file without its extension counts as resolved), notes nothing links to, sync
 conflict copies (`Note 2.md`, Dropbox "conflicted copy", Syncthing `.sync-conflict-`),
-overdue reviews and lifecycle problems, and per-file line limits you set
-(`"lint": { "maxLines": { "MEMORY.md": 150 } }`). `--strict` exits 7 on warnings, for a
-scheduled job.
+overdue reviews and lifecycle problems, source citations and immutable-source hashes,
+and per-file line limits you set (`"lint": { "maxLines": { "MEMORY.md": 150 } }`).
+Folders can opt into info-level `unsourced` findings. See [sources.md](sources.md).
+`--strict` exits 7 on warnings, for a scheduled job.
