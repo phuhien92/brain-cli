@@ -7,7 +7,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { Store, type RefreshStats } from "./store.js";
 import { sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.4.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -48,7 +48,7 @@ COMMANDS
 
 GLOBAL FLAGS
   --vault <dir>               Vault root (default: $BRAIN_VAULT, else the nearest
-                              parent folder holding .obsidian/ or .brain/)
+                              parent folder holding .obsidian/ or brain.json)
   --json                      Emit a versioned machine-readable envelope
   --quiet, -q                 Suppress successful human-readable output
   --version                   Print the version
@@ -59,6 +59,8 @@ CONFIG
                               { "machine": "mac-mini",
                                 "exports": [{ "kind": "learning", "path": "~/fm/data/learnings.md" }] }
   $BRAIN_MACHINE              Overrides the machine name (default: hostname)
+  $BRAIN_STATE_DIR            Where indexes live (default ~/.local/state/brain); never
+                              inside the vault, so iCloud/Dropbox never sync a live database
 
 EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
@@ -351,14 +353,14 @@ function locateVault(flag: string | undefined): string {
   }
   let dir = process.cwd();
   for (;;) {
-    if (existsSync(join(dir, ".obsidian")) || existsSync(join(dir, ".brain"))) return dir;
+    if (existsSync(join(dir, ".obsidian")) || existsSync(join(dir, "brain.json"))) return dir;
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
   throw new CliError(
     "no_vault",
-    "no vault found: pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or .brain/",
+    "no vault found: pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or brain.json",
     1,
   );
 }

@@ -5,7 +5,7 @@ holds the rules an agent changing the code must not break.
 
 ## Invariants
 
-1. **The vault is the source of truth; the index is a cache.** `.brain/index.db` can be
+1. **The vault is the source of truth; the index is a cache.** The index (`$BRAIN_STATE_DIR/<vault>-<id>/index.db`, never inside the vault) can be
    deleted at any time and must rebuild to the same state. Never store anything in the
    index that cannot be re-derived from the markdown — with one exception, the hash of
    what was last exported to each path, whose loss only makes `export` refuse until

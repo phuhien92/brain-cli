@@ -1,4 +1,5 @@
 // Two machines, one remote, both writing memory: the scenario brain sync exists for.
+import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";

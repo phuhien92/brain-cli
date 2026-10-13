@@ -1,9 +1,11 @@
+import "./isolate.js";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
-import { Store, toMatchExpression } from "../src/store.js";
+import { existsSync, readdirSync } from "node:fs";
+import { indexDir, Store, toMatchExpression } from "../src/store.js";
 
 let vault: string;
 
@@ -30,6 +32,19 @@ test("first refresh indexes every note and skips dot-folders and node_modules", 
   assert.equal(stats.added, 3);
   assert.equal(store.count(), 3);
   store.close();
+});
+
+test("the index lives outside the vault, so a synced vault never carries a live database", () => {
+  const store = Store.open(vault);
+  store.refresh();
+  store.close();
+  assert.ok(!existsSync(join(vault, ".brain")));
+  assert.ok(!readdirSync(vault).some((f) => f.endsWith(".db")));
+  const dir = indexDir(vault);
+  assert.ok(dir.startsWith(process.env.BRAIN_STATE_DIR!));
+  assert.ok(existsSync(join(dir, "index.db")));
+  assert.equal(indexDir(vault), dir, "stable per vault");
+  assert.notEqual(indexDir(vault + "-other"), dir, "distinct per vault");
 });
 
 test("refresh is incremental: unchanged, touched, edited, added, deleted", () => {

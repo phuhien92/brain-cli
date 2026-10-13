@@ -1,4 +1,9 @@
-// The index: a SQLite file at <vault>/.brain/index.db, never committed.
+// The index: a SQLite file kept OUTSIDE the vault, one per vault, at
+// $BRAIN_STATE_DIR/<id>/index.db (default ~/.local/state/brain/<id>/), where
+// <id> is derived from the vault's real path. Outside, because vaults are
+// synced — by git, but also by iCloud, Dropbox or Obsidian Sync — and a live
+// SQLite database (with its -wal and -shm files) synced between two machines
+// corrupts, or comes back as "index 2.db". The index is per-machine by nature.
 //
 // Freshness model (borrowed from Serena): one full pass up front, then every
 // command calls refresh() first. refresh() stats every note and re-parses only
@@ -9,6 +14,7 @@
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
@@ -63,8 +69,8 @@ export class Store {
     this.db = db;
   }
 
-  static open(vault: string, opts: { rebuild?: boolean } = {}): Store {
-    const dir = join(vault, ".brain");
+  static open(vault: string, opts: { rebuild?: boolean; stateDir?: string } = {}): Store {
+    const dir = indexDir(vault, opts.stateDir);
     mkdirSync(dir, { recursive: true });
     const db = new DatabaseSync(join(dir, "index.db"));
     db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
@@ -321,6 +327,14 @@ export class Store {
       content: readFileSync(join(this.vault, ...path.split("/")), "utf8"),
     };
   }
+}
+
+export function indexDir(vault: string, stateDir?: string): string {
+  const root = stateDir || process.env.BRAIN_STATE_DIR || join(homedir(), ".local", "state", "brain");
+  const name = vault.split(/[\\/]/).filter(Boolean).pop() ?? "vault";
+  const id = createHash("sha256").update(vault).digest("hex").slice(0, 12);
+  // Readable and unique: "COWORK-OS-3f9a1c2b7d4e".
+  return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
 }
 
 // Turn a natural-language query into an FTS5 expression. Terms are OR-ed and

@@ -22,8 +22,8 @@ instead of linking it.
 
 ## Prerequisites
 
-- Your vault is a git repository with a remote, cloned on both machines, with `.brain/` in
-  its `.gitignore`.
+- Your vault is a git repository with a remote, cloned on both machines. (brain keeps its
+  index outside the vault, so there is nothing to add to `.gitignore`.)
 - `brain` installed on both machines (`npm install -g github:phuhien92/brain-cli`).
 
 ## 1. Configure each machine

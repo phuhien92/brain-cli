@@ -57,7 +57,7 @@ brain sync                       # share it with your other machines
 ```
 
 The vault is `--vault <dir>`, else `$BRAIN_VAULT`, else the nearest parent folder holding
-`.obsidian/` or `.brain/`.
+`.obsidian/` or a `brain.json`.
 
 ### Teaching an agent to use it
 
@@ -184,8 +184,12 @@ Configuration is split by what may travel:
 The design is borrowed from [Serena](https://github.com/oraios/serena): index once up
 front, then keep the index current as a side effect of using it.
 
-- The index is a SQLite file at `<vault>/.brain/index.db` — a cache, never committed
-  (add `.brain/` to the vault's `.gitignore`). Delete it and it rebuilds.
+- The index is a SQLite file **outside the vault**, at
+  `~/.local/state/brain/<vault-name>-<id>/index.db` (`$BRAIN_STATE_DIR` to move it). Vaults
+  get synced — by git, and just as often by iCloud, Dropbox or Obsidian Sync — and a live
+  SQLite database synced between two machines corrupts or forks into "index 2.db". So the
+  vault holds only markdown, and each machine builds its own index. Delete it and it
+  rebuilds.
 - Every command starts with a refresh: it `stat`s each note and compares modification
   time and size with the index. Only changed files are read; of those, only files whose
   **content hash** changed are re-parsed, so a `git checkout` that touches timestamps

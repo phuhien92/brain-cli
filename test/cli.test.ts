@@ -1,5 +1,6 @@
 // Runs the real executable, so the shebang, the JSON envelope and the exit
 // codes are what an agent actually gets.
+import "./isolate.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
