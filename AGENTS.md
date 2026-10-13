@@ -37,8 +37,12 @@ holds the rules an agent changing the code must not break.
 11. **`brain context` never fails.** It runs inside other tools' startup hooks: on any
    error it prints nothing and exits 0. The installer never edits a harness's settings
    file; it prints the snippet.
-12. **Nothing leaves the machine** except what `brain sync` pushes to the vault's own git
-   remote. No other network calls, no telemetry, no embeddings API.
+12. **Notes never leave the machine** except through the user's own `brain sync` to the
+   vault's remote. Two other things may: anonymous telemetry (on by default) whose fields are
+   exactly `Event` in `src/telemetry.ts` and docs/telemetry.md — adding a field means updating
+   both and the test that searches events for private strings; and feedback, only as a
+   redacted draft a person submits, or posted with their permission. Never in the foreground
+   of a command, never on stdout, never able to fail a command.
 
 ## Layout
 

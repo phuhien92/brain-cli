@@ -1,0 +1,227 @@
+// Anonymous usage telemetry. On by default; off with any of:
+//   brain telemetry disable · BRAIN_TELEMETRY=0 · DO_NOT_TRACK=1 ·
+//   "telemetry": false in ~/.config/brain/config.json
+//
+// What an event holds is fixed by `Event` below and nothing else: the command
+// name, its outcome, coarse buckets, versions, and a random install id. Never
+// a path, a query, a note title, note content, a vault or machine name, or an
+// environment variable. `brain telemetry show` prints the queue verbatim.
+//
+// Sending never touches a command's latency or result: events are appended to
+// a local queue, and at most once a day a detached background process posts
+// them. No collector configured (BRAIN_TELEMETRY_URL) → nothing is sent and
+// the queue stays capped on this machine.
+
+import { randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { homedir, platform, arch } from "node:os";
+import { join } from "node:path";
+
+export const TELEMETRY_SCHEMA = "brain.telemetry.v1";
+const QUEUE_CAP = 500; // events kept while unsent; oldest dropped first
+const FLUSH_EVERY_MS = 24 * 60 * 60 * 1000;
+
+export interface Event {
+  schema: typeof TELEMETRY_SCHEMA;
+  install: string; // random UUID, created on first run, rotatable with `telemetry reset`
+  day: string; // YYYY-MM-DD only; no time of day
+  command: string; // e.g. "search", "log.add"; never arguments
+  exit: number;
+  error: string | null; // error code such as "not_found"; never the message
+  ms: "<100" | "<500" | "<2000" | ">=2000";
+  notes: "0" | "<100" | "<1k" | "<10k" | "<100k" | ">=100k" | null;
+  sync: string | null; // "git" | "none" | "command" | "auto"
+  integrations: number | null;
+  scoped: boolean; // BRAIN_AS was set (not which one)
+  json: boolean;
+  version: string;
+  node: string; // major version
+  os: string; // platform-arch
+}
+
+export interface Context {
+  notes?: number;
+  sync?: string;
+  integrations?: number;
+  scoped?: boolean;
+}
+
+export function stateRoot(): string {
+  return process.env.BRAIN_STATE_DIR || join(homedir(), ".local", "state", "brain");
+}
+
+const file = (name: string) => join(stateRoot(), name);
+
+interface Settings {
+  install: string;
+  enabled: boolean | null; // null = default (on)
+  notified: boolean;
+  lastFlush: number;
+}
+
+function readSettings(): Settings {
+  try {
+    const s = JSON.parse(readFileSync(file("telemetry.json"), "utf8")) as Partial<Settings>;
+    return {
+      install: typeof s.install === "string" ? s.install : randomUUID(),
+      enabled: typeof s.enabled === "boolean" ? s.enabled : null,
+      notified: s.notified === true,
+      lastFlush: typeof s.lastFlush === "number" ? s.lastFlush : 0,
+    };
+  } catch {
+    return { install: randomUUID(), enabled: null, notified: false, lastFlush: 0 };
+  }
+}
+
+function writeSettings(s: Settings): void {
+  mkdirSync(stateRoot(), { recursive: true });
+  const tmp = file(`telemetry.json.${process.pid}`);
+  writeFileSync(tmp, JSON.stringify(s, null, 2) + "\n");
+  renameSync(tmp, file("telemetry.json"));
+}
+
+export interface Status {
+  enabled: boolean;
+  reason: string; // why it is on or off
+  collector: string | null;
+  queued: number;
+  install: string;
+}
+
+export function status(userConfigTelemetry?: unknown): Status {
+  const s = readSettings();
+  const env = (process.env.BRAIN_TELEMETRY ?? "").toLowerCase();
+  const collector = process.env.BRAIN_TELEMETRY_URL || null;
+  const queued = queue().length;
+  const off = (reason: string): Status => ({ enabled: false, reason, collector, queued, install: s.install });
+  if (["0", "false", "off", "no"].includes(env)) return off("BRAIN_TELEMETRY is off");
+  if (process.env.DO_NOT_TRACK && process.env.DO_NOT_TRACK !== "0") return off("DO_NOT_TRACK is set");
+  if (userConfigTelemetry === false) return off('"telemetry": false in the user config');
+  if (s.enabled === false) return off("disabled with brain telemetry disable");
+  return { enabled: true, reason: s.enabled === true ? "enabled" : "on by default", collector, queued, install: s.install };
+}
+
+export function setEnabled(enabled: boolean): void {
+  const s = readSettings();
+  s.enabled = enabled;
+  s.notified = true;
+  writeSettings(s);
+}
+
+export function resetInstallId(): string {
+  const s = readSettings();
+  s.install = randomUUID();
+  writeSettings(s);
+  return s.install;
+}
+
+export function queue(): Event[] {
+  try {
+    return readFileSync(file("telemetry-queue.jsonl"), "utf8")
+      .split("\n")
+      .filter(Boolean)
+      .map((l) => JSON.parse(l) as Event);
+  } catch {
+    return [];
+  }
+}
+
+export function clearQueue(): void {
+  writeFileSync(file("telemetry-queue.jsonl"), "");
+}
+
+function bucketMs(ms: number): Event["ms"] {
+  return ms < 100 ? "<100" : ms < 500 ? "<500" : ms < 2000 ? "<2000" : ">=2000";
+}
+
+function bucketNotes(n: number | undefined): Event["notes"] {
+  if (n === undefined) return null;
+  return n === 0 ? "0" : n < 100 ? "<100" : n < 1000 ? "<1k" : n < 10000 ? "<10k" : n < 100000 ? "<100k" : ">=100k";
+}
+
+export function buildEvent(
+  install: string,
+  r: { command: string; exit: number; error: string | null; ms: number; json: boolean; version: string },
+  ctx: Context,
+): Event {
+  return {
+    schema: TELEMETRY_SCHEMA,
+    install,
+    day: new Date().toISOString().slice(0, 10),
+    command: r.command.replace(/[^a-z.-]/g, "").slice(0, 32) || "unknown",
+    exit: r.exit,
+    error: r.error ? r.error.replace(/[^a-z_]/g, "").slice(0, 32) : null,
+    ms: bucketMs(r.ms),
+    notes: bucketNotes(ctx.notes),
+    sync: ctx.sync ?? null,
+    integrations: ctx.integrations ?? null,
+    scoped: ctx.scoped ?? false,
+    json: r.json,
+    version: r.version,
+    node: process.versions.node.split(".")[0] ?? "?",
+    os: `${platform()}-${arch()}`,
+  };
+}
+
+// Called once per command, after it finished. Never throws, never blocks on
+// the network, never writes to stdout.
+export function record(
+  r: { command: string; exit: number; error: string | null; ms: number; json: boolean; version: string },
+  ctx: Context,
+  userConfigTelemetry: unknown,
+  binPath: string,
+): void {
+  try {
+    if (!status(userConfigTelemetry).enabled) return;
+    const s = readSettings();
+    if (!s.notified) {
+      process.stderr.write(
+        "brain collects anonymous usage data (command names, outcomes, versions; never paths, queries or note content).\n" +
+          "See exactly what is sent with `brain telemetry show`; turn it off with `brain telemetry disable` or DO_NOT_TRACK=1.\n",
+      );
+      s.notified = true;
+    }
+    mkdirSync(stateRoot(), { recursive: true });
+    appendFileSync(file("telemetry-queue.jsonl"), JSON.stringify(buildEvent(s.install, r, ctx)) + "\n");
+    const q = queue();
+    if (q.length > QUEUE_CAP) {
+      writeFileSync(file("telemetry-queue.jsonl"), q.slice(-QUEUE_CAP).map((e) => JSON.stringify(e)).join("\n") + "\n");
+    }
+    const due = Date.now() - s.lastFlush > FLUSH_EVERY_MS;
+    if (due && process.env.BRAIN_TELEMETRY_URL && existsSync(binPath)) {
+      s.lastFlush = Date.now();
+      const child = spawn(process.execPath, ["--no-warnings=ExperimentalWarning", binPath, "telemetry", "flush"], {
+        detached: true,
+        stdio: "ignore",
+        env: { ...process.env },
+      });
+      child.unref();
+    }
+    writeSettings(s);
+  } catch {
+    // Telemetry must never affect a command.
+  }
+}
+
+// Post the queue to the collector; on success, clear it. Runs in the detached
+// background process, or by hand.
+export async function flush(): Promise<{ sent: number; error: string | null }> {
+  const url = process.env.BRAIN_TELEMETRY_URL;
+  const events = queue();
+  if (!url) return { sent: 0, error: "no collector configured (BRAIN_TELEMETRY_URL)" };
+  if (!events.length) return { sent: 0, error: null };
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ schema: TELEMETRY_SCHEMA, events }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return { sent: 0, error: `collector answered ${res.status}` };
+    clearQueue();
+    return { sent: events.length, error: null };
+  } catch (err) {
+    return { sent: 0, error: (err as Error).message };
+  }
+}

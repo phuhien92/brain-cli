@@ -1,7 +1,24 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { ConfigError, inScope, loadConfig, readScope, slug, type Config } from "./config.js";
+import { ConfigError, inScope, loadConfig, readScope, slug, userSettings, type Config } from "./config.js";
+import {
+  createDraft,
+  diagnostics,
+  getDraft,
+  issueUrl,
+  KINDS,
+  lastError,
+  listDrafts,
+  markSubmitted,
+  postWithGh,
+  redactor,
+  repo,
+  saveLastError,
+  type Kind,
+} from "./feedback.js";
+import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
@@ -9,7 +26,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.7.1";
+export const VERSION = "0.8.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -76,6 +93,17 @@ COMMANDS
       --dry-run               Show what would be written
       --force                 Replace an existing file brain did not write
 
+  feedback "<what happened>"  Draft a bug report, idea or docs fix for brain, redacted on this
+      --kind bug|idea|docs    machine (vault path, note paths and titles, emails, numbers)
+      --from-last-error       Include the last command that failed here
+  feedback list|show <id>     Your drafts
+  feedback submit <id>        Print a pre-filled GitHub issue link for a person to submit;
+      --post                  post with the gh CLI instead — only with the user's permission:
+                              --user-approved, or "feedback": { "post": "allow" } in config
+  telemetry [status|show|enable|disable|reset]
+                              Anonymous usage data — on by default; show prints exactly what
+                              is queued; DO_NOT_TRACK=1 or BRAIN_TELEMETRY=0 also turn it off
+
   help                        Show this help
 
 GLOBAL FLAGS
@@ -118,7 +146,47 @@ interface Out {
   quiet: boolean;
 }
 
+// Telemetry records a command by a name from these lists only. Anything else
+// a user typed (a query, a note, feedback text) can never become a name.
+const COMMANDS = ["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const SUBCOMMANDS: Record<string, string[]> = {
+  log: ["add", "import"],
+  lifecycle: ["set", "review", "archive", "restore", "status"],
+  agent: ["install"],
+  feedback: ["list", "show", "submit", "add"],
+  telemetry: ["status", "show", "enable", "disable", "reset", "flush"],
+};
+
+export function telemetryName(command: string, sub: string | undefined): string {
+  if (!COMMANDS.includes(command)) return "unknown";
+  return sub && SUBCOMMANDS[command]?.includes(sub) ? `${command}.${sub}` : command;
+}
+
+const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
+
+// Filled in while a command runs, read once it finishes, for telemetry.
+let tCommand = "unknown";
+let tError: string | null = null;
+let tContext: telemetry.Context = {};
+
 export async function main(argv: string[]): Promise<number> {
+  const started = Date.now();
+  tCommand = "unknown";
+  tError = null;
+  tContext = {};
+  const exit = await run(argv);
+  if (tCommand !== "telemetry.flush") {
+    telemetry.record(
+      { command: tCommand, exit, error: tError, ms: Date.now() - started, json: argv.includes("--json"), version: VERSION },
+      tContext,
+      userSettings().telemetry,
+      BIN,
+    );
+  }
+  return exit;
+}
+
+async function run(argv: string[]): Promise<number> {
   let parsed;
   try {
     parsed = parseArgs({
@@ -153,6 +221,10 @@ export async function main(argv: string[]): Promise<number> {
         due: { type: "boolean", default: false },
         strict: { type: "boolean", default: false },
         "include-archived": { type: "boolean", default: false },
+        title: { type: "string" },
+        "from-last-error": { type: "boolean", default: false },
+        post: { type: "boolean", default: false },
+        "user-approved": { type: "boolean", default: false },
       },
     });
   } catch (err) {
@@ -163,6 +235,7 @@ export async function main(argv: string[]): Promise<number> {
   const { values: flags, positionals } = parsed;
   const out: Out = { json: flags.json ?? false, quiet: flags.quiet ?? false };
   const [command = "help", ...args] = positionals;
+  tCommand = telemetryName(command, args[0]);
 
   if (flags.version) {
     print(out, "version", { version: VERSION }, null, () => VERSION);
@@ -172,6 +245,50 @@ export async function main(argv: string[]): Promise<number> {
     if (out.json) print(out, "help", { usage: HELP }, null, () => "");
     else process.stdout.write(HELP);
     return 0;
+  }
+
+  if (command === "telemetry") {
+    try {
+      const [sub = "status"] = args;
+      const settings = userSettings();
+      if (sub === "flush") {
+        const r = await telemetry.flush();
+        print(out, "telemetry.flush", r, null, () => (r.error ? `not sent: ${r.error}` : `sent ${r.sent} event(s)`));
+        return 0;
+      }
+      if (sub === "enable" || sub === "disable") telemetry.setEnabled(sub === "enable");
+      if (sub === "reset") telemetry.resetInstallId();
+      if (!["status", "show", "enable", "disable", "reset"].includes(sub)) {
+        throw new CliError("usage", "usage: brain telemetry [status|show|enable|disable|reset]", 2);
+      }
+      const st = telemetry.status(settings.telemetry);
+      if (sub === "show") {
+        const events = telemetry.queue();
+        print(out, "telemetry.show", { ...st, events }, null, () =>
+          events.length ? events.map((e) => JSON.stringify(e)).join("\n") : "no events queued",
+        );
+        return 0;
+      }
+      print(out, `telemetry.${sub}`, st, null, () =>
+        [
+          `telemetry: ${st.enabled ? "on" : "off"} (${st.reason})`,
+          `collector: ${st.collector ?? "not configured — events stay on this machine"}`,
+          `queued: ${st.queued} event(s) · install id: ${st.install}`,
+          "what is collected: docs/telemetry.md · see it: brain telemetry show · stop: brain telemetry disable",
+        ].join("\n"),
+      );
+      return 0;
+    } catch (err) {
+      return fail(out, tCommand, err);
+    }
+  }
+
+  if (command === "feedback") {
+    try {
+      return await feedbackCommand(args, flags, out);
+    } catch (err) {
+      return fail(out, tCommand, err);
+    }
   }
 
   if (command === "agent") {
@@ -236,6 +353,12 @@ export async function main(argv: string[]): Promise<number> {
     };
     store = Store.open(vault, { rebuild: command === "index" && flags.rebuild });
     let index = store.refresh({ verify: command === "index" && flags.verify });
+    tContext = {
+      notes: store.count(),
+      sync: typeof cfg.sync === "object" ? "command" : cfg.sync,
+      integrations: Object.keys(cfg.integrations).length,
+      scoped: !!cfg.as,
+    };
 
     switch (command) {
       case "index": {
@@ -521,6 +644,119 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
+async function feedbackCommand(
+  args: string[],
+  flags: Record<string, unknown>,
+  out: Out,
+): Promise<number> {
+  const [sub, ...rest] = args;
+
+  if (sub === "list") {
+    const drafts = listDrafts();
+    print(out, "feedback.list", { drafts }, null, () =>
+      drafts.length
+        ? drafts.map((d) => `${d.id}  ${d.status.padEnd(9)} ${d.kind.padEnd(4)} ${d.title}`).join("\n")
+        : "no feedback drafts",
+    );
+    return 0;
+  }
+
+  if (sub === "show" || sub === "submit") {
+    const id = rest[0] ?? "";
+    const draft = getDraft(id);
+    if (!draft) throw new CliError("not_found", `no feedback draft '${id}' (brain feedback list)`, 3);
+    if (sub === "show") {
+      print(out, "feedback.show", { ...draft, url: draft.url ?? issueUrl(draft) }, null, () =>
+        `${draft.title}\n\n${draft.body}\n\n${Object.entries(draft.diagnostics).map(([k, v]) => `${k}: ${v}`).join("\n")}`,
+      );
+      return 0;
+    }
+    if (!flags.post) {
+      // The default: a person opens the page, reads it, and submits it.
+      const url = issueUrl(draft);
+      print(out, "feedback.submit", { id: draft.id, posted: false, url }, null, () =>
+        `Open this link, review the report, and click "Submit new issue":\n${url}`,
+      );
+      return 0;
+    }
+    // Posting without a person in the loop needs their say-so: either they
+    // allowed it on this machine, or they asked for this report to be posted.
+    const allowed = userSettings().feedbackPost === "allow";
+    if (!allowed && !flags["user-approved"]) {
+      throw new CliError(
+        "not_permitted",
+        'posting needs the user\'s permission: they asked for it (--user-approved) or allowed it ("feedback": { "post": "allow" } in ~/.config/brain/config.json)',
+        6,
+      );
+    }
+    let posted: string;
+    try {
+      posted = postWithGh(draft);
+    } catch (err) {
+      throw new CliError("post_failed", `gh issue create failed (${(err as Error).message.split("\n")[0]}); submit by link instead: brain feedback submit ${draft.id}`, 1);
+    }
+    const done = markSubmitted(draft, posted);
+    print(out, "feedback.submit", { id: done.id, posted: true, url: posted }, null, () => posted);
+    return 0;
+  }
+
+  // Create a draft: brain feedback "<what happened>" [--kind] [--title] [--from-last-error]
+  const text = (sub === "add" ? rest : args).join(" ").trim();
+  const last = flags["from-last-error"] ? lastError() : null;
+  if (flags["from-last-error"] && !last) throw new CliError("not_found", "no recorded error on this machine", 3);
+  if (!text && !last) {
+    throw new CliError("usage", 'usage: brain feedback "<what happened>" [--kind bug|idea|docs] [--title …] [--from-last-error]', 2);
+  }
+  const kind = (flags.kind as string | undefined) ?? "bug";
+  if (!(KINDS as readonly string[]).includes(kind)) throw new CliError("usage", `--kind must be one of: ${KINDS.join(", ")}`, 2);
+
+  // Redact against this vault when there is one: its path and every note's
+  // path and title become placeholders.
+  let vault: string | null = null;
+  let notes: { path: string; title: string }[] = [];
+  let s: Store | null = null;
+  try {
+    vault = findVault(flags.vault as string | undefined);
+    s = Store.open(vault);
+    s.refresh();
+    notes = s.db.prepare("SELECT path, title FROM notes").all() as { path: string; title: string }[];
+  } catch {
+    vault = null;
+  } finally {
+    s?.close();
+  }
+  const redact = redactor({ vault, notes });
+  const body = [
+    text || "(no description)",
+    ...(last
+      ? ["", "### What failed", "", "```", `brain ${last.args.join(" ")}`, `exit ${last.exit} · ${last.code}`, last.message, "```"]
+      : []),
+  ].join("\n");
+  const title = (flags.title as string | undefined)?.trim() || (last ? `${last.command}: ${last.code}` : text.split("\n")[0]!.slice(0, 80));
+  const draft = createDraft(
+    {
+      kind: kind as Kind,
+      title,
+      body,
+      diagnostics: diagnostics(VERSION, last ? { command: last.command, error: last.code, exit: String(last.exit) } : {}),
+      fingerprintSeed: last ? `${last.command}|${last.code}|${VERSION}` : `${kind}|${title.toLowerCase()}`,
+    },
+    redact,
+  );
+  print(out, "feedback.add", { draft, repo: repo() }, null, () =>
+    [
+      `drafted ${draft.id} (${draft.kind}) — redacted preview:`,
+      "",
+      `  ${draft.title}`,
+      ...draft.body.split("\n").map((l) => `  ${l}`),
+      "",
+      `review: brain feedback show ${draft.id}`,
+      `submit: brain feedback submit ${draft.id}   (prints a link for a person to submit)`,
+    ].join("\n"),
+  );
+  return 0;
+}
+
 function brief(st: LifecycleState | undefined) {
   if (!st) return null;
   return { category: st.category, asOf: st.asOf, reviewed: st.reviewed, due: st.due, overdue: st.overdue, archived: st.archived, reason: st.reason };
@@ -666,6 +902,18 @@ function fail(out: Out, command: string, err: unknown): number {
           : err instanceof OfflineNoteError
             ? new CliError("offline", err.message, 1)
           : new CliError("internal", err instanceof Error ? err.message : String(err), 1);
+  tError = e.code;
+  if (command !== "feedback" && !command.startsWith("feedback.")) {
+    saveLastError({
+      time: new Date().toISOString(),
+      command,
+      args: process.argv.slice(2),
+      code: e.code,
+      exit: e.exit,
+      message: e.message,
+      version: VERSION,
+    });
+  }
   if (out.json) {
     const envelope = {
       schema: SCHEMA,

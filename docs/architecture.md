@@ -108,11 +108,15 @@ sequenceDiagram
 | [`src/lint.ts`](../src/lint.ts) | Read-only health rules |
 | [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log, pull --rebase, push), none, command |
 | [`src/agent.ts`](../src/agent.ts) | Session primer (`brain context`) and per-harness install |
+| [`src/telemetry.ts`](../src/telemetry.ts) | Anonymous usage events: fixed fields, local queue, daily background send |
+| [`src/feedback.ts`](../src/feedback.ts) | Feedback drafts, redaction, issue links, permission-gated posting |
 | [`src/cli.ts`](../src/cli.ts) | Arguments, vault discovery, permission checks, output, exit codes |
 
 Zero runtime dependencies: `node:sqlite` (FTS5 with Porter stemming), `node:util`
 `parseArgs`, `node:crypto`. That is why `npm install -g` never compiles anything and why
-brain can run inside an agent's sandbox without network access.
+brain runs inside an agent's sandbox without network access: the only network use, the
+daily telemetry send ([telemetry.md](telemetry.md)), happens in a detached background
+process and its failure is invisible to commands.
 
 ## Guarantees and how they are held
 

@@ -58,6 +58,20 @@ When the user confirms a time-bound note is still true, record it:
 `brain log 10` shows recent entries; `brain sync` shares them with the user's other
 machines (commit, pull, push). Run `brain sync` only if the user's setup says to.
 
+## Report problems with brain
+
+When brain itself misbehaves — an `internal` error, a result that contradicts these
+instructions or its docs, a feature you needed more than once — draft a report:
+
+```sh
+brain feedback "<what you expected and what happened>" --kind bug --from-last-error
+```
+
+Use `--kind idea` or `--kind docs` as fits. Show the user the redacted draft
+(`brain feedback show <id>`) and the link from `brain feedback submit <id>`. **Post it
+yourself (`--post --user-approved`) only if the user asked you to**; never post on your own
+initiative. Never put note content in a report.
+
 ## Rules
 
 - The vault is personal. Do not copy its contents into anything that leaves the machine

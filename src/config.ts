@@ -182,6 +182,28 @@ function folderPrefix(p: string): string {
   return clean + "/";
 }
 
+// Machine-level preferences that apply with or without a vault (telemetry,
+// feedback). Read on their own so `brain telemetry` works anywhere.
+export interface UserSettings {
+  telemetry: boolean | null; // null = default
+  feedbackPost: "ask" | "allow"; // may agents post issues without being asked each time
+}
+
+export function userSettings(): UserSettings {
+  const path = process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
+  let cfg: Record<string, unknown> = {};
+  try {
+    cfg = readJson(path) ?? {};
+  } catch {
+    cfg = {};
+  }
+  const post = objectAt(cfg, "feedback").post;
+  return {
+    telemetry: typeof cfg.telemetry === "boolean" ? cfg.telemetry : null,
+    feedbackPost: post === "allow" ? "allow" : "ask",
+  };
+}
+
 export function slug(s: string): string {
   return s
     .normalize("NFKD")
