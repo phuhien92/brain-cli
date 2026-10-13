@@ -81,7 +81,7 @@ arguments. It sets:
 | Variable | Value |
 | --- | --- |
 | `BRAIN_VAULT` | real path of the current vault |
-| `BRAIN_BIN` | the exact brain launcher that started the extension |
+| `BRAIN_BIN` | an invocation-specific brain launcher carrying the extension's scope |
 | `BRAIN_AS` | extension name, or the existing integration name when already scoped |
 | `BRAIN_EXT_DIR` | this extension's installed directory |
 | `BRAIN_MACHINE` | current machine name |
@@ -89,7 +89,8 @@ arguments. It sets:
 | `BRAIN_EXTENSION_ARGS_JSON` | Windows `.cmd` launchers only: the command arguments as a JSON string list |
 
 Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
-the manifest scope. If the original command was already under `BRAIN_AS`, brain uses the
+the manifest scope; the launcher restores its trusted scope and redaction context before dispatch.
+If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
 narrow a caller but cannot widen it. Extension children may call only `search`, `get`, read-only
 `log`, `log add`, `view`, and `lifecycle status` (plus `help` and `--version`); `log import`, `context`,

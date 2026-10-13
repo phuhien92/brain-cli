@@ -48,7 +48,7 @@ brain ext install https://github.com/someone/brain-granola.git  # clones and sho
 brain granola import --since 2026-10-01            # runs the extension's executable
 ```
 
-The executable gets `BRAIN_VAULT`, `BRAIN_BIN` (the brain that launched it),
+The executable gets `BRAIN_VAULT`, `BRAIN_BIN` (an invocation-specific scoped brain launcher),
 `BRAIN_AS=<extension name>` and `BRAIN_EXT_DIR`, and does its work by calling
 `brain … --json` itself. Because it runs **as its own integration**, everything it reads
 and writes goes through the scope its manifest declares.

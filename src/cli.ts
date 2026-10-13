@@ -1,10 +1,10 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { hostname } from "node:os";
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { hostname, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { ConfigError, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
 import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
@@ -1009,6 +1009,21 @@ interface ExtensionInvocation {
   as?: string;
 }
 
+function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; path: string } {
+  const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
+  const path = join(directory, "brain.mjs");
+  const values = { ...locked, BRAIN_BIN: path };
+  writeFileSync(path, `#!/usr/bin/env node
+const locked = ${JSON.stringify(values)};
+for (const [key, value] of Object.entries(locked)) {
+  if (value === null) delete process.env[key];
+  else process.env[key] = value;
+}
+await import(${JSON.stringify(pathToFileURL(BIN).href)});
+`, { mode: 0o700 });
+  return { directory, path };
+}
+
 function commandPosition(argv: string[]): number {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
@@ -1070,16 +1085,29 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   }
   if (!installed) throw new CliError("not_found", `extension '${name}' is not installed on this machine`, 3);
   const launcher = resolveLauncher(installed.directory, installed.manifest);
+  const redactToken = randomUUID();
+  const childRunner = extensionBrainRunner({
+    BRAIN_VAULT: vault,
+    BRAIN_CONFIG: process.env.BRAIN_CONFIG ?? null,
+    BRAIN_STATE_DIR: process.env.BRAIN_STATE_DIR ?? null,
+    BRAIN_EXTENSIONS_DIR: dirname(installed.directory),
+    BRAIN_AS: parentAs || installed.manifest.name,
+    BRAIN_MACHINE: cfg.machine,
+    BRAIN_EXTENSION_SCOPE: installed.manifest.name,
+    BRAIN_EXTENSION_PARENT_AS: parentAs || null,
+    BRAIN_EXT_REDACT: "1",
+    BRAIN_EXT_REDACT_TOKEN: redactToken,
+  });
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     BRAIN_VAULT: vault,
-    BRAIN_BIN: BIN,
+    BRAIN_BIN: childRunner.path,
     BRAIN_AS: parentAs || installed.manifest.name,
     BRAIN_EXT_DIR: installed.directory,
     BRAIN_MACHINE: cfg.machine,
     BRAIN_EXTENSION_SCOPE: installed.manifest.name,
     BRAIN_EXT_REDACT: "1",
-    BRAIN_EXT_REDACT_TOKEN: randomUUID(),
+    BRAIN_EXT_REDACT_TOKEN: redactToken,
   };
   if (parentAs) env.BRAIN_EXTENSION_PARENT_AS = parentAs;
   else delete env.BRAIN_EXTENSION_PARENT_AS;
@@ -1145,7 +1173,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
         ...(policyError ? { policyError } : {}),
       });
     });
-  });
+  }).finally(() => rmSync(childRunner.directory, { recursive: true, force: true }));
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.policyError) throw result.policyError;
   if (result.error) throw new ExtensionError("extension_failed", `${name} could not start: ${result.error.message}`);
