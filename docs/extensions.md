@@ -118,7 +118,7 @@ the extension name (`source` for direct calls). The hash selects one machine-ind
 machines merge as the same file, while different content for one source ID produces a sync conflict
 instead of a second source record.
 
-The process must write exactly one JSON line to stdout using the existing envelope:
+The process must write exactly one non-empty JSON line to stdout using the existing envelope:
 
 ```json
 {"schema":"brain.v1","command":"example.import","ok":true,"data":{"added":2}}

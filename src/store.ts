@@ -78,7 +78,11 @@ export class Store {
     const dir = indexDir(vault, opts.stateDir);
     mkdirSync(dir, { recursive: true });
     const db = new DatabaseSync(join(dir, "index.db"));
-    db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+    // Separate brain processes can refresh the same per-machine cache at the
+    // same time (for example, two idempotent extension imports). Wait briefly
+    // for the other writer instead of surfacing SQLite's transient lock as a
+    // product failure.
+    db.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
     const store = new Store(vault, db);
     store.migrate(opts.rebuild ?? false);
     return store;
@@ -151,7 +155,11 @@ export class Store {
     const seen = new Set<string>();
     const touchStat = this.db.prepare("UPDATE notes SET mtime = ?, size = ? WHERE path = ?");
 
-    this.db.exec("BEGIN");
+    // Take the writer reservation before reading the cache snapshot. With a
+    // deferred transaction, another process can commit after our reads and
+    // SQLite cannot upgrade this stale snapshot to a writer even when a busy
+    // timeout is configured.
+    this.db.exec("BEGIN IMMEDIATE");
     try {
       for (const abs of walk(this.vault, offline)) {
         const rel = toPosix(relative(this.vault, abs));

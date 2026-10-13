@@ -10,7 +10,7 @@ three decisions:
 2. **brain never edits a note or source.** Its only writes into the vault are *new files*
    under `log/` and `sources/`, all created exclusively. That is what makes the vault safe
    to sync by any means — git, iCloud, Dropbox — between machines.
-3. **The JSON envelope is the API.** Agents, scripts and future extensions talk to brain
+3. **The JSON envelope is the API.** Agents, scripts and command extensions talk to brain
    through `brain … --json` and exit codes, never through its internals.
 
 ## The big picture
@@ -98,6 +98,7 @@ sequenceDiagram
 | Vault config: integrations, sync mode, lifecycle windows, lint limits | `<vault>/brain.json` | yes | the same on every machine |
 | The index | `~/.local/state/brain/<vault>-<id>/index.db` | **never** | a live SQLite database corrupts when a sync service copies it; each machine builds its own |
 | Machine config: machine name, view paths, sync override | `~/.config/brain/config.json` | **never** | it names paths that exist only on this machine |
+| Installed command extensions | `~/.local/share/brain/extensions` | **never** | executable code is approved and installed separately on each machine |
 | Exported views (e.g. firstmate's `learnings.md`) | wherever the tool expects them | no | generated from the log; regular files, never symlinks |
 
 ## The code
@@ -116,13 +117,13 @@ sequenceDiagram
 | [`src/agent.ts`](../src/agent.ts) | Session primer (`brain context`) and per-harness install |
 | [`src/telemetry.ts`](../src/telemetry.ts) | Anonymous usage events: fixed fields, local queue, daily background send |
 | [`src/feedback.ts`](../src/feedback.ts) | Feedback drafts, redaction, issue links, permission-gated posting |
+| [`src/extensions.ts`](../src/extensions.ts) | Command-extension manifests, installation, enablement and launchers |
 | [`src/cli.ts`](../src/cli.ts) | Arguments, vault discovery, permission checks, output, exit codes |
 
 Zero runtime dependencies: `node:sqlite` (FTS5 with Porter stemming), `node:util`
-`parseArgs`, `node:crypto`. That is why `npm install -g` never compiles anything and why
-brain runs inside an agent's sandbox without network access: the only network use, the
-daily telemetry send when a person has opted in ([telemetry.md](telemetry.md)), happens in a detached background
-process and its failure is invisible to commands.
+`parseArgs`, `node:crypto`. That is why `npm install -g` never compiles anything. brain's own
+HTTP use is limited to opted-in telemetry ([telemetry.md](telemetry.md)); Git-backed sync and Git
+extension installation invoke Git, and installed extension processes may use their declared hosts.
 
 ## Guarantees and how they are held
 
@@ -141,5 +142,6 @@ still read files directly. See [integrations.md](integrations.md#what-a-scope-is
 ## Extension points
 
 Today: integrations (configuration, [integrations.md](integrations.md)), sync commands,
-lint limits, lifecycle windows. Next: process extensions — commands and event hooks in any
-language, speaking the same JSON contract ([design/extensions.md](design/extensions.md)).
+lint limits, lifecycle windows and process-isolated command extensions in any language
+([extensions.md](extensions.md)). Event hooks remain proposed
+([design/extensions.md](design/extensions.md)).
