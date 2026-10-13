@@ -67,6 +67,7 @@ export class ExtensionError extends Error {
 const MANIFEST = "brain-extension.json";
 const METADATA = ".brain-install.json";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
+const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const RESERVED = new Set([
   "setup", "index", "search", "get", "log", "view", "export", "sync", "lifecycle", "lint",
   "integrations", "doctor", "path", "context", "agent", "feedback", "telemetry", "ext", "help",
@@ -107,7 +108,7 @@ export function readManifest(directory: string): ExtensionManifest {
     throw new ExtensionError("invalid_manifest", `${path}: name must be lowercase letters, digits and dashes`, 2);
   }
   const version = typeof o.version === "string" ? o.version.trim() : "";
-  if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(version)) {
+  if (!SEMVER.test(version)) {
     throw new ExtensionError("invalid_manifest", `${path}: version must be semver (for example 1.2.3)`, 2);
   }
   const command = typeof o.command === "string" ? o.command.replace(/\\/g, "/") : "";
@@ -260,7 +261,7 @@ function enable(vault: string, name: string): void {
 }
 
 function gitSource(source: string): string | null {
-  return /^(?:https?|ssh|git|file):\/\//.test(source) || /^[^@\s]+@[^:\s]+:.+/.test(source) ? source : null;
+  return /^(?:https?|ssh|git|file):\/\//i.test(source) || /^[^@\s]+@[^:\s]+:.+/.test(source) ? source : null;
 }
 
 export function publicExtensionSource(source: string): string {

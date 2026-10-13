@@ -190,16 +190,16 @@ test("install rejects terminal controls in permission text and unsupported sourc
   assert.equal(alias.code, 3, alias.stdout + alias.stderr);
   assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);
 
-  const credentialFailure = interactiveInstall(f, "http://user:secret-token@127.0.0.1:1/private.git?access_token=query-secret#fragment");
+  const credentialFailure = interactiveInstall(f, "HTTPS://user:secret-token@127.0.0.1:1/private.git?access_token=query-secret#fragment");
   assert.equal(credentialFailure.code, 1, credentialFailure.stdout + credentialFailure.stderr);
   assert.ok(!(credentialFailure.stdout + credentialFailure.stderr).includes("secret-token"));
   assert.ok(!(credentialFailure.stdout + credentialFailure.stderr).includes("query-secret"));
-  assert.match(credentialFailure.stdout + credentialFailure.stderr, /http:\/\/127\.0\.0\.1:1\/private\.git/);
+  assert.match(credentialFailure.stdout + credentialFailure.stderr, /https:\/\/127\.0\.0\.1:1\/private\.git/);
   const lastError = readFileSync(join(f.state, "last-error.json"), "utf8");
   assert.ok(!lastError.includes("secret-token"));
   assert.ok(!lastError.includes("query-secret"));
   assert.ok(!lastError.includes("fragment"));
-  assert.match(lastError, /http:\/\/127\.0\.0\.1:1\/private\.git/);
+  assert.match(lastError, /https:\/\/127\.0\.0\.1:1\/private\.git/);
 
   const linked = echoExtension(join(f.root, "linked-source"), "linked");
   const externalHelper = join(f.root, "external-helper.mjs");
@@ -209,6 +209,28 @@ test("install rejects terminal controls in permission text and unsupported sourc
   assert.equal(linkedInstall.code, 2, linkedInstall.stdout + linkedInstall.stderr);
   assert.match(linkedInstall.stdout + linkedInstall.stderr, /cannot be a symlink/);
   assert.equal(existsSync(join(f.extensions, "linked")), false);
+});
+
+test("extension manifest versions follow SemVer 2", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const valid = makeExtension(join(f.root, "valid-version"), {
+    name: "valid-version",
+    version: "1.2.3-alpha.1+build.5",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: [], network: [] },
+  }, `process.stdout.write(JSON.stringify({schema:"brain.v1",command:"valid-version",ok:true,data:{}})+"\\n")`);
+  assert.equal(interactiveInstall(f, valid).code, 0);
+  assert.equal(json(f, ["ext", "list"]).body.data.extensions[0].manifest.version, "1.2.3-alpha.1+build.5");
+
+  const invalid = makeExtension(join(f.root, "invalid-version"), {
+    name: "invalid-version",
+    version: "1.2.3-alpha.01",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: [], network: [] },
+  }, "");
+  const rejected = interactiveInstall(f, invalid);
+  assert.equal(rejected.code, 2, rejected.stdout + rejected.stderr);
+  assert.match(rejected.stdout + rejected.stderr, /version must be semver/);
 });
 
 test("git installation records its commit, remove is machine-local, and missing installs fail cleanly", { skip: process.platform === "win32" }, (t) => {
