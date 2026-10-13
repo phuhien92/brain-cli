@@ -72,12 +72,12 @@ COMMANDS
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
   log import <kind> <file>    Turn an existing memory file into entries, one per list item;
-                              titles already recorded are skipped; missing entries are listed
+                              text already recorded is skipped; missing entries are listed
                               as retirement candidates but never retired automatically
   log retire <entry-id>       Retire an entry with an immutable lifecycle event
       --reason <text>         Optional reason for the retirement
   log replace <entry-id>      Retire an entry and add its replacement in one command
-      --text <text>           Required replacement text
+      --text <text>           Complete replacement: first line is title, remainder is body
   view <kind>                 Print every active <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
@@ -552,7 +552,7 @@ async function run(argv: string[]): Promise<number> {
               summary,
               `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
               ...result.retirementCandidates.map((candidate) =>
-                `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}`,
+                `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`,
               ),
             ].join("\n");
           });
@@ -575,10 +575,11 @@ async function run(argv: string[]): Promise<number> {
           }
           const text = flags.text?.trim();
           if (!text) throw new CliError("usage", "replace needs --text <text>", 2);
+          const [title = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
           const replacement = addEntry(vault, cfg, {
             kind: target.kind,
-            title: text,
-            body: target.body,
+            title,
+            body: bodyLines.join("\n").trim(),
             tags: target.tags,
           });
           const event = recordRetirement(vault, cfg, target.path, {

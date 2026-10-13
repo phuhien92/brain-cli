@@ -36,6 +36,7 @@ export const LIFECYCLE_KIND = "lifecycle";
 export interface RetirementCandidate {
   path: string;
   title: string;
+  body: string;
 }
 
 export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
@@ -156,7 +157,7 @@ export function renderView(entries: Entry[], header?: string): string {
   // write a sync could fight over); the view shows the oldest once.
   const seen = new Set<string>();
   const unique = sorted.filter((e) => {
-    const key = norm(e.title) + "\n" + norm(e.body);
+    const key = entryKey(e);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -208,9 +209,9 @@ export function exportView(store: Store, cfg: Config, target: ExportTarget, forc
 // Split an existing memory file into entries: one per top-level list item
 // (with its indented continuation lines), one per free-standing paragraph.
 // Headings become tags. HTML comments — stow's tier markers and file
-// pointers — are dropped from titles. Entries whose title already exists for
-// this kind are skipped, so importing on a second machine does not duplicate
-// what the first already captured.
+// pointers — are dropped from titles. Entries whose title and body already
+// exist for this kind are skipped, so importing on a second machine does not
+// duplicate what the first already captured.
 export function parseImport(markdown: string): { title: string; body: string; tags: string[] }[] {
   const items: { title: string; body: string; tags: string[] }[] = [];
   let section: string | null = null;
@@ -263,25 +264,26 @@ export function importFile(
   const entryKind = slug(kind);
   const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
   const activeEntries = listEntries(store, cfg, { kind: entryKind });
-  // A retired title remains recorded: importing a stale generated file must
+  // A retired entry remains recorded: importing a stale generated file must
   // not silently recreate it as a new active entry.
-  const existing = new Set(allEntries.map((e) => norm(e.title)));
+  const existing = new Set(allEntries.map(entryKey));
   const added: string[] = [];
   let skipped = 0;
   // A millisecond apart and ending now, so the view (oldest first) keeps the
   // file's original order and nothing imported sorts after a later entry.
   const items = parseImport(source);
-  const imported = new Set(items.map((item) => norm(item.title)));
+  const imported = new Set(items.map(entryKey));
   const retirementCandidates = activeEntries
-    .filter((entry) => !imported.has(norm(entry.title)))
-    .map(({ path, title }) => ({ path, title }));
+    .filter((entry) => !imported.has(entryKey(entry)))
+    .map(({ path, title, body }) => ({ path, title, body }));
   const base = Date.now() - items.length;
   items.forEach((item, i) => {
-    if (existing.has(norm(item.title))) {
+    const key = entryKey(item);
+    if (existing.has(key)) {
       skipped++;
       return;
     }
-    existing.add(norm(item.title));
+    existing.add(key);
     added.push(addEntry(store.vault, cfg, { kind, ...item, created: new Date(base + i) }));
   });
   // What was just imported is now captured, so exporting over this file is no
@@ -296,6 +298,10 @@ function stripComments(s: string): string {
 
 function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function entryKey(entry: { title: string; body: string }): string {
+  return `${norm(entry.title)}\n${norm(entry.body)}`;
 }
 
 export function sha(s: string): string {

@@ -125,11 +125,14 @@ brain log retire log/learning/<entry-id>.md --reason "removed by /stow"
 brain export --force
 ```
 
-`import` never retires anything automatically. For a direct rewording that has not already
-been imported, replace the old entry in one command instead:
+`import` never retires anything automatically. If a title stays the same but its indented
+body changes, import adds the new text and lists the old entry as a candidate. For a direct
+rewording that has not already been imported, replace the old entry in one command instead;
+the first line is the new title and later lines are the new body:
 
 ```sh
-brain log replace log/learning/<entry-id>.md --text "the corrected learning"
+brain log replace log/learning/<entry-id>.md --text 'the corrected learning
+supporting detail'
 ```
 
 Both commands leave the original entry untouched and add lifecycle files under

@@ -101,14 +101,15 @@ test("log retire and replace append lifecycle events while views omit retired en
 
   const old = brain(["log", "add", "learning", "Needs rewording", "--body", "Preserved body", "--tag", "ops"]);
   const oldPath = old.body.data.path as string;
-  const replaced = brain(["log", "replace", oldPath, "--text", "Clear wording"]);
+  const replaced = brain(["log", "replace", oldPath, "--text", "Clear wording\nCorrected body"]);
   assert.equal(replaced.code, 0);
   assert.equal(replaced.body.data.target, oldPath);
   assert.match(replaced.body.data.replacement, /^log\/learning\//);
   assert.equal(readFileSync(join(vault, oldPath), "utf8").includes("Needs rewording"), true);
   const view = brain(["view", "learning"]).body.data.markdown as string;
   assert.doesNotMatch(view, /Old wording|Needs rewording/);
-  assert.match(view, /- Clear wording\n {2}Preserved body/);
+  assert.match(view, /- Clear wording\n {2}Corrected body/);
+  assert.doesNotMatch(view, /Preserved body/);
   const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
   assert.deepEqual(active.map((entry: { title: string }) => entry.title), ["Clear wording"]);
   assert.equal(readdirSync(join(vault, "log/lifecycle")).length, 2);
@@ -116,7 +117,7 @@ test("log retire and replace append lifecycle events while views omit retired en
 
 test("replace completes with quoted log paths", () => {
   write("brain.json", JSON.stringify({ log: { dir: 'memory/"quoted"' } }));
-  const original = brain(["log", "add", "learning", "Original wording"]);
+  const original = brain(["log", "add", "learning", "Original wording", "--body", "Stale body"]);
   const originalPath = original.body.data.path as string;
   assert.match(originalPath, /"quoted"/);
 
@@ -124,6 +125,7 @@ test("replace completes with quoted log paths", () => {
   assert.equal(replaced.code, 0);
   const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
   assert.deepEqual(active.map((entry: { title: string }) => entry.title), ["Replacement wording"]);
+  assert.equal(active[0].body, "");
   const event = brain(["get", replaced.body.data.event, "--meta"]).body.data.frontmatter;
   assert.equal(event.target, originalPath);
   assert.equal(event.replacement, replaced.body.data.replacement);
@@ -139,6 +141,23 @@ test("import does not claim an absent active entry was removed", () => {
   assert.match(result.stdout, /active logged entries are not present in this file/);
   assert.match(result.stdout, /path: "log\/learning\//);
   assert.doesNotMatch(result.stdout, /brain log retire|--reason|removed from imported file/);
+});
+
+test("import captures a body-only rewording and offers the old entry for retirement", () => {
+  const old = brain(["log", "add", "learning", "Deploy safely", "--body", "old detail"]);
+  const imported = join(vault, "learnings.md");
+  writeFileSync(imported, "- Deploy safely\n  new detail\n");
+
+  const result = brain(["log", "import", "learning", imported]);
+  assert.equal(result.code, 0);
+  assert.equal(result.body.data.added.length, 1);
+  assert.deepEqual(result.body.data.retirementCandidates, [{ path: old.body.data.path, title: "Deploy safely", body: "old detail" }]);
+  assert.match(brain(["view", "learning"]).body.data.markdown, /old detail[\s\S]*new detail/);
+
+  assert.equal(brain(["log", "retire", old.body.data.path]).code, 0);
+  const view = brain(["view", "learning"]).body.data.markdown;
+  assert.doesNotMatch(view, /old detail/);
+  assert.match(view, /new detail/);
 });
 
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {

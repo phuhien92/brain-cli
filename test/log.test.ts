@@ -117,7 +117,7 @@ test("import lists missing active entries as retirement candidates without retir
 
   writeFileSync(target, "- One\n");
   const result = importFile(store, c, "learning", target);
-  assert.deepEqual(result.retirementCandidates, [{ path: two, title: "Two" }]);
+  assert.deepEqual(result.retirementCandidates, [{ path: two, title: "Two", body: "" }]);
   store.refresh();
   assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path).sort(), [one, two].sort());
 

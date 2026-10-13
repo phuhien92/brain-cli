@@ -31,13 +31,14 @@ never edited by two machines either. Each entry records which machine wrote it.
   wrote it, it refuses, because those edits are not in any entry yet. Capture them with
   `brain log import`, then `brain export --force`.
 - **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
-  top-level list item, dropping HTML-comment markers from titles. Titles already recorded
-  are skipped, so importing on a second machine adds only what is new there. Active logged
-  entries missing from the file are listed as retirement candidates; import never retires
-  them automatically.
+  top-level list item, dropping HTML-comment markers from titles. Title-and-body text already
+  recorded is skipped, so importing on a second machine adds only what is new there. A body
+  change adds the new text and lists the old entry as a retirement candidate. Import never
+  retires entries automatically.
 - **`brain log retire <entry-id> [--reason …]`** records an immutable lifecycle event;
   views and exports omit the entry while its original file remains untouched.
-  **`brain log replace <entry-id> --text …`** adds corrected text and retires the old entry.
+  **`brain log replace <entry-id> --text …`** adds corrected text and retires the old entry;
+  the first line of `--text` is the new title and any remaining lines are its new body.
   Concurrent retirements create separate event files and do not conflict.
 
 Configuration is split by what may travel: `brain.json` in the vault (the same on every
