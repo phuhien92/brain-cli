@@ -33,7 +33,7 @@ test("the committed dist/src is exactly what src compiles to", () => {
   }
 });
 
-test("a clean package artifact globally installs without build tools and includes a runnable brain executable", () => {
+test("a global install from a git URL needs no build tools and yields a runnable brain executable", () => {
   const scratch = mkdtempSync(join(tmpdir(), "brain-git-install-"));
   const repo = join(scratch, "repo");
   const prefix = join(scratch, "prefix");
@@ -61,15 +61,12 @@ test("a clean package artifact globally installs without build tools and include
       npm_config_cache: join(scratch, "npm-cache"),
       npm_config_update_notifier: "false",
     };
-    const packed = spawnSync(process.execPath, [npmCli, "pack", "--json", "--pack-destination", scratch], {
-      cwd: repo,
-      encoding: "utf8",
-      env,
-    });
-    assert.equal(packed.status, 0, `${packed.stdout}\n${packed.stderr}`);
-    const [{ filename }] = JSON.parse(packed.stdout) as [{ filename: string }];
+    const git = (...args: string[]) => run("git", ["-c", "user.name=brain", "-c", "user.email=brain@example.invalid", ...args], repo);
+    git("init", "-q");
+    git("add", "-A");
+    git("commit", "-q", "-m", "snapshot");
 
-    const installed = spawnSync(process.execPath, [npmCli, "install", "--global", "--prefix", prefix, join(scratch, filename)], {
+    const installed = spawnSync(process.execPath, [npmCli, "install", "--global", "--prefix", prefix, `git+file://${repo}`], {
       cwd: scratch,
       encoding: "utf8",
       env,
