@@ -921,7 +921,7 @@ async function run(argv: string[]): Promise<number> {
 }
 
 async function extensionManagementCommand(args: string[], flags: Record<string, unknown>, out: Out): Promise<number> {
-  const [sub = "list", ...rest] = args;
+  const [sub, ...rest] = args;
   const vault = findVault(flags.vault as string | undefined);
 
   if (sub === "install") {

@@ -20,7 +20,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
-import { parseNote } from "./note.js";
+import { parseNote, type Frontmatter } from "./note.js";
 import { extensionsRoot } from "./paths.js";
 
 export interface ExtensionPermissions {
@@ -255,6 +255,16 @@ export function enabledExtensionNames(vault: string): string[] {
     .map((entry) => entry.name.slice(0, -3))
     .filter((name) => slug(name) === name && isEnablementMarker(join(directory, `${name}.md`), name))
     .sort();
+}
+
+export function isExtensionEnablementNote(vault: string, notePath: string, frontmatter: Frontmatter): boolean {
+  const directory = relative(vault, enablementDirectory(vault)).replace(/\\/g, "/");
+  const normalized = notePath.replace(/\\/g, "/");
+  if (!normalized.startsWith(`${directory}/`)) return false;
+  const file = normalized.slice(directory.length + 1);
+  if (file.includes("/") || !file.endsWith(".md")) return false;
+  const name = file.slice(0, -3);
+  return slug(name) === name && frontmatter.kind === "extension" && frontmatter.extension === name;
 }
 
 function isEnablementMarker(path: string, name: string): boolean {

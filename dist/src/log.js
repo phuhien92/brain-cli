@@ -8,23 +8,71 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { slug } from "./config.js";
+import { parseNote } from "./note.js";
 export const RETIRE_ACTION = "retire";
 export const LIFECYCLE_KIND = "lifecycle";
 export function addEntry(vault, cfg, input) {
+    const { dir, name, content } = prepareEntry(vault, cfg, input);
+    // 'wx' fails if the file exists, so a same-second, same-title entry gets a
+    // suffix instead of silently replacing the first.
+    for (let n = 1;; n++) {
+        const file = join(dir, n === 1 ? `${name}.md` : `${name}-${n}.md`);
+        try {
+            writeFileSync(file, content, { flag: "wx" });
+            return `${cfg.logDir}/${slug(input.kind)}/${file.slice(dir.length + 1)}`;
+        }
+        catch (err) {
+            if (err.code !== "EEXIST")
+                throw err;
+        }
+    }
+}
+export function addEntryOnce(store, cfg, input, sourceId, created, machine) {
+    if (!/^[0-9a-f]{64}$/.test(sourceId))
+        throw new Error("source ID must be a SHA-256 hash");
+    const kind = slug(input.kind);
+    const prefix = `${cfg.logDir}/${kind}/`.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
+    const indexed = store.db.prepare(`SELECT path, json_extract(frontmatter, '$.machine') AS machine FROM notes
+      WHERE path LIKE ? ESCAPE '\\'
+        AND json_extract(frontmatter, '$.kind') = ?
+        AND json_extract(frontmatter, '$.source-id') = ?
+      ORDER BY path LIMIT 1`).get(prefix, kind, sourceId);
+    if (indexed)
+        return { path: indexed.path, added: false, machine: indexed.machine };
+    const withSource = { ...input, fields: { ...input.fields, "source-id": sourceId } };
+    const { dir, content } = prepareEntry(store.vault, cfg, withSource, { created, machine });
+    const relativePath = `${cfg.logDir}/${kind}/source-${sourceId}.md`;
+    const file = join(dir, `source-${sourceId}.md`);
+    try {
+        writeFileSync(file, content, { flag: "wx" });
+        return { path: relativePath, added: true, machine };
+    }
+    catch (err) {
+        if (err.code !== "EEXIST")
+            throw err;
+        const existing = parseNote(relativePath, readFileSync(file, "utf8"));
+        if (existing.frontmatter.kind !== kind || existing.frontmatter["source-id"] !== sourceId) {
+            throw new Error(`source ID path '${relativePath}' is occupied by a different entry`);
+        }
+        return { path: relativePath, added: false, machine: String(existing.frontmatter.machine ?? "") };
+    }
+}
+function prepareEntry(vault, cfg, input, origin) {
     const kind = slug(input.kind);
     if (!kind)
         throw new Error("an entry needs a kind, e.g. 'learning'");
     const title = input.title.replace(/\s+/g, " ").trim();
     if (!title)
         throw new Error("an entry needs a title");
-    const created = input.created ?? new Date();
+    const created = origin?.created ?? input.created ?? new Date();
     const iso = created.toISOString(); // millisecond precision: the view's order is creation order
     const day = iso.slice(0, 10);
-    const name = `${day}-${cfg.machine}-${slug(title) || "entry"}`;
+    const machine = origin?.machine ?? cfg.machine;
+    const name = `${day}-${machine}-${slug(title) || "entry"}`;
     const dir = join(vault, ...cfg.logDir.split("/"), kind);
     mkdirSync(dir, { recursive: true });
     const tags = [...new Set((input.tags ?? []).map((t) => t.replace(/^#/, "").trim().toLowerCase()).filter(Boolean))];
-    const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${cfg.machine}`];
+    const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${JSON.stringify(machine)}`];
     if (tags.length)
         lines.push(`tags: [${tags.join(", ")}]`);
     for (const [key, value] of Object.entries(input.fields ?? {})) {
@@ -35,19 +83,7 @@ export function addEntry(vault, cfg, input) {
     lines.push("---", `# ${title}`, "");
     const body = (input.body ?? "").replace(/\r\n/g, "\n").trim();
     const content = lines.join("\n") + (body ? `\n${body}\n` : "");
-    // 'wx' fails if the file exists, so a same-second, same-title entry gets a
-    // suffix instead of silently replacing the first.
-    for (let n = 1;; n++) {
-        const file = join(dir, n === 1 ? `${name}.md` : `${name}-${n}.md`);
-        try {
-            writeFileSync(file, content, { flag: "wx" });
-            return `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`;
-        }
-        catch (err) {
-            if (err.code !== "EEXIST")
-                throw err;
-        }
-    }
+    return { dir, name, content };
 }
 export function listEntries(store, cfg, opts = {}) {
     const rows = store.db

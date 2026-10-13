@@ -16,9 +16,10 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote } from "./note.js";
+import { isExtensionEnablementNote } from "./extensions.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 // Folders that are never notes. Dot-folders (.git, .obsidian, .trash, .brain)
 // are skipped wholesale.
 const SKIP_DIRS = new Set(["node_modules"]);
@@ -33,7 +34,11 @@ export class Store {
         const dir = indexDir(vault, opts.stateDir);
         mkdirSync(dir, { recursive: true });
         const db = new DatabaseSync(join(dir, "index.db"));
-        db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+        // Separate brain processes can refresh the same per-machine cache at the
+        // same time (for example, two idempotent extension imports). Wait briefly
+        // for the other writer instead of surfacing SQLite's transient lock as a
+        // product failure.
+        db.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
         const store = new Store(vault, db);
         store.migrate(opts.rebuild ?? false);
         return store;
@@ -93,7 +98,11 @@ export class Store {
         }
         const seen = new Set();
         const touchStat = this.db.prepare("UPDATE notes SET mtime = ?, size = ? WHERE path = ?");
-        this.db.exec("BEGIN");
+        // Take the writer reservation before reading the cache snapshot. With a
+        // deferred transaction, another process can commit after our reads and
+        // SQLite cannot upgrade this stale snapshot to a writer even when a busy
+        // timeout is configured.
+        this.db.exec("BEGIN IMMEDIATE");
         try {
             for (const abs of walk(this.vault, offline)) {
                 const rel = toPosix(relative(this.vault, abs));
@@ -112,7 +121,12 @@ export class Store {
                     stats.unchanged++;
                     continue;
                 }
-                this.write(rel, content, hash, st.mtimeMs, st.size);
+                const indexed = this.write(rel, content, hash, st.mtimeMs, st.size);
+                if (!indexed) {
+                    if (prev)
+                        stats.removed++;
+                    continue;
+                }
                 if (prev)
                     stats.updated++;
                 else
@@ -150,6 +164,10 @@ export class Store {
     }
     write(path, content, hash, mtime, size) {
         const note = parseNote(path, content);
+        if (isExtensionEnablementNote(this.vault, path, note.frontmatter)) {
+            this.remove(path);
+            return false;
+        }
         this.remove(path);
         const { lastInsertRowid: id } = this.db
             .prepare(`INSERT INTO notes (path, mtime, size, hash, title, frontmatter, tags, aliases, headings)
@@ -161,6 +179,7 @@ export class Store {
         this.db
             .prepare("INSERT INTO notes_fts (rowid, title, aliases, headings, tags, body) VALUES (?, ?, ?, ?, ?, ?)")
             .run(id, note.title, note.aliases.join(" "), note.headings.join("\n"), note.tags.join(" "), note.body);
+        return true;
     }
     // Machine-local bookkeeping (e.g. the hash brain last exported to a path).
     // It lives in the cache on purpose: losing it only makes exports cautious.

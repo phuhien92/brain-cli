@@ -17,10 +17,11 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
+import { isExtensionEnablementNote } from "./extensions.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // Folders that are never notes. Dot-folders (.git, .obsidian, .trash, .brain)
 // are skipped wholesale.
@@ -178,7 +179,11 @@ export class Store {
           stats.unchanged++;
           continue;
         }
-        this.write(rel, content, hash, st.mtimeMs, st.size);
+        const indexed = this.write(rel, content, hash, st.mtimeMs, st.size);
+        if (!indexed) {
+          if (prev) stats.removed++;
+          continue;
+        }
         if (prev) stats.updated++;
         else stats.added++;
       }
@@ -212,8 +217,12 @@ export class Store {
     this.db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
   }
 
-  private write(path: string, content: string, hash: string, mtime: number, size: number): void {
+  private write(path: string, content: string, hash: string, mtime: number, size: number): boolean {
     const note = parseNote(path, content);
+    if (isExtensionEnablementNote(this.vault, path, note.frontmatter)) {
+      this.remove(path);
+      return false;
+    }
     this.remove(path);
     const { lastInsertRowid: id } = this.db
       .prepare(
@@ -236,6 +245,7 @@ export class Store {
     this.db
       .prepare("INSERT INTO notes_fts (rowid, title, aliases, headings, tags, body) VALUES (?, ?, ?, ?, ?, ?)")
       .run(id, note.title, note.aliases.join(" "), note.headings.join("\n"), note.tags.join(" "), note.body);
+    return true;
   }
 
   // Machine-local bookkeeping (e.g. the hash brain last exported to a path).

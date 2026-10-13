@@ -120,6 +120,18 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(readdirSync(f.vault).includes("brain.json"), false, "enabling an extension does not create mutable vault config");
   assert.match(readFileSync(join(f.vault, "log", "extensions", "echoer.md"), "utf8"), /extension: "echoer"/);
 
+  const bare = json(f, ["ext"]);
+  assert.equal(bare.code, 2);
+  assert.equal(bare.body.error.code, "usage");
+
+  const markerPath = "log/extensions/echoer.md";
+  assert.equal(json(f, ["search", "echoer"]).body.data.results.length, 0);
+  assert.equal(json(f, ["get", markerPath]).code, 3);
+  assert.equal(json(f, ["log", "10"]).body.data.entries.length, 0);
+  assert.equal(json(f, ["view", "extension"]).body.data.entries, 0);
+  assert.equal(json(f, ["log", "retire", markerPath]).code, 3);
+  assert.equal(json(f, ["log", "replace", markerPath, "--text", "replacement"]).code, 3);
+
   const listed = json(f, ["ext", "list"]);
   assert.equal(listed.code, 0);
   const record = listed.body.data.extensions[0];
@@ -161,6 +173,7 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(enabledAgain.code, 0, enabledAgain.stdout + enabledAgain.stderr);
   assert.equal(readFileSync(join(secondVault, "brain.json"), "utf8"), '{\n  "log": { "dir": "memory" }\n}\n');
   assert.match(readFileSync(join(secondVault, "memory", "extensions", "echoer.md"), "utf8"), /extension: "echoer"/);
+  assert.equal(json(second, ["search", "echoer"]).body.data.results.length, 0, "custom log directories hide enablement markers too");
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
   const collisionVault = join(f.root, "collision-vault");
@@ -170,6 +183,7 @@ test("install needs human permission approval and exposes the declared permissio
   const collisionContent = "---\nkind: observation\n---\n# Echoer notes\n";
   writeFileSync(collisionPath, collisionContent);
   const collision = { ...f, vault: collisionVault };
+  assert.equal(json(collision, ["get", "log/extensions/echoer.md"]).code, 0, "an unrelated note in the marker directory remains visible");
   assert.equal(json(collision, ["echoer"]).code, 3, "an unrelated slug-named note cannot enable an extension");
   const conflicted = interactiveInstall(collision, source);
   assert.equal(conflicted.code, 5, conflicted.stdout + conflicted.stderr);
