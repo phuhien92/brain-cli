@@ -17,7 +17,6 @@
   },
   "scripts": {
     "build": "tsc -p .",
-    "prepare": "tsc -p .",
     "test": "npm run build && node --no-warnings=ExperimentalWarning --test \"dist/test/*.test.js\"",
     "typecheck": "tsc -p . --noEmit"
   },

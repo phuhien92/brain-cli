@@ -1,0 +1,348 @@
+// The index: a SQLite file kept OUTSIDE the vault, one per vault, at
+// $BRAIN_STATE_DIR/<id>/index.db (default ~/.local/state/brain/<id>/), where
+// <id> is derived from the vault's real path. Outside, because vaults are
+// synced — by git, but also by iCloud, Dropbox or Obsidian Sync — and a live
+// SQLite database (with its -wal and -shm files) synced between two machines
+// corrupts, or comes back as "index 2.db". The index is per-machine by nature.
+//
+// Freshness model (borrowed from Serena): one full pass up front, then every
+// command calls refresh() first. refresh() stats every note and re-parses only
+// those whose (mtime, size) changed — and of those, only the ones whose content
+// hash changed. Deleted notes are dropped. There is no watcher and no daemon:
+// the index is never stale at the moment it is read, and costs a stat() per
+// note to keep that way.
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join, relative, sep } from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import { basename, parseNote } from "./note.js";
+import { stateRoot, vaultStateDir } from "./paths.js";
+const SCHEMA_VERSION = 1;
+// Folders that are never notes. Dot-folders (.git, .obsidian, .trash, .brain)
+// are skipped wholesale.
+const SKIP_DIRS = new Set(["node_modules"]);
+export class Store {
+    vault;
+    db;
+    constructor(vault, db) {
+        this.vault = vault;
+        this.db = db;
+    }
+    static open(vault, opts = {}) {
+        const dir = indexDir(vault, opts.stateDir);
+        mkdirSync(dir, { recursive: true });
+        const db = new DatabaseSync(join(dir, "index.db"));
+        db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;");
+        const store = new Store(vault, db);
+        store.migrate(opts.rebuild ?? false);
+        return store;
+    }
+    close() {
+        this.db.close();
+    }
+    migrate(rebuild) {
+        this.db.exec("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
+        const row = this.db.prepare("SELECT value FROM meta WHERE key = 'schema_version'").get();
+        if (!rebuild && row && Number(row.value) === SCHEMA_VERSION)
+            return;
+        // The index is a cache of the vault: on a version change or --rebuild it is
+        // dropped and recreated, never migrated.
+        this.db.exec(`
+      DROP TABLE IF EXISTS notes;
+      DROP TABLE IF EXISTS links;
+      DROP TABLE IF EXISTS notes_fts;
+      CREATE TABLE notes (
+        id          INTEGER PRIMARY KEY,
+        path        TEXT NOT NULL UNIQUE,
+        mtime       REAL NOT NULL,
+        size        INTEGER NOT NULL,
+        hash        TEXT NOT NULL,
+        title       TEXT NOT NULL,
+        frontmatter TEXT NOT NULL,
+        tags        TEXT NOT NULL,
+        aliases     TEXT NOT NULL,
+        headings    TEXT NOT NULL
+      );
+      CREATE TABLE links (
+        src     TEXT NOT NULL,
+        target  TEXT NOT NULL,
+        heading TEXT
+      );
+      CREATE INDEX links_src ON links(src);
+      CREATE INDEX links_target ON links(target COLLATE NOCASE);
+      CREATE VIRTUAL TABLE notes_fts USING fts5(
+        title, aliases, headings, tags, body,
+        tokenize = 'porter unicode61 remove_diacritics 2'
+      );
+    `);
+        this.db
+            .prepare("INSERT INTO meta(key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+            .run(String(SCHEMA_VERSION));
+    }
+    // verify: ignore the (mtime, size) shortcut and hash every note. For the
+    // rare edit that keeps both — a same-length change inside one timestamp
+    // tick, or a sync tool that restores mtimes — and for peace of mind.
+    refresh(opts = {}) {
+        const started = performance.now();
+        const stats = { added: 0, updated: 0, removed: 0, unchanged: 0, offline: 0, ms: 0 };
+        const offline = new Set();
+        const known = new Map();
+        for (const r of this.db.prepare("SELECT path, mtime, size, hash FROM notes").all()) {
+            known.set(r.path, { mtime: r.mtime, size: r.size, hash: r.hash });
+        }
+        const seen = new Set();
+        const touchStat = this.db.prepare("UPDATE notes SET mtime = ?, size = ? WHERE path = ?");
+        this.db.exec("BEGIN");
+        try {
+            for (const abs of walk(this.vault, offline)) {
+                const rel = toPosix(relative(this.vault, abs));
+                seen.add(rel);
+                const st = statSync(abs);
+                const prev = known.get(rel);
+                if (!opts.verify && prev && prev.mtime === st.mtimeMs && prev.size === st.size) {
+                    stats.unchanged++;
+                    continue;
+                }
+                const content = readFileSync(abs, "utf8");
+                const hash = createHash("sha256").update(content).digest("hex");
+                if (prev && prev.hash === hash) {
+                    // Touched but not edited (git checkout, sync tools): no re-parse.
+                    touchStat.run(st.mtimeMs, st.size, rel);
+                    stats.unchanged++;
+                    continue;
+                }
+                this.write(rel, content, hash, st.mtimeMs, st.size);
+                if (prev)
+                    stats.updated++;
+                else
+                    stats.added++;
+            }
+            for (const path of known.keys()) {
+                if (seen.has(path))
+                    continue;
+                // iCloud "Optimize Mac Storage" replaces a note with .Name.md.icloud
+                // until it is opened. The note still exists; keep what the index knew
+                // so search does not silently lose it.
+                if (offline.has(path))
+                    continue;
+                this.remove(path);
+                stats.removed++;
+            }
+            stats.offline = offline.size;
+            this.db.exec("COMMIT");
+        }
+        catch (err) {
+            this.db.exec("ROLLBACK");
+            throw err;
+        }
+        stats.ms = Math.round(performance.now() - started);
+        return stats;
+    }
+    remove(path) {
+        const row = this.db.prepare("SELECT id FROM notes WHERE path = ?").get(path);
+        if (!row)
+            return;
+        // notes_fts rows share the note's id as their rowid, so this is a keyed delete.
+        this.db.prepare("DELETE FROM notes_fts WHERE rowid = ?").run(row.id);
+        this.db.prepare("DELETE FROM links WHERE src = ?").run(path);
+        this.db.prepare("DELETE FROM notes WHERE id = ?").run(row.id);
+    }
+    write(path, content, hash, mtime, size) {
+        const note = parseNote(path, content);
+        this.remove(path);
+        const { lastInsertRowid: id } = this.db
+            .prepare(`INSERT INTO notes (path, mtime, size, hash, title, frontmatter, tags, aliases, headings)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+            .run(path, mtime, size, hash, note.title, JSON.stringify(note.frontmatter), JSON.stringify(note.tags), JSON.stringify(note.aliases), JSON.stringify(note.headings));
+        const insertLink = this.db.prepare("INSERT INTO links (src, target, heading) VALUES (?, ?, ?)");
+        for (const l of note.links)
+            insertLink.run(path, l.target, l.heading);
+        this.db
+            .prepare("INSERT INTO notes_fts (rowid, title, aliases, headings, tags, body) VALUES (?, ?, ?, ?, ?, ?)")
+            .run(id, note.title, note.aliases.join(" "), note.headings.join("\n"), note.tags.join(" "), note.body);
+    }
+    // Machine-local bookkeeping (e.g. the hash brain last exported to a path).
+    // It lives in the cache on purpose: losing it only makes exports cautious.
+    getMeta(key) {
+        const row = this.db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
+        return row?.value ?? null;
+    }
+    setMeta(key, value) {
+        this.db
+            .prepare("INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+            .run(key, value);
+    }
+    count() {
+        return this.db.prepare("SELECT count(*) AS n FROM notes").get().n;
+    }
+    search(query, opts = {}) {
+        const match = opts.raw ? query : toMatchExpression(query);
+        if (!match)
+            return [];
+        const limit = Math.max(1, Math.min(opts.limit ?? 10, 100));
+        const where = ["notes_fts MATCH ?"];
+        const params = [match];
+        if (opts.path) {
+            where.push("(n.path = ? OR n.path LIKE ? ESCAPE '\\')");
+            const prefix = toPosix(opts.path).replace(/^\.?\/+|\/+$/g, "");
+            params.push(prefix, escapeLike(prefix) + "/%");
+        }
+        if (opts.scope) {
+            // Out-of-scope notes are filtered in the query, not after it, so a
+            // restricted caller still gets `limit` results it is allowed to see.
+            if (!opts.scope.length)
+                return [];
+            where.push("(" + opts.scope.map(() => "n.path LIKE ? ESCAPE '\\'").join(" OR ") + ")");
+            for (const prefix of opts.scope)
+                params.push(escapeLike(prefix) + "%");
+        }
+        if (opts.exclude?.length) {
+            where.push(`n.path NOT IN (${opts.exclude.map(() => "?").join(", ")})`);
+            params.push(...opts.exclude);
+        }
+        if (opts.excludePrefix) {
+            where.push("n.path NOT LIKE ? ESCAPE '\\'");
+            params.push(escapeLike(opts.excludePrefix) + "%");
+        }
+        if (opts.tag) {
+            where.push("EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = ?)");
+            params.push(opts.tag.replace(/^#/, "").toLowerCase());
+        }
+        // Column weights: a hit in the title or an alias says far more about what a
+        // note is *about* than the same word in passing in its body.
+        const rows = this.db
+            .prepare(`SELECT n.path, n.title, n.tags,
+                bm25(notes_fts, 10.0, 8.0, 4.0, 4.0, 1.0) AS rank,
+                snippet(notes_fts, 4, '[', ']', '…', 16) AS snippet
+           FROM notes_fts JOIN notes n ON n.id = notes_fts.rowid
+          WHERE ${where.join(" AND ")}
+          ORDER BY rank, n.path
+          LIMIT ?`)
+            .all(...params, limit);
+        return rows.map((r) => ({
+            path: r.path,
+            title: r.title,
+            score: round(-r.rank),
+            snippet: r.snippet.replace(/\s+/g, " ").trim(),
+            tags: JSON.parse(r.tags),
+        }));
+    }
+    // Resolve a reference the way an Obsidian wiki-link does: exact path, path
+    // without extension, then note name / title / alias, case-insensitively.
+    resolve(ref) {
+        const clean = toPosix(ref.trim()).replace(/^\.\//, "");
+        const withExt = /\.md$/i.test(clean) ? clean : `${clean}.md`;
+        const exact = this.db
+            .prepare("SELECT path FROM notes WHERE path = ? COLLATE NOCASE OR path = ? COLLATE NOCASE")
+            .all(clean, withExt);
+        if (exact.length)
+            return exact.map((r) => r.path);
+        const name = basename(clean).toLowerCase();
+        const all = this.db.prepare("SELECT path, title, aliases FROM notes").all();
+        const byName = all.filter((r) => basename(r.path).toLowerCase() === name);
+        if (byName.length)
+            return byName.map((r) => r.path).sort();
+        return all
+            .filter((r) => r.title.toLowerCase() === name ||
+            JSON.parse(r.aliases).some((a) => a.toLowerCase() === name))
+            .map((r) => r.path)
+            .sort();
+    }
+    get(path) {
+        const r = this.db.prepare("SELECT * FROM notes WHERE path = ?").get(path);
+        if (!r)
+            return null;
+        const links = this.db.prepare("SELECT target, heading FROM links WHERE src = ?").all(path);
+        return {
+            path: r.path,
+            title: r.title,
+            frontmatter: JSON.parse(r.frontmatter),
+            tags: JSON.parse(r.tags),
+            aliases: JSON.parse(r.aliases),
+            headings: JSON.parse(r.headings),
+            links,
+            mtime: r.mtime,
+            content: readNote(this.vault, path),
+        };
+    }
+}
+export function indexDir(vault, stateDir) {
+    return vaultStateDir(vault, stateDir || stateRoot());
+}
+// Turn a natural-language query into an FTS5 expression. Terms are OR-ed and
+// left to bm25 to rank: an agent asks "interview prep for frontend roles", and
+// a note matching three of four words should still come back — first if it
+// matches the rare ones. Quoted phrases in the query are kept as phrases.
+const STOP = new Set("a an and are as at be but by for from has have how i in is it its me my of on or our so that the their this to was what when where which who why will with you your".split(" "));
+export function toMatchExpression(query) {
+    const parts = [];
+    const phraseRe = /"([^"]+)"/g;
+    for (const m of query.matchAll(phraseRe)) {
+        const words = tokens(m[1]);
+        if (words.length)
+            parts.push(`"${words.join(" ")}"`);
+    }
+    const rest = query.replace(phraseRe, " ");
+    const all = tokens(rest);
+    const content = all.filter((w) => !STOP.has(w));
+    // A query made only of stop words ("what is it") still searches for them.
+    for (const w of new Set(content.length ? content : all))
+        parts.push(`"${w}"`);
+    return parts.join(" OR ");
+}
+function tokens(s) {
+    return (s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 0);
+}
+// Yields every note. Records iCloud placeholders (".Name.md.icloud") in
+// `offline` as the vault-relative path of the note they stand in for.
+function* walk(dir, offline, root = dir) {
+    let entries;
+    try {
+        entries = readdirSync(dir, { withFileTypes: true });
+    }
+    catch {
+        return;
+    }
+    for (const e of entries) {
+        const placeholder = /^\.(.+\.md)\.icloud$/i.exec(e.name);
+        if (placeholder && e.isFile()) {
+            offline.add(toPosix(relative(root, join(dir, placeholder[1]))));
+            continue;
+        }
+        if (e.name.startsWith("."))
+            continue;
+        const full = join(dir, e.name);
+        if (e.isDirectory()) {
+            if (!SKIP_DIRS.has(e.name))
+                yield* walk(full, offline, root);
+        }
+        else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) {
+            yield full;
+        }
+    }
+}
+export class OfflineNoteError extends Error {
+}
+function readNote(vault, path) {
+    const abs = join(vault, ...path.split("/"));
+    try {
+        return readFileSync(abs, "utf8");
+    }
+    catch (err) {
+        const parts = path.split("/");
+        const name = parts.pop();
+        if (existsSync(join(vault, ...parts, `.${name}.icloud`))) {
+            throw new OfflineNoteError(`${path} is in iCloud but not downloaded on this machine; open it in Obsidian or run: brctl download "${abs}"`);
+        }
+        throw err;
+    }
+}
+function toPosix(p) {
+    return sep === "/" ? p : p.split(sep).join("/");
+}
+function escapeLike(s) {
+    return s.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+function round(n) {
+    return Math.round(n * 1000) / 1000;
+}
