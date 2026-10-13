@@ -645,6 +645,7 @@ async function run(argv: string[]): Promise<number> {
                       const safeUrl = (url.protocol === "https:" || url.protocol === "http:")
                         && !url.username && !url.password && !url.search && !url.hash && url.toString() === value;
                       if (!safeUrl) return all;
+                      if (redact(url.origin) !== url.origin) return "";
                       let decodedPath = "";
                       try {
                         decodedPath = decodeURIComponent(url.pathname);
@@ -1183,8 +1184,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     throw new ExtensionError("extension_protocol", `${name} returned an exit code that disagrees with its envelope`);
   }
   if (envelope!.ok === false) {
-    const error = envelope!.error as Record<string, unknown>;
-    tError = error.code as string;
+    tError = "extension_failed";
   }
   if (out.json || !out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
   return result.code ?? 1;

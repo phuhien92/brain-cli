@@ -311,6 +311,9 @@ else if (action === "flood") {
 } else if (action === "failure-with-data") {
   process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: false, data: {}, error: { code: "failed", message: "failed" } }) + "\\n");
   process.exitCode = 1;
+} else if (action === "private-error") {
+  process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: false, error: { code: "customer_acme_private", message: "local detail" } }) + "\\n");
+  process.exitCode = 1;
 } else process.stdout.write("not json\\nextra line\\n");`);
   assert.equal(interactiveInstall(f, brokenSource).code, 0);
 
@@ -352,6 +355,13 @@ else if (action === "flood") {
     assert.equal(ambiguous.code, 1);
     assert.equal(ambiguous.body.error.code, "extension_protocol");
   }
+
+  const privateError = json(f, ["broken", "private-error"], { BRAIN_TELEMETRY: "1" });
+  assert.equal(privateError.code, 1);
+  assert.equal(privateError.body.error.code, "customer_acme_private", "the local extension envelope stays unchanged");
+  const events = readFileSync(join(f.state, "telemetry-queue.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+  assert.equal(events.at(-1).error, "extension_failed");
+  assert.ok(!JSON.stringify(events).includes("customer_acme_private"));
 
   const hung = json(f, ["broken", "hang"]);
   assert.equal(hung.code, 1);
@@ -476,7 +486,8 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
 import { spawnSync } from "node:child_process";
 const encoded=Buffer.from("private@example.com").toString("base64url");
 const nestedUrl=Buffer.from("https://app.example/meetings/alice%2540example.com").toString("base64url");
-const body="<!-- brain-protected:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+encoded+" -->\\n<!-- brain-protected-url:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+nestedUrl+" -->";
+const unsafeOriginUrl=Buffer.from("https://tenant-99887766.example/meetings/public").toString("base64url");
+const body="<!-- brain-protected:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+encoded+" -->\\n<!-- brain-protected-url:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+nestedUrl+" -->\\n<!-- brain-protected-url:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+unsafeOriginUrl+" -->";
 const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add","event","redaction probe","--tag","private@example.com","--tag","1234567","--body","-","--json"],{env:process.env,encoding:"utf8",input:body});
 process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
 `);
@@ -486,6 +497,7 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
   const redactedNote = readFileSync(join(f.vault, ...redacted.body.data.path.split("/")), "utf8");
   assert.ok(!redactedNote.includes("private@example.com"), "extensions cannot protect arbitrary values from redaction");
   assert.ok(!redactedNote.includes("alice%2540example.com"), "nested URL encoding cannot bypass redaction");
+  assert.ok(!redactedNote.includes("tenant-"), "sensitive origins are omitted instead of partially redacted");
   assert.match(redactedNote, /https:\/\/app\.example\//);
   assert.match(redactedNote, /tags: \[<email>, <number>\]/);
 });

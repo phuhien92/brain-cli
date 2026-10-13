@@ -97,11 +97,11 @@ mutating lifecycle commands, machine administration,
 configuration, diagnostics, sync/export, feedback, telemetry, unrestricted index/lint data,
 path inspection, and other extensions are denied before dispatch. Inputs an extension sends through `brain log add` are run
 through core redaction before the new note is created. To retain a sanitized HTTP(S) source URL,
-remove credentials, query, and fragment, ensure its decoded path contains no redacted values or
-nested percent escapes, encode its
+remove credentials, query, and fragment, ensure its origin and decoded path contain no redacted values
+and its path contains no nested percent escapes, encode its
 canonical UTF-8 bytes as base64url, and place it inside
 `<!-- brain-protected-url:<BRAIN_EXT_REDACT_TOKEN>:<encoded-url> -->`. Core reduces a URL with a sensitive
-or malformed encoded path to its origin and rejects other protected values.
+or malformed encoded path to its origin, omits a URL with a sensitive origin, and rejects other protected values.
 Use `brain log add … --source-id <sha256> --source-created <canonical-ISO-timestamp>` for exact
 create-only source deduplication. The timestamp preserves source chronology, while provenance is
 the extension name (`source` for direct calls). The hash selects one machine-independent path: identical imports on separate
