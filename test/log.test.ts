@@ -15,6 +15,9 @@ const cfg = (machine = "mini", exports: Config["exports"] = []): Config => ({
   machine,
   exports,
   userConfigPath: "",
+  sync: "none",
+  integrations: {},
+  as: null,
 });
 
 beforeEach(() => {

@@ -22,24 +22,35 @@ instead of linking it.
 
 ## Prerequisites
 
-- Your vault is a git repository with a remote, cloned on both machines. (brain keeps its
-  index outside the vault, so there is nothing to add to `.gitignore`.)
+- Your vault reaches both machines somehow — git, iCloud, Dropbox, anything; set
+  `"sync"` in `brain.json` to match ([integrations.md](integrations.md#how-the-vault-reaches-other-machines)).
+  brain keeps its index outside the vault, so there is nothing to ignore.
 - `brain` installed on both machines (`npm install -g github:phuhien92/brain-cli`).
 
-## 1. Configure each machine
+## 1. Declare firstmate, then configure each machine
+
+In the vault's `brain.json` (it travels with the vault):
+
+```json
+{
+  "integrations": {
+    "firstmate": {
+      "read": ["firstmate/", "Build Ideas HQ/"],
+      "write": ["learning"],
+      "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } }
+    }
+  }
+}
+```
 
 `~/.config/brain/config.json` on the **Mac mini**:
 
 ```json
 {
   "machine": "mac-mini",
-  "exports": [
-    {
-      "kind": "learning",
-      "path": "~/firstmate/data/learnings.md",
-      "header": "<!-- memory tiers: see the stow skill -->"
-    }
-  ]
+  "integrations": {
+    "firstmate": { "views": { "learning": "~/firstmate/data/learnings.md" } }
+  }
 }
 ```
 
@@ -51,6 +62,13 @@ Point brain at the vault in your shell profile on both machines:
 ```sh
 export BRAIN_VAULT=~/vault
 ```
+
+Set `BRAIN_AS=firstmate` **only where firstmate's agents run** — the firstmate repo's
+`.claude/settings.json` (`{ "env": { "BRAIN_AS": "firstmate" } }`) or the environment it
+launches crewmates with. Never in your shell profile: that would scope every agent on the
+machine, including your own sessions over the whole vault.
+
+See [integrations.md](integrations.md) for what a scope does and does not protect.
 
 ## 2. Capture what each machine already knows
 

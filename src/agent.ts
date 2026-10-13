@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Config } from "./config.js";
+import { inScope, readScope, type Config } from "./config.js";
 import { listEntries } from "./log.js";
 import type { Store } from "./store.js";
 
@@ -23,7 +23,9 @@ export function context(store: Store, cfg: Config, limit = 5): string {
   // Over-fetch, then drop titles already shown: two machines may hold the same
   // learning as two entries (see renderView).
   const seen = new Set<string>();
+  const scope = readScope(cfg);
   const entries = listEntries(store, cfg, { limit: limit * 3 })
+    .filter((e) => inScope(e.path, scope))
     .filter((e) => {
       const key = e.kind + "\n" + e.title.toLowerCase().replace(/\s+/g, " ").trim();
       if (seen.has(key)) return false;
@@ -34,6 +36,9 @@ export function context(store: Store, cfg: Config, limit = 5): string {
   const lines = [
     "<brain>",
     `The user's notes and long-term memory are in a markdown vault (${store.count()} notes) searchable with the \`brain\` CLI.`,
+    ...(cfg.as
+      ? [`You are connected as the \`${cfg.as.name}\` integration: brain shows you ${cfg.as.read === null ? "the whole vault" : cfg.as.read.join(", ")}${cfg.as.write.length ? ` and lets you record ${cfg.as.write.join(", ")} entries` : ""}.`]
+      : []),
     'Before answering anything about their notes, decisions, preferences or past work, run `brain search "<question>" --json`',
     "and read the top results with `brain get <path> --json`; rephrase and search again before concluding something is not recorded.",
     'Record durable lessons with `brain log add learning "<one line>"`. See the `brain` skill for details.',

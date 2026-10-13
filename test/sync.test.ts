@@ -107,7 +107,7 @@ test("a note edited on both machines stops sync with exit 5 and names the file",
   assert.equal(git(laptop.vault, "status", "--porcelain"), "");
 });
 
-test("no git, or no upstream, are reported rather than failing silently", () => {
+test("no git means sync mode none unless git is asked for; no upstream is reported", () => {
   const solo = join(root, "solo");
   mkdirSync(join(solo, ".obsidian"), { recursive: true });
   const r = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, "sync", "--json"], {
@@ -115,8 +115,19 @@ test("no git, or no upstream, are reported rather than failing silently", () => 
     env: { ...process.env, BRAIN_VAULT: solo, BRAIN_CONFIG: join(root, "none.json"), BRAIN_MACHINE: "solo" },
     encoding: "utf8",
   });
-  assert.equal(r.status, 1);
-  assert.equal(JSON.parse(r.stdout).error.code, "not_git");
+  // "auto" (the default) on a folder without git means another service syncs it.
+  assert.equal(r.status, 0);
+  assert.equal(JSON.parse(r.stdout).data.mode, "none");
+  // Asking for git explicitly on a folder without git is an error.
+  writeFileSync(join(solo, "brain.json"), JSON.stringify({ sync: "git" }));
+  const forced = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, "sync", "--json"], {
+    cwd: solo,
+    env: { ...process.env, BRAIN_VAULT: solo, BRAIN_CONFIG: join(root, "none.json"), BRAIN_MACHINE: "solo" },
+    encoding: "utf8",
+  });
+  assert.equal(forced.status, 1);
+  assert.equal(JSON.parse(forced.stdout).error.code, "not_git");
+  rmSync(join(solo, "brain.json"));
 
   git(solo, "init", "-q", "-b", "main");
   git(solo, "config", "user.email", "t@example.com");

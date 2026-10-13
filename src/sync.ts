@@ -13,6 +13,7 @@ import { join } from "node:path";
 import type { Config } from "./config.js";
 
 export interface SyncResult {
+  mode: "git" | "none" | "command";
   committed: number; // files in the commit brain made, 0 if none
   pulled: number; // commits brought in by the pull
   pushed: boolean;
@@ -29,13 +30,45 @@ export class SyncError extends Error {
   }
 }
 
-export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}): SyncResult {
-  const git = (...args: string[]) => run(vault, args);
-
+export function isGitRepo(vault: string): boolean {
   try {
-    if (git("rev-parse", "--is-inside-work-tree") !== "true") throw new Error();
+    return run(vault, ["rev-parse", "--is-inside-work-tree"]) === "true";
   } catch {
-    throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote to sync`);
+    return false;
+  }
+}
+
+export function resolveSyncMode(vault: string, cfg: Config): "git" | "none" | "command" {
+  if (typeof cfg.sync === "object") return "command";
+  if (cfg.sync === "auto") return isGitRepo(vault) ? "git" : "none";
+  return cfg.sync;
+}
+
+export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}): SyncResult {
+  const mode = resolveSyncMode(vault, cfg);
+  if (mode === "none") {
+    // Something else (iCloud, Dropbox, Syncthing, Obsidian Sync) moves the
+    // files; one-file-per-entry is what keeps that conflict-free.
+    return { mode, committed: 0, pulled: 0, pushed: false, remote: false };
+  }
+  if (mode === "command") {
+    const command = (cfg.sync as { command: string }).command;
+    try {
+      execFileSync(process.platform === "win32" ? "cmd" : "sh", process.platform === "win32" ? ["/c", command] : ["-c", command], {
+        cwd: vault,
+        stdio: ["ignore", "pipe", "pipe"],
+        env: { ...process.env, BRAIN_VAULT: vault, BRAIN_LOG_DIR: cfg.logDir, BRAIN_MACHINE: cfg.machine },
+      });
+    } catch (err) {
+      const e = err as { stderr?: Buffer; message: string };
+      throw new SyncError("git_failed", `sync command failed: ${(e.stderr?.toString() || e.message).trim().split("\n").slice(-3).join(" ")}`);
+    }
+    return { mode, committed: 0, pulled: 0, pushed: false, remote: true };
+  }
+
+  const git = (...args: string[]) => run(vault, args);
+  if (!isGitRepo(vault)) {
+    throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote, or set "sync": "none" in brain.json`);
   }
 
   const owned = [cfg.logDir, "brain.json"].filter((p) => existsSync(join(vault, p)));
@@ -57,7 +90,7 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
   } catch {
     upstream = null;
   }
-  if (!upstream) return { committed, pulled: 0, pushed: false, remote: false };
+  if (!upstream) return { mode, committed, pulled: 0, pushed: false, remote: false };
 
   // Count what arrived by how far the upstream ref moved, not HEAD: a rebase
   // rewrites this machine's own commits, which are not "pulled".
@@ -94,7 +127,7 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
       }
     }
   }
-  return { committed, pulled, pushed, remote: true };
+  return { mode, committed, pulled, pushed, remote: true };
 }
 
 function run(cwd: string, args: string[]): string {

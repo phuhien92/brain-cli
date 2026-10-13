@@ -1,13 +1,13 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { ConfigError, loadConfig, slug, type Config } from "./config.js";
+import { ConfigError, inScope, loadConfig, readScope, slug, type Config } from "./config.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { addEntry, exportView, importFile, listEntries, renderView, type ExportResult } from "./log.js";
-import { Store, type RefreshStats } from "./store.js";
-import { sync, SyncError } from "./sync.js";
+import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
+import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.5.1";
+export const VERSION = "0.6.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -40,7 +40,15 @@ COMMANDS
   view <kind>                 Print every <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
-  sync [--no-push]            Commit new entries, pull --rebase, push, then export
+  sync [--no-push]            Bring other machines' changes in and send ours out, by the
+                              vault's sync mode (brain.json "sync"): git commits the log,
+                              pulls and pushes; none leaves it to iCloud/Dropbox/etc.;
+                              { "command": … } runs yours. Then refreshes and exports
+
+  integrations                List the repos/tools connected to this vault, what each may
+                              read and write, and their view paths on this machine
+  doctor                      Check this machine's setup: vault, index location, sync
+                              mode, iCloud placeholders, git inside a synced folder
 
   context [--limit n]         Print a short primer for an agent: what brain is, plus the n most
                               recent memory titles. Prints nothing (exit 0) without a vault,
@@ -54,6 +62,8 @@ COMMANDS
 GLOBAL FLAGS
   --vault <dir>               Vault root (default: $BRAIN_VAULT, else the nearest
                               parent folder holding .obsidian/ or brain.json)
+  --as <integration>          Act as a configured integration ($BRAIN_AS): search, get and
+                              log see only its folders; log add only its kinds
   --json                      Emit a versioned machine-readable envelope
   --quiet, -q                 Suppress successful human-readable output
   --version                   Print the version
@@ -70,6 +80,7 @@ CONFIG
 EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
   5 conflict: sync hit notes edited on two machines, or export found unrecorded edits
+  6 not permitted: outside the acting integration's scope
 `;
 
 class CliError extends Error {
@@ -114,6 +125,7 @@ export async function main(argv: string[]): Promise<number> {
         force: { type: "boolean", default: false },
         "no-push": { type: "boolean", default: false },
         "dry-run": { type: "boolean", default: false },
+        as: { type: "string" },
       },
     });
   } catch (err) {
@@ -171,7 +183,7 @@ export async function main(argv: string[]): Promise<number> {
     try {
       const limit = flags.limit === undefined ? 5 : Math.max(0, Math.min(Number(flags.limit) || 0, 50));
       const vault = findVault(flags.vault);
-      const cfg = loadConfig(vault);
+      const cfg = loadConfig(vault, { as: flags.as });
       ctxStore = Store.open(vault);
       const index = ctxStore.refresh();
       const text = context(ctxStore, cfg, limit);
@@ -186,11 +198,15 @@ export async function main(argv: string[]): Promise<number> {
 
   let store: Store | null = null;
   try {
-    if (!["index", "search", "get", "log", "view", "export", "sync"].includes(command)) {
+    if (!["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor"].includes(command)) {
       throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
     }
     const vault = findVault(flags.vault);
-    const cfg = loadConfig(vault);
+    const cfg = loadConfig(vault, { as: flags.as });
+    const scope = readScope(cfg);
+    const permit = (ok: boolean, what: string) => {
+      if (!ok) throw new CliError("not_permitted", `integration '${cfg.as!.name}' may not ${what}`, 6);
+    };
     store = Store.open(vault, { rebuild: command === "index" && flags.rebuild });
     let index = store.refresh();
 
@@ -210,7 +226,7 @@ export async function main(argv: string[]): Promise<number> {
         if (!Number.isInteger(limit) || limit < 1) throw new CliError("usage", "--limit must be a positive integer", 2);
         let hits;
         try {
-          hits = store.search(query, { limit, path: flags.path, tag: flags.tag?.[0], raw: flags.raw });
+          hits = store.search(query, { limit, path: flags.path, tag: flags.tag?.[0], raw: flags.raw, scope });
         } catch (err) {
           if (flags.raw) throw new CliError("bad_query", `invalid FTS5 query: ${(err as Error).message}`, 2);
           throw err;
@@ -228,7 +244,9 @@ export async function main(argv: string[]): Promise<number> {
       case "get": {
         const ref = args.join(" ").trim();
         if (!ref) throw new CliError("usage", "get needs a note: brain get <path|name|title>", 2);
-        const matches = store.resolve(ref);
+        // Out-of-scope notes are reported as not found, not as forbidden:
+        // a restricted caller should not learn what else the vault holds.
+        const matches = store.resolve(ref).filter((p) => inScope(p, scope));
         if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
         if (matches.length > 1) {
           throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, {
@@ -271,6 +289,7 @@ export async function main(argv: string[]): Promise<number> {
           const [kind = "", ...titleWords] = rest;
           const title = titleWords.join(" ").trim();
           if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t]', 2);
+          if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
           const body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           const path = addEntry(vault, cfg, { kind, title, body, tags: flags.tag });
           index = store.refresh();
@@ -280,6 +299,7 @@ export async function main(argv: string[]): Promise<number> {
         if (sub === "import") {
           const [kind = "", file = ""] = rest;
           if (!slug(kind) || !file) throw new CliError("usage", "usage: brain log import <kind> <file>", 2);
+          if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `import '${slug(kind)}' entries`);
           const abs = resolve(file);
           if (!existsSync(abs)) throw new CliError("not_found", `no file at ${abs}`, 3);
           const result = importFile(store, cfg, kind, abs);
@@ -294,7 +314,9 @@ export async function main(argv: string[]): Promise<number> {
         if (!Number.isInteger(n) || n < 1 || rest.length) {
           throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file>", 2);
         }
-        const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: n });
+        const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
+          .filter((e) => inScope(e.path, scope))
+          .slice(0, n);
         print(out, "log", { entries }, { vault, index }, () =>
           entries.length
             ? entries.map((e) => `${e.created.slice(0, 10)}  ${e.kind.padEnd(10)} ${e.machine.padEnd(12)} ${e.title}`).join("\n")
@@ -306,6 +328,7 @@ export async function main(argv: string[]): Promise<number> {
       case "view": {
         const kind = slug(args[0] ?? "");
         if (!kind) throw new CliError("usage", "usage: brain view <kind>", 2);
+        if (cfg.as) permit(inScope(`${cfg.logDir}/${kind}/`, scope), `read '${kind}' entries`);
         const entries = listEntries(store, cfg, { kind });
         const markdown = renderView(entries);
         print(out, command, { kind, entries: entries.length, markdown }, { vault, index }, () => markdown);
@@ -329,8 +352,12 @@ export async function main(argv: string[]): Promise<number> {
         const exports = runExports(store, cfg, false);
         print(out, command, { ...result, machine: cfg.machine, exports }, { vault, index }, () =>
           [
-            `${cfg.machine}: committed ${result.committed} · pulled ${result.pulled} · ` +
-              (result.remote ? (result.pushed ? "pushed" : "nothing to push") : "no upstream — local commit only"),
+            result.mode === "none"
+              ? `${cfg.machine}: sync mode "none" — files are moved by your sync service; index refreshed`
+              : result.mode === "command"
+                ? `${cfg.machine}: ran the configured sync command`
+                : `${cfg.machine}: committed ${result.committed} · pulled ${result.pulled} · ` +
+                  (result.remote ? (result.pushed ? "pushed" : "nothing to push") : "no upstream — local commit only"),
             formatExports(exports),
           ]
             .filter(Boolean)
@@ -342,6 +369,39 @@ export async function main(argv: string[]): Promise<number> {
         if (drift.length && !out.json) process.stderr.write(`brain: ${driftMessage(drift)}\n`);
         return 0;
       }
+
+      case "integrations": {
+        const list = Object.values(cfg.integrations).map((i) => ({
+          name: i.name,
+          read: i.read ?? ["*"],
+          write: i.write,
+          views: i.views.map((v) => ({ kind: v.kind, path: v.path })),
+          acting: cfg.as?.name === i.name,
+        }));
+        print(out, command, { integrations: list, as: cfg.as?.name ?? null }, { vault, index }, () =>
+          list.length
+            ? list
+                .map((i) =>
+                  [
+                    `${i.acting ? "* " : ""}${i.name}`,
+                    `    read:  ${i.read.join(", ") || "(only its own log)"}`,
+                    `    write: ${i.write.join(", ") || "(nothing)"}`,
+                    ...(i.views.length ? i.views.map((v) => `    view:  ${v.kind} → ${v.path}`) : ["    view:  (none on this machine)"]),
+                  ].join("\n"),
+                )
+                .join("\n")
+            : 'no integrations yet — declare one under "integrations" in brain.json (see docs/integrations.md)',
+        );
+        return 0;
+      }
+
+      case "doctor": {
+        const checks = doctor(vault, cfg, index, store.count());
+        print(out, command, { checks }, { vault, index }, () =>
+          checks.map((c) => `${c.status === "ok" ? "ok  " : "WARN"}  ${c.check}: ${c.detail}`).join("\n"),
+        );
+        return 0;
+      }
     }
     return 0;
   } catch (err) {
@@ -349,6 +409,54 @@ export async function main(argv: string[]): Promise<number> {
   } finally {
     store?.close();
   }
+}
+
+interface Check {
+  check: string;
+  status: "ok" | "warn";
+  detail: string;
+}
+
+// Each check names what it found and, when it warns, what to do. Nothing here
+// changes anything: doctor only reads.
+function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number): Check[] {
+  const checks: Check[] = [];
+  const synced = /\/Library\/Mobile Documents\/|\/Library\/CloudStorage\/|\/Dropbox\/|\/OneDrive\//.test(vault + "/");
+  const mode = resolveSyncMode(vault, cfg);
+  checks.push({ check: "vault", status: "ok", detail: `${vault} (${notes} notes)` });
+  checks.push({
+    check: "index",
+    status: indexDir(vault).startsWith(vault + "/") ? "warn" : "ok",
+    detail: `${indexDir(vault)}${indexDir(vault).startsWith(vault + "/") ? " is inside the vault; set BRAIN_STATE_DIR outside it" : " (outside the vault, never synced)"}`,
+  });
+  checks.push({
+    check: "sync",
+    status: "ok",
+    detail: typeof cfg.sync === "object" ? `command: ${cfg.sync.command}` : `${cfg.sync}${cfg.sync === "auto" ? ` → ${mode}` : ""}${synced ? " (vault is in a cloud-synced folder)" : ""}`,
+  });
+  if (synced && isGitRepo(vault)) {
+    checks.push({
+      check: "git in a synced folder",
+      status: "warn",
+      detail:
+        "the vault is a git repository inside iCloud/Dropbox/OneDrive. Two sync systems on one folder can corrupt .git. " +
+        "Keep git out of the synced copy (a separate clone, or .git moved to .git.nosync with a .git symlink for iCloud), " +
+        'or pick one: "sync": "none" if the cloud folder is the sync.',
+    });
+  }
+  if (index.offline) {
+    checks.push({
+      check: "offline notes",
+      status: "warn",
+      detail: `${index.offline} note(s) are cloud placeholders on this machine; search uses what was last indexed, get cannot read them. ` +
+        'Turn off "Optimize Mac Storage" for the vault folder, or keep it downloaded.',
+    });
+  }
+  for (const v of cfg.exports) {
+    checks.push({ check: `view ${v.kind}`, status: existsSync(dirname(v.path)) ? "ok" : "warn", detail: existsSync(dirname(v.path)) ? v.path : `${dirname(v.path)} does not exist on this machine` });
+  }
+  if (cfg.as) checks.push({ check: "acting as", status: "ok", detail: cfg.as.name });
+  return checks;
 }
 
 function runExports(store: Store, cfg: Config, force: boolean): ExportResult[] {
@@ -420,6 +528,8 @@ function fail(out: Out, command: string, err: unknown): number {
         ? new CliError(err.code, err.message, err.code === "sync_conflict" ? 5 : 1, err.files.length ? { files: err.files } : undefined)
         : err instanceof ConfigError
           ? new CliError("config", err.message, 1)
+          : err instanceof OfflineNoteError
+            ? new CliError("offline", err.message, 1)
           : new CliError("internal", err instanceof Error ? err.message : String(err), 1);
   if (out.json) {
     const envelope = {

@@ -126,8 +126,26 @@ code, so an agent can branch without parsing prose:
 | 3 | `not_found` | `get` matched no note |
 | 4 | `ambiguous` | `get` matched several notes; `error.candidates` lists their paths |
 | 5 | `sync_conflict`, `export_drift` | a note was edited on two machines (`error.files`), or an exported file was edited since brain wrote it |
+| 6 | `not_permitted` | the acting integration (`BRAIN_AS`) may not write that kind |
 
 `schema` changes only on a breaking change to this shape.
+
+## One vault, many repos
+
+Several tools can share one vault — an agent orchestrator, a coaching skill, scheduled
+jobs — and more will come. Each is an **integration**, declared in the vault's
+`brain.json` with the folders it may read and the memory kinds it may write; its paths on
+each machine live in that machine's config; its agents run with `BRAIN_AS=<name>`.
+
+```json
+{ "integrations": {
+    "interview-coach": { "read": ["Career HQ/"], "write": ["interview"] },
+    "firstmate": { "read": ["firstmate/"], "write": ["learning"] } } }
+```
+
+A scoped agent's searches, reads and log only see its folders; anything else is "not
+found". Adding a repo is configuration, never code: [docs/integrations.md](docs/integrations.md).
+`brain integrations` lists who is connected; `brain doctor` checks this machine's setup.
 
 ## Memory across machines
 
@@ -149,10 +167,12 @@ Two machines never create the same file, so `git` merges their logs with no conf
 The single-file shape that existing tools expect is *generated* from the log, so it is
 never edited by two machines either. Each entry records which machine wrote it.
 
-- **`brain sync`** commits only the log folder and `brain.json` — never a note you are
-  halfway through — then `pull --rebase --autostash` and `push`. If a *note* was edited on
-  both machines, it stops with exit 5 and the file names, after aborting the rebase so the
-  vault is left as it was.
+- **`brain sync`** follows the vault's `"sync"` mode, because files reach other machines
+  in many ways: `git` (any remote) commits only the log folder and `brain.json` — never a
+  note you are halfway through — then pulls with rebase and pushes, stopping with exit 5
+  and the file names if a *note* was edited on both machines; `none` leaves moving files
+  to iCloud, Dropbox, Syncthing or Obsidian Sync; `{ "command": … }` runs yours. `auto`
+  (the default) picks git when the vault is a git repository.
 - **`brain export`** writes a view to a path outside the vault as a regular file (not a
   symlink — some tools rightly refuse those). If that file was edited since brain last
   wrote it, it refuses, because those edits are not in any entry yet. Capture them with
@@ -219,8 +239,8 @@ will arrive as an optional mode stored in the same SQLite file, not a separate s
 2. **Memory that syncs across machines** — one file per entry, generated views, `export`
    with drift protection, `import`, `sync`. First consumer:
    [firstmate](https://github.com/kunchenguid/firstmate). ✅
-3. **Scopes** — `brain search --scope engineering`, so a coding agent can read the
-   engineering notes without being able to read the finance ones.
+3. **Integrations and scopes** — named integrations with read folders and write kinds,
+   `BRAIN_AS`, pluggable sync, `brain doctor`. ✅
 4. **Lifecycle and lint** — review windows by category (`current-state`, `news`,
    `research`), archive, broken-link and orphan checks; and a published benchmark of grep
    vs. the Obsidian CLI vs. `brain` on real questions, measuring tokens read and whether

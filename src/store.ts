@@ -13,7 +13,7 @@
 // note to keep that way.
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -30,6 +30,7 @@ export interface RefreshStats {
   updated: number;
   removed: number;
   unchanged: number;
+  offline: number; // notes a sync service evicted to a placeholder (kept, not removed)
   ms: number;
 }
 
@@ -46,6 +47,7 @@ export interface SearchOptions {
   path?: string; // folder prefix filter
   tag?: string;
   raw?: boolean; // query is FTS5 syntax, passed through
+  scope?: string[] | null; // folder prefixes the caller may read; null/undefined = all
 }
 
 export interface NoteRecord {
@@ -127,7 +129,8 @@ export class Store {
 
   refresh(): RefreshStats {
     const started = performance.now();
-    const stats: RefreshStats = { added: 0, updated: 0, removed: 0, unchanged: 0, ms: 0 };
+    const stats: RefreshStats = { added: 0, updated: 0, removed: 0, unchanged: 0, offline: 0, ms: 0 };
+    const offline = new Set<string>();
 
     const known = new Map<string, { mtime: number; size: number; hash: string }>();
     for (const r of this.db.prepare("SELECT path, mtime, size, hash FROM notes").all() as {
@@ -144,7 +147,7 @@ export class Store {
 
     this.db.exec("BEGIN");
     try {
-      for (const abs of walk(this.vault)) {
+      for (const abs of walk(this.vault, offline)) {
         const rel = toPosix(relative(this.vault, abs));
         seen.add(rel);
         const st = statSync(abs);
@@ -168,9 +171,14 @@ export class Store {
 
       for (const path of known.keys()) {
         if (seen.has(path)) continue;
+        // iCloud "Optimize Mac Storage" replaces a note with .Name.md.icloud
+        // until it is opened. The note still exists; keep what the index knew
+        // so search does not silently lose it.
+        if (offline.has(path)) continue;
         this.remove(path);
         stats.removed++;
       }
+      stats.offline = offline.size;
       this.db.exec("COMMIT");
     } catch (err) {
       this.db.exec("ROLLBACK");
@@ -244,6 +252,13 @@ export class Store {
       where.push("(n.path = ? OR n.path LIKE ? ESCAPE '\\')");
       const prefix = toPosix(opts.path).replace(/^\.?\/+|\/+$/g, "");
       params.push(prefix, escapeLike(prefix) + "/%");
+    }
+    if (opts.scope) {
+      // Out-of-scope notes are filtered in the query, not after it, so a
+      // restricted caller still gets `limit` results it is allowed to see.
+      if (!opts.scope.length) return [];
+      where.push("(" + opts.scope.map(() => "n.path LIKE ? ESCAPE '\\'").join(" OR ") + ")");
+      for (const prefix of opts.scope) params.push(escapeLike(prefix) + "%");
     }
     if (opts.tag) {
       where.push("EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = ?)");
@@ -324,7 +339,7 @@ export class Store {
       headings: JSON.parse(r.headings) as string[],
       links,
       mtime: r.mtime,
-      content: readFileSync(join(this.vault, ...path.split("/")), "utf8"),
+      content: readNote(this.vault, path),
     };
   }
 }
@@ -366,7 +381,9 @@ function tokens(s: string): string[] {
   return (s.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((w) => w.length > 0);
 }
 
-function* walk(dir: string): Generator<string> {
+// Yields every note. Records iCloud placeholders (".Name.md.icloud") in
+// `offline` as the vault-relative path of the note they stand in for.
+function* walk(dir: string, offline: Set<string>, root = dir): Generator<string> {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -374,13 +391,36 @@ function* walk(dir: string): Generator<string> {
     return;
   }
   for (const e of entries) {
+    const placeholder = /^\.(.+\.md)\.icloud$/i.exec(e.name);
+    if (placeholder && e.isFile()) {
+      offline.add(toPosix(relative(root, join(dir, placeholder[1]!))));
+      continue;
+    }
     if (e.name.startsWith(".")) continue;
     const full = join(dir, e.name);
     if (e.isDirectory()) {
-      if (!SKIP_DIRS.has(e.name)) yield* walk(full);
+      if (!SKIP_DIRS.has(e.name)) yield* walk(full, offline, root);
     } else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) {
       yield full;
     }
+  }
+}
+
+export class OfflineNoteError extends Error {}
+
+function readNote(vault: string, path: string): string {
+  const abs = join(vault, ...path.split("/"));
+  try {
+    return readFileSync(abs, "utf8");
+  } catch (err) {
+    const parts = path.split("/");
+    const name = parts.pop()!;
+    if (existsSync(join(vault, ...parts, `.${name}.icloud`))) {
+      throw new OfflineNoteError(
+        `${path} is in iCloud but not downloaded on this machine; open it in Obsidian or run: brctl download "${abs}"`,
+      );
+    }
+    throw err;
   }
 }
 

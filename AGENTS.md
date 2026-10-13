@@ -29,19 +29,25 @@ holds the rules an agent changing the code must not break.
 8. **Zero runtime dependencies.** `node:sqlite`, `node:util` `parseArgs` and a small
    frontmatter parser in `src/note.ts`. A dependency has to justify itself against
    `npx brain-cli` staying instant and native-build-free.
-9. **`brain context` never fails.** It runs inside other tools' startup hooks: on any
+9. **Scopes hide, they do not reveal.** Under `BRAIN_AS`, an out-of-scope note is
+   `not_found` (never "forbidden"), filtered inside the query so `limit` still counts. A
+   scope is a guardrail for brain's output, not a sandbox; docs must never claim more.
+10. **No sync service is assumed.** Nothing outside `src/sync.ts`'s git mode may require
+   git; every other guarantee must hold when iCloud or Dropbox moves the files.
+11. **`brain context` never fails.** It runs inside other tools' startup hooks: on any
    error it prints nothing and exits 0. The installer never edits a harness's settings
    file; it prints the snippet.
-10. **Nothing leaves the machine** except what `brain sync` pushes to the vault's own git
+12. **Nothing leaves the machine** except what `brain sync` pushes to the vault's own git
    remote. No other network calls, no telemetry, no embeddings API.
 
 ## Layout
 
 - `src/note.ts` — parse one note: frontmatter, title, headings, tags, aliases, wiki-links.
 - `src/store.ts` — the SQLite index: schema, incremental refresh, search, resolve, get.
-- `src/config.ts` — `brain.json` (synced) and the machine-local user config.
+- `src/config.ts` — `brain.json` (synced) and the machine-local user config: sync mode,
+  integrations, `BRAIN_AS`, read scope.
 - `src/log.ts` — log entries: add, list, import, render a view, export with drift check.
-- `src/sync.ts` — commit the log, pull --rebase, push.
+- `src/sync.ts` — sync modes: git (commit the log, pull --rebase, push), none, command.
 - `src/agent.ts` — `brain context` (the session primer) and `brain agent install` per harness.
 - `src/cli.ts` — argument parsing, vault discovery, output and exit codes.
 - `skills/brain/SKILL.md` — the skill every harness installs; its `description` decides
