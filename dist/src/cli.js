@@ -8,12 +8,13 @@ import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, rec
 import { createDraft, diagnostics, getDraft, issueUrl, KINDS, lastError, listDrafts, markSubmitted, postWithGh, redactor, repo, saveLastError, } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install } from "./agent.js";
-import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows } from "./lifecycle.js";
+import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows } from "./lifecycle.js";
 import { lint } from "./lint.js";
-import { addEntry, exportView, importFile, listEntries, renderView } from "./log.js";
+import { addEntry, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView } from "./log.js";
 import { OfflineNoteError, Store } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
+import { ingest } from "./source.js";
 export const VERSION = "0.10.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
@@ -46,17 +47,26 @@ COMMANDS
       --lines <n>             Only the first n lines of each section (or of the note) —
                               enough for a newest-first log
 
+  ingest <file>               Copy an immutable source into sources/ with searchable metadata
+      --title <title>          Source title (default: the input file name)
+      --tag <tag>             Tag the source (repeatable)
+
   log add <kind> <title>      Record an entry as a new file: <log>/<kind>/<date>-<machine>-<slug>.md
       --body <text|->         Entry body (- reads stdin)
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
   log import <kind> <file>    Turn an existing memory file into entries, one per list item;
-                              titles already recorded are skipped
-  view <kind>                 Print every <kind> entry as one markdown list, oldest first
+                              text already recorded is skipped; missing entries are listed
+                              as retirement candidates but never retired automatically
+  log retire <entry-id>       Retire an entry with an immutable lifecycle event
+      --reason <text>         Optional reason for the retirement
+  log replace <entry-id>      Retire an entry and add its replacement in one command
+      --text <text>           Complete replacement: first line is title, remainder is body
+  view <kind>                 Print every active <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
   sync [--no-push]            Bring other machines' changes in and send ours out, by the
-                              vault's sync mode (brain.json "sync"): git commits the log,
+                              vault's sync mode (brain.json "sync"): git commits the log and sources,
                               pulls and pushes; none leaves it to iCloud/Dropbox/etc.;
                               { "command": … } runs yours. Then refreshes and exports
 
@@ -70,8 +80,9 @@ COMMANDS
                               Hide an obsolete or misplaced note from search and recall
   lifecycle restore <note>    Undo an archive
   lifecycle status [--due]    Every note with lifecycle data; --due: only overdue ones
-  lint [--strict]             Report broken links, orphans, sync conflict copies, overdue
-                              reviews, lifecycle problems and line limits (--strict: exit 7
+  lint [--strict]             Report broken links, source integrity/provenance, orphans,
+                              sync conflict copies, overdue reviews, lifecycle problems and
+                              line limits (--strict: exit 7
                               if anything is reported at warn level)
 
   integrations                List the repos/tools connected to this vault, what each may
@@ -138,9 +149,9 @@ class CliError extends Error {
 }
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
 const SUBCOMMANDS = {
-    log: ["add", "import"],
+    log: ["add", "import", "retire", "replace"],
     lifecycle: ["set", "review", "archive", "restore", "status"],
     agent: ["install"],
     feedback: ["list", "show", "submit", "add"],
@@ -211,6 +222,7 @@ async function run(argv) {
                 "as-of": { type: "string" },
                 on: { type: "string" },
                 reason: { type: "string" },
+                text: { type: "string" },
                 due: { type: "boolean", default: false },
                 strict: { type: "boolean", default: false },
                 "include-archived": { type: "boolean", default: false },
@@ -366,7 +378,7 @@ async function run(argv) {
     }
     let store = null;
     try {
-        if (!["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
+        if (!["index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
             throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
         }
         const vault = findVault(flags.vault);
@@ -385,6 +397,19 @@ async function run(argv) {
             scoped: !!cfg.as,
         };
         switch (command) {
+            case "ingest": {
+                if (args.length !== 1)
+                    throw new CliError("usage", "usage: brain ingest <file> [--title <title>] [--tag <tag>]", 2);
+                if (cfg.as)
+                    permit(false, "ingest sources");
+                const file = resolve(args[0]);
+                if (!existsSync(file))
+                    throw new CliError("not_found", `no file at ${file}`, 3);
+                const result = ingest(vault, cfg, { file, title: flags.title, tags: flags.tag });
+                index = store.refresh();
+                print(out, command, result, { vault, index }, () => result.new ? result.path : `${result.path} (already ingested)`);
+                return 0;
+            }
             case "index": {
                 const data = { notes: store.count(), ...index };
                 print(out, command, data, { vault, index }, () => `${vault}\n${data.notes} notes · +${index.added} ~${index.updated} -${index.removed} · ${index.ms}ms`);
@@ -475,7 +500,7 @@ async function run(argv) {
                 }
                 if (sub === "import") {
                     const [kind = "", file = ""] = rest;
-                    if (!slug(kind) || !file)
+                    if (!slug(kind) || !file || rest.length !== 2)
                         throw new CliError("usage", "usage: brain log import <kind> <file>", 2);
                     if (cfg.as)
                         permit(cfg.as.write.includes(slug(kind)), `import '${slug(kind)}' entries`);
@@ -484,13 +509,54 @@ async function run(argv) {
                         throw new CliError("not_found", `no file at ${abs}`, 3);
                     const result = importFile(store, cfg, kind, abs);
                     index = store.refresh();
-                    print(out, "log.import", { file: abs, kind: slug(kind), ...result }, { vault, index }, () => `imported ${result.added.length} ${slug(kind)} entries from ${abs}` +
-                        (result.skipped ? ` (${result.skipped} already recorded)` : ""));
+                    print(out, "log.import", { file: abs, kind: slug(kind), ...result }, { vault, index }, () => {
+                        const summary = `imported ${result.added.length} ${slug(kind)} entries from ${abs}` +
+                            (result.skipped ? ` (${result.skipped} already recorded)` : "");
+                        if (!result.retirementCandidates.length)
+                            return summary;
+                        return [
+                            summary,
+                            `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
+                            ...result.retirementCandidates.map((candidate) => `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`),
+                        ].join("\n");
+                    });
+                    return 0;
+                }
+                if (sub === "retire" || sub === "replace") {
+                    if (rest.length !== 1) {
+                        throw new CliError("usage", `usage: brain log ${sub} <entry-id>${sub === "replace" ? " --text <text>" : " [--reason <text>]"}`, 2);
+                    }
+                    const target = resolveLogEntry(store, cfg, rest[0], scope);
+                    if (cfg.as)
+                        permit(cfg.as.write.includes(target.kind), `${sub} '${target.kind}' entries`);
+                    if (sub === "retire") {
+                        const reason = flags.reason?.trim().replace(/\s+/g, " ") || undefined;
+                        const event = recordRetirement(vault, cfg, target.path, { reason });
+                        index = store.refresh();
+                        print(out, "log.retire", { target: target.path, event, reason: reason ?? null }, { vault, index }, () => `${target.path}: retired  (${event})`);
+                        return 0;
+                    }
+                    const text = flags.text?.trim();
+                    if (!text)
+                        throw new CliError("usage", "replace needs --text <text>", 2);
+                    const [title = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
+                    const replacement = addEntry(vault, cfg, {
+                        kind: target.kind,
+                        title,
+                        body: bodyLines.join("\n").trim(),
+                        tags: target.tags,
+                    });
+                    const event = recordRetirement(vault, cfg, target.path, {
+                        reason: `replaced by ${replacement}`,
+                        replacement,
+                    });
+                    index = store.refresh();
+                    print(out, "log.replace", { target: target.path, replacement, event }, { vault, index }, () => `${target.path}: retired and replaced by ${replacement}  (${event})`);
                     return 0;
                 }
                 const n = sub === undefined ? 10 : Number(sub);
                 if (!Number.isInteger(n) || n < 1 || rest.length) {
-                    throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file>", 2);
+                    throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <text>", 2);
                 }
                 const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
                     .filter((e) => inScope(e.path, scope))
@@ -876,6 +942,23 @@ function doctor(vault, cfg, index, notes) {
 }
 function runExports(store, cfg, force) {
     return cfg.exports.map((t) => exportView(store, cfg, t, force));
+}
+function resolveLogEntry(store, cfg, ref, scope) {
+    const entries = new Map(listEntries(store, cfg, { includeRetired: true })
+        .filter((entry) => entry.kind !== LIFECYCLE_KIND)
+        .map((entry) => [entry.path, entry]));
+    const matches = store.resolve(ref)
+        .filter((path) => inScope(path, scope))
+        .map((path) => entries.get(path))
+        .filter((entry) => entry !== undefined);
+    if (matches.length === 0)
+        throw new CliError("not_found", `no log entry matches '${ref}'`, 3);
+    if (matches.length > 1) {
+        throw new CliError("ambiguous", `'${ref}' matches ${matches.length} log entries — use a path`, 4, {
+            candidates: matches.map((entry) => entry.path),
+        });
+    }
+    return matches[0];
 }
 function formatExports(exports) {
     return exports.map((e) => `export ${e.kind} → ${e.path}: ${e.status} (${e.entries} entries)`).join("\n");

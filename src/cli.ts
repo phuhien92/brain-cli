@@ -22,9 +22,9 @@ import {
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
-import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
+import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
-import { addEntry, exportView, importFile, listEntries, renderView, type ExportResult } from "./log.js";
+import { addEntry, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
@@ -72,8 +72,13 @@ COMMANDS
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
   log import <kind> <file>    Turn an existing memory file into entries, one per list item;
-                              titles already recorded are skipped
-  view <kind>                 Print every <kind> entry as one markdown list, oldest first
+                              text already recorded is skipped; missing entries are listed
+                              as retirement candidates but never retired automatically
+  log retire <entry-id>       Retire an entry with an immutable lifecycle event
+      --reason <text>         Optional reason for the retirement
+  log replace <entry-id>      Retire an entry and add its replacement in one command
+      --text <text>           Complete replacement: first line is title, remainder is body
+  view <kind>                 Print every active <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
   sync [--no-push]            Bring other machines' changes in and send ours out, by the
@@ -168,7 +173,7 @@ interface Out {
 // a user typed (a query, a note, feedback text) can never become a name.
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
 const SUBCOMMANDS: Record<string, string[]> = {
-  log: ["add", "import"],
+  log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
   agent: ["install"],
   feedback: ["list", "show", "submit", "add"],
@@ -247,6 +252,7 @@ async function run(argv: string[]): Promise<number> {
         "as-of": { type: "string" },
         on: { type: "string" },
         reason: { type: "string" },
+        text: { type: "string" },
         due: { type: "boolean", default: false },
         strict: { type: "boolean", default: false },
         "include-archived": { type: "boolean", default: false },
@@ -531,21 +537,64 @@ async function run(argv: string[]): Promise<number> {
         }
         if (sub === "import") {
           const [kind = "", file = ""] = rest;
-          if (!slug(kind) || !file) throw new CliError("usage", "usage: brain log import <kind> <file>", 2);
+          if (!slug(kind) || !file || rest.length !== 2) throw new CliError("usage", "usage: brain log import <kind> <file>", 2);
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `import '${slug(kind)}' entries`);
           const abs = resolve(file);
           if (!existsSync(abs)) throw new CliError("not_found", `no file at ${abs}`, 3);
           const result = importFile(store, cfg, kind, abs);
           index = store.refresh();
-          print(out, "log.import", { file: abs, kind: slug(kind), ...result }, { vault, index }, () =>
-            `imported ${result.added.length} ${slug(kind)} entries from ${abs}` +
-            (result.skipped ? ` (${result.skipped} already recorded)` : ""),
+          print(out, "log.import", { file: abs, kind: slug(kind), ...result }, { vault, index }, () => {
+            const summary =
+              `imported ${result.added.length} ${slug(kind)} entries from ${abs}` +
+              (result.skipped ? ` (${result.skipped} already recorded)` : "");
+            if (!result.retirementCandidates.length) return summary;
+            return [
+              summary,
+              `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
+              ...result.retirementCandidates.map((candidate) =>
+                `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`,
+              ),
+            ].join("\n");
+          });
+          return 0;
+        }
+        if (sub === "retire" || sub === "replace") {
+          if (rest.length !== 1) {
+            throw new CliError("usage", `usage: brain log ${sub} <entry-id>${sub === "replace" ? " --text <text>" : " [--reason <text>]"}`, 2);
+          }
+          const target = resolveLogEntry(store, cfg, rest[0]!, scope);
+          if (cfg.as) permit(cfg.as.write.includes(target.kind), `${sub} '${target.kind}' entries`);
+          if (sub === "retire") {
+            const reason = flags.reason?.trim().replace(/\s+/g, " ") || undefined;
+            const event = recordRetirement(vault, cfg, target.path, { reason });
+            index = store.refresh();
+            print(out, "log.retire", { target: target.path, event, reason: reason ?? null }, { vault, index }, () =>
+              `${target.path}: retired  (${event})`,
+            );
+            return 0;
+          }
+          const text = flags.text?.trim();
+          if (!text) throw new CliError("usage", "replace needs --text <text>", 2);
+          const [title = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
+          const replacement = addEntry(vault, cfg, {
+            kind: target.kind,
+            title,
+            body: bodyLines.join("\n").trim(),
+            tags: target.tags,
+          });
+          const event = recordRetirement(vault, cfg, target.path, {
+            reason: `replaced by ${replacement}`,
+            replacement,
+          });
+          index = store.refresh();
+          print(out, "log.replace", { target: target.path, replacement, event }, { vault, index }, () =>
+            `${target.path}: retired and replaced by ${replacement}  (${event})`,
           );
           return 0;
         }
         const n = sub === undefined ? 10 : Number(sub);
         if (!Number.isInteger(n) || n < 1 || rest.length) {
-          throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file>", 2);
+          throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <text>", 2);
         }
         const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
           .filter((e) => inScope(e.path, scope))
@@ -961,6 +1010,25 @@ function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number):
 
 function runExports(store: Store, cfg: Config, force: boolean): ExportResult[] {
   return cfg.exports.map((t) => exportView(store, cfg, t, force));
+}
+
+function resolveLogEntry(store: Store, cfg: Config, ref: string, scope: string[] | null): Entry {
+  const entries = new Map(
+    listEntries(store, cfg, { includeRetired: true })
+      .filter((entry) => entry.kind !== LIFECYCLE_KIND)
+      .map((entry) => [entry.path, entry]),
+  );
+  const matches = store.resolve(ref)
+    .filter((path) => inScope(path, scope))
+    .map((path) => entries.get(path))
+    .filter((entry): entry is Entry => entry !== undefined);
+  if (matches.length === 0) throw new CliError("not_found", `no log entry matches '${ref}'`, 3);
+  if (matches.length > 1) {
+    throw new CliError("ambiguous", `'${ref}' matches ${matches.length} log entries — use a path`, 4, {
+      candidates: matches.map((entry) => entry.path),
+    });
+  }
+  return matches[0]!;
 }
 
 function formatExports(exports: ExportResult[]): string {

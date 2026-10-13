@@ -43,7 +43,7 @@ export type SyncSpec = "auto" | "git" | "none" | { command: string };
 export interface Integration {
   name: string;
   read: string[] | null; // vault-relative folder prefixes; null = the whole vault ("*")
-  write: string[]; // log kinds it may add
+  write: string[]; // log kinds it may operate on
   views: ExportTarget[]; // its views that have a path on this machine
 }
 

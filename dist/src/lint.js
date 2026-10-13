@@ -3,11 +3,14 @@
 // Every rule reads the index and the file tree; none changes anything. A
 // finding names the file, the rule and what to do. Severities: "warn" for
 // things that make answers wrong or links dead, "info" for housekeeping.
-import { readdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { inScope, readScope } from "./config.js";
-import { LIFECYCLE_KIND, lifecycleStates } from "./lifecycle.js";
-import { basename } from "./note.js";
+import { lifecycleStates } from "./lifecycle.js";
+import { LIFECYCLE_KIND } from "./log.js";
+import { basename, parseNote } from "./note.js";
+import { SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
 // Names sync services give the loser of a conflict. Each must match a file
 // whose "original" also exists, so a note honestly titled "Plan 2" is fine.
 const CONFLICT_PATTERNS = [
@@ -19,7 +22,7 @@ export function lint(store, cfg) {
     const findings = [];
     const scope = readScope(cfg);
     const logPrefix = `${cfg.logDir}/`;
-    const notes = store.db.prepare("SELECT path, title, aliases FROM notes").all().filter((n) => inScope(n.path, scope));
+    const notes = store.db.prepare("SELECT path, title, aliases, frontmatter FROM notes").all().filter((n) => inScope(n.path, scope));
     const allPaths = new Set(notes.map((n) => n.path));
     const lower = (s) => s.toLowerCase();
     // Resolution tables, the way Obsidian resolves [[links]].
@@ -32,12 +35,17 @@ export function lint(store, cfg) {
         for (const a of JSON.parse(n.aliases))
             byTitle.set(lower(a), n.path);
     }
-    // Every non-note file (attachments, .excalidraw boards, PDFs), findable by
-    // vault path, file name, or file name without its extension.
-    const files = new Set();
-    for (const f of walkFiles(store.vault)) {
+    // Every non-note file (attachments, .excalidraw boards, sources), findable
+    // by vault path, file name, or file name without its extension.
+    const sidecars = sourceSidecars(store.vault);
+    const originals = new Set(sidecars.map((sidecar) => sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length)));
+    const managed = new Set([...sidecars, ...originals]);
+    const files = new Map();
+    for (const f of walkFiles(store.vault, originals)) {
         const name = lower(f.split("/").pop());
-        files.add(lower(f)).add(name).add(name.replace(/\.[^.]+$/, ""));
+        for (const key of [lower(f), name, name.replace(/\.[^.]+$/, "")])
+            if (!files.has(key))
+                files.set(key, f);
     }
     const resolve = (target) => {
         const t = lower(target.replace(/\\/g, "/").replace(/^\.?\//, ""));
@@ -49,11 +57,18 @@ export function lint(store, cfg) {
         if (suffix)
             return suffix.path;
         const name = basename(t);
-        return byName.get(name) ?? byTitle.get(name) ?? byTitle.get(t) ?? null;
+        const note = byName.get(name) ?? byTitle.get(name) ?? byTitle.get(t);
+        if (note)
+            return note;
+        return files.get(t) ?? files.get(t.split("/").pop()) ?? null;
     };
     // broken-link, and inbound counts for orphans
     const inbound = new Map();
     const links = store.db.prepare("SELECT src, target FROM links").all();
+    const explicitSources = new Map(notes.map((n) => [n.path, sourceTargets(JSON.parse(n.frontmatter))]));
+    const linksBySource = new Map();
+    for (const link of links)
+        linksBySource.set(link.src, [...(linksBySource.get(link.src) ?? []), link.target]);
     const reported = new Set();
     for (const l of links) {
         if (!allPaths.has(l.src))
@@ -63,10 +78,9 @@ export function lint(store, cfg) {
             inbound.set(hit, (inbound.get(hit) ?? 0) + 1);
             continue;
         }
+        if (explicitSources.get(l.src)?.includes(l.target))
+            continue; // reported by source-missing below
         const isAttachment = /\.[a-z0-9]+$/i.test(l.target) && !/\.md$/i.test(l.target);
-        const t = lower(l.target.replace(/\\/g, "/").replace(/^\.?\//, ""));
-        if (files.has(t) || files.has(t.split("/").pop()))
-            continue; // a file, by path, name, or name without extension
         const key = `${l.src}\n${l.target}`;
         if (reported.has(key))
             continue;
@@ -81,7 +95,7 @@ export function lint(store, cfg) {
     // orphan: nothing links here. Root-level notes and log entries are entry
     // points by design, not orphans.
     for (const n of notes) {
-        if (!n.path.includes("/") || n.path.startsWith(logPrefix))
+        if (!n.path.includes("/") || n.path.startsWith(logPrefix) || managed.has(n.path))
             continue;
         if (!inbound.get(n.path)) {
             findings.push({ rule: "orphan", severity: "info", path: n.path, message: "no note links here" });
@@ -128,6 +142,55 @@ export function lint(store, cfg) {
         for (const p of st.problems)
             findings.push({ rule: "lifecycle", severity: "warn", path: st.path, message: p });
     }
+    // source-missing: explicit provenance must resolve to a note or file.
+    for (const n of notes) {
+        for (const target of explicitSources.get(n.path) ?? []) {
+            if (!resolve(target)) {
+                findings.push({
+                    rule: "source-missing",
+                    severity: "warn",
+                    path: n.path,
+                    message: `source [[${target}]] does not resolve to any note or file`,
+                });
+            }
+        }
+    }
+    // source-modified: every sidecar still has its original, and the
+    // original's bytes still match the digest the sidecar recorded.
+    for (const sidecar of sidecars) {
+        if (!inScope(sidecar, scope))
+            continue;
+        const path = sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length);
+        if (!existsSync(join(store.vault, ...path.split("/")))) {
+            findings.push({ rule: "source-modified", severity: "warn", path: sidecar, message: `source file ${path} is missing` });
+            continue;
+        }
+        let expected;
+        try {
+            expected = parseNote(sidecar, readFileSync(join(store.vault, ...sidecar.split("/")), "utf8")).frontmatter.sha256;
+        }
+        catch {
+            expected = null;
+        }
+        const actual = createHash("sha256").update(readFileSync(join(store.vault, ...path.split("/")))).digest("hex");
+        if (typeof expected !== "string" || !/^[0-9a-f]{64}$/.test(expected)) {
+            findings.push({ rule: "source-modified", severity: "warn", path, message: `${sidecar} has no valid sha256` });
+        }
+        else if (actual !== expected) {
+            findings.push({ rule: "source-modified", severity: "warn", path, message: `sha256 does not match ${sidecar}` });
+        }
+    }
+    // unsourced: selected folders require either an explicit `sources:` entry
+    // or a normal wiki-link that resolves to an ingested source.
+    for (const n of notes) {
+        if (managed.has(n.path) || !cfg.lintUnsourced.some((prefix) => n.path.startsWith(prefix)))
+            continue;
+        const explicit = explicitSources.get(n.path) ?? [];
+        const linked = (linksBySource.get(n.path) ?? []).some((target) => managed.has(resolve(target) ?? ""));
+        if (!explicit.length && !linked) {
+            findings.push({ rule: "unsourced", severity: "info", path: n.path, message: "no source citation" });
+        }
+    }
     // max-lines: per-file limits the vault sets for itself
     for (const [path, max] of Object.entries(cfg.lintMaxLines)) {
         if (!allPaths.has(path))
@@ -141,7 +204,21 @@ export function lint(store, cfg) {
     const order = { warn: 0, info: 1 };
     return findings.sort((a, b) => order[a.severity] - order[b.severity] || a.rule.localeCompare(b.rule) || a.path.localeCompare(b.path));
 }
-function* walkFiles(root, dir = root) {
+function sourceTargets(frontmatter) {
+    const value = frontmatter.sources;
+    if (value === undefined || value === null)
+        return [];
+    const targets = [];
+    for (const item of Array.isArray(value) ? value : [String(value)]) {
+        for (const match of item.matchAll(/\[\[([^\]\n]+?)\]\]/g)) {
+            const target = match[1].split(/\\?\|/)[0].split("#")[0].trim();
+            if (target && !targets.includes(target))
+                targets.push(target);
+        }
+    }
+    return targets;
+}
+function* walkFiles(root, originals, dir = root) {
     let entries;
     try {
         entries = readdirSync(dir, { withFileTypes: true });
@@ -154,8 +231,12 @@ function* walkFiles(root, dir = root) {
             continue;
         const full = join(dir, e.name);
         if (e.isDirectory())
-            yield* walkFiles(root, full);
-        else if (e.isFile() && !e.name.toLowerCase().endsWith(".md"))
-            yield relative(root, full).split(sep).join("/");
+            yield* walkFiles(root, originals, full);
+        else if (e.isFile()) {
+            const rel = relative(root, full).split(sep).join("/");
+            if (!e.name.toLowerCase().endsWith(".md") || originals.has(rel)) {
+                yield rel;
+            }
+        }
     }
 }

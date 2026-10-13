@@ -4,7 +4,7 @@
 //   { "log": { "dir": "log" },
 //     "sync": "auto",                      // "auto" | "git" | "none" | { "command": "…" }
 //     "lifecycle": { "windows": { "current-state": 30 } },   // review windows in days
-//     "lint": { "maxLines": { "MEMORY.md": 150 } },
+//     "lint": { "maxLines": { "MEMORY.md": 150 }, "unsourced": ["Research/"] },
 //     "integrations": {                    // one block per repo/tool that uses the vault
 //       "firstmate": { "read": ["firstmate/"], "write": ["learning"],
 //                      "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } } } } }
@@ -101,14 +101,16 @@ export function loadConfig(vault, opts = {}) {
         }
         lifecycleWindows[cat] = days;
     }
+    const lintCfg = objectAt(vaultCfg, "lint");
     const lintMaxLines = {};
-    for (const [path, n] of Object.entries(objectAt(objectAt(vaultCfg, "lint"), "maxLines"))) {
+    for (const [path, n] of Object.entries(objectAt(lintCfg, "maxLines"))) {
         if (!(typeof n === "number" && Number.isInteger(n) && n > 0)) {
             throw new ConfigError(`brain.json: lint.maxLines["${path}"] must be a positive integer`);
         }
         lintMaxLines[path] = n;
     }
-    return { logDir, machine, exports, sync, integrations, as, lifecycleWindows, lintMaxLines, userConfigPath };
+    const lintUnsourced = stringList(lintCfg.unsourced, "brain.json: lint.unsourced").map(folderPrefix);
+    return { logDir, machine, exports, sync, integrations, as, lifecycleWindows, lintMaxLines, lintUnsourced, userConfigPath };
 }
 // What the acting integration may read: its declared folders plus the log
 // folders of the kinds it writes. null means unrestricted (no BRAIN_AS, or "*").

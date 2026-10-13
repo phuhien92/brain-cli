@@ -79,13 +79,19 @@ test("search and get see only the acting integration's folders", () => {
 
 test("an integration writes only its kinds and reads its own log", () => {
   assert.equal(brain(["log", "add", "learning", "Crew lesson"], { BRAIN_AS: "firstmate" }).code, 0);
+  const disposable = brain(["log", "add", "learning", "Retire through the integration"], { BRAIN_AS: "firstmate" });
+  assert.equal(brain(["log", "retire", disposable.body.data.path], { BRAIN_AS: "firstmate" }).code, 0);
+  const replaceable = brain(["log", "add", "learning", "Replace through the integration"], { BRAIN_AS: "firstmate" });
+  assert.equal(brain(["log", "replace", replaceable.body.data.path, "--text", "Replacement through the integration"], { BRAIN_AS: "firstmate" }).code, 0);
   const denied = brain(["log", "add", "interview", "Not mine"], { BRAIN_AS: "firstmate" });
   assert.equal(denied.code, 6);
   assert.equal(denied.body.error.code, "not_permitted");
-  assert.equal(brain(["log", "add", "interview", "Brex screen"], { BRAIN_AS: "interview-coach" }).code, 0);
+  const interview = brain(["log", "add", "interview", "Brex screen"], { BRAIN_AS: "interview-coach" });
+  assert.equal(interview.code, 0);
+  assert.equal(brain(["log", "retire", interview.body.data.path], { BRAIN_AS: "firstmate" }).code, 3, "out-of-scope entries stay hidden");
 
   const fmLog = brain(["log"], { BRAIN_AS: "firstmate" });
-  assert.deepEqual(fmLog.body.data.entries.map((e: { title: string }) => e.title), ["Crew lesson"]);
+  assert.deepEqual(fmLog.body.data.entries.map((e: { title: string }) => e.title), ["Replacement through the integration", "Crew lesson"]);
   assert.equal(brain(["view", "interview"], { BRAIN_AS: "firstmate" }).code, 6);
 });
 

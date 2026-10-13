@@ -30,7 +30,7 @@ flowchart LR
     ARGS["args + BRAIN_AS scope"] --> REFRESH["refresh: stat, hash, re-parse changed notes"]
     REFRESH --> CMD{"command"}
     CMD --> READ["search / get / context"]
-    CMD --> WRITE["log add / lifecycle / ingest"]
+    CMD --> WRITE["log mutations / lifecycle / ingest"]
     CMD --> MOVE["sync / export"]
     CMD --> CHECK["lint / doctor"]
   end
@@ -108,7 +108,7 @@ sequenceDiagram
 | [`src/store.ts`](../src/store.ts) | The SQLite index: schema, incremental refresh, BM25 search, wiki-link-style resolve, `get` |
 | [`src/paths.ts`](../src/paths.ts) | Where brain keeps things; one resolver for `brain path`, `doctor`, the index and telemetry |
 | [`src/config.ts`](../src/config.ts) | `brain.json` + machine config: sync mode, integrations, `BRAIN_AS` scope |
-| [`src/log.ts`](../src/log.ts) | Memory entries: add, list, import, render a view, export with drift check |
+| [`src/log.ts`](../src/log.ts) | Memory entries: add, list, import, retire, replace, render a view, export with drift check |
 | [`src/source.ts`](../src/source.ts) | SHA-256 source ingest, exclusive creates, metadata sidecars and idempotency |
 | [`src/lifecycle.ts`](../src/lifecycle.ts) | Categories, review windows, lifecycle events, each note's state |
 | [`src/lint.ts`](../src/lint.ts) | Read-only health rules |

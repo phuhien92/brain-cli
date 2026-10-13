@@ -11,7 +11,7 @@
 // leaves an audit trail.
 
 import type { Config } from "./config.js";
-import { addEntry } from "./log.js";
+import { addEntry, LIFECYCLE_KIND, RETIRE_ACTION } from "./log.js";
 import type { Store } from "./store.js";
 
 export const CATEGORIES = ["memory", "identity", "preference", "principle", "research", "current-state", "news"] as const;
@@ -27,8 +27,6 @@ export const DEFAULT_WINDOWS: Record<Category, number | null> = {
   "current-state": 30,
   news: 14,
 };
-
-export const LIFECYCLE_KIND = "lifecycle";
 
 export interface LifecycleState {
   path: string;
@@ -73,7 +71,11 @@ export function lifecycleStates(store: Store, cfg: Config): Map<string, Lifecycl
   for (const r of rows) {
     const fm = JSON.parse(r.frontmatter) as Record<string, unknown>;
     if (r.path.startsWith(eventDir)) {
-      if (typeof fm.target === "string") events.push({ created: String(fm.created ?? ""), path: r.path, fm });
+      // Log-entry retirements share the append-only lifecycle folder but are
+      // handled by log views, not by note freshness state.
+      if (fm.action !== RETIRE_ACTION && typeof fm.target === "string") {
+        events.push({ created: String(fm.created ?? ""), path: r.path, fm });
+      }
       continue;
     }
     const category = fm.category;

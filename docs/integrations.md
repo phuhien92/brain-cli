@@ -30,8 +30,10 @@ This file travels with the vault, so every machine sees the same declarations.
 
 - **`read`** — vault folders it may search and open. `["*"]` means the whole vault. It can
   always read the log entries of the kinds it writes, so `read` can be empty.
-- **`write`** — log kinds it may add (`brain log add <kind> …`). Each kind is its own
-  folder under `log/`, so integrations never write the same files.
+- **`write`** — log kinds it may add, import, retire, or replace. Retiring and replacing
+  are authorized by the target entry's kind; the lifecycle event they create does not
+  require a separate `"lifecycle"` permission. Direct `brain lifecycle …` commands do.
+  Each kind is its own folder under `log/`, so integrations never write the same files.
 - **`views`** — kinds it needs as a single generated file (for tools that read one
   `learnings.md`), with an optional header line.
 
@@ -61,8 +63,8 @@ repo's `.claude/settings.json`:
 ```
 
 From then on, every `brain` call from that repo is scoped: `search`, `get`, `log` and
-`context` see only its folders, and `log add` accepts only its kinds. `--as <name>` does
-the same for a single command.
+`context` see only its folders, and log mutations accept only its kinds. `--as <name>`
+does the same for a single command.
 
 Check the result with `brain integrations` (who is connected, on this machine) and
 `brain doctor`.

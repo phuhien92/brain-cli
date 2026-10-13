@@ -11,7 +11,8 @@
 | `get <note>` | a note by path, file name, title or alias; `--meta`, `--section`, `--lines` | below |
 | `ingest <file>` | immutably copy a local source; `--title`, repeatable `--tag` | [sources.md](sources.md) |
 | `log add <kind> <title>` | record memory as a new file | [memory.md](memory.md) |
-| `log [n]`, `log import`, `view`, `export`, `sync` | read, import, render, export and sync memory | [memory.md](memory.md) |
+| `log retire <entry-id> [--reason …]`, `log replace <entry-id> --text …` | retire or replace an entry through immutable lifecycle events | [memory.md](memory.md) |
+| `log [n]`, `log import`, `view`, `export`, `sync` | read, import, render, export and sync active memory | [memory.md](memory.md) |
 | `lifecycle set\|review\|archive\|restore\|status` | how long a note stays true | [lifecycle.md](lifecycle.md) |
 | `lint [--strict]` | vault health, read-only | [lifecycle.md](lifecycle.md#lint) |
 | `integrations`, `doctor` | who is connected; this machine's setup | [integrations.md](integrations.md) |
