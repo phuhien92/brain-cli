@@ -4,7 +4,7 @@
 //   { "log": { "dir": "log" },
 //     "sync": "auto",                      // "auto" | "git" | "none" | { "command": "…" }
 //     "integrations": {                    // one block per repo/tool that uses the vault
-//       "firstmate": { "read": ["firstmate/", "Build Ideas HQ/"], "write": ["learning"],
+//       "firstmate": { "read": ["firstmate/"], "write": ["learning"],
 //                      "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } } } } }
 //
 // ~/.config/brain/config.json ($BRAIN_CONFIG) — machine-local, never synced,

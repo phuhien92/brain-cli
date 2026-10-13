@@ -35,7 +35,7 @@ In the vault's `brain.json` (it travels with the vault):
 {
   "integrations": {
     "firstmate": {
-      "read": ["firstmate/", "Build Ideas HQ/"],
+      "read": ["firstmate/"],
       "write": ["learning"],
       "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } }
     }

@@ -20,7 +20,7 @@ This file travels with the vault, so every machine sees the same declarations.
       "write": ["interview"]
     },
     "firstmate": {
-      "read": ["firstmate/", "Build Ideas HQ/"],
+      "read": ["firstmate/"],
       "write": ["learning"],
       "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } }
     }
