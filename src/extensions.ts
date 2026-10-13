@@ -75,7 +75,7 @@ const RESERVED = new Set([
   "integrations", "doctor", "path", "context", "agent", "feedback", "telemetry", "ext", "help",
 ]);
 const RESERVED_ENVIRONMENT = new Set([
-  "BRAIN_AS", "BRAIN_BIN", "BRAIN_EXTENSION_ARGS_JSON", "BRAIN_EXTENSION_LAUNCHER",
+  "BRAIN_AS", "BRAIN_BIN", "BRAIN_BIN_ARGS_JSON", "BRAIN_EXTENSION_ARGS_JSON", "BRAIN_EXTENSION_LAUNCHER",
   "BRAIN_EXTENSION_PARENT_AS", "BRAIN_EXTENSION_SCOPE", "BRAIN_EXT_DIR", "BRAIN_EXT_REDACT",
   "BRAIN_EXT_REDACT_TOKEN", "BRAIN_MACHINE", "BRAIN_VAULT",
 ]);
@@ -215,6 +215,12 @@ export function extensionProcess(launcher: string, args: string[], platform = pr
     env: { BRAIN_EXTENSION_LAUNCHER: launcher, BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
     windowsVerbatimArguments: true,
   };
+}
+
+export function extensionBrainProcess(runner: string, platform = process.platform): ExtensionProcess {
+  return platform === "win32"
+    ? { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] }
+    : { file: runner, args: [] };
 }
 
 export function extensionDirectory(name: string): string {

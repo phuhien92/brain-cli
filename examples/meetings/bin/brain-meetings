@@ -24,7 +24,14 @@ function fail(code, message, exit = 1) {
 function brain(args, input) {
   const bin = process.env.BRAIN_BIN;
   if (!bin) throw new Error("BRAIN_BIN was not provided by brain");
-  const result = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", bin, ...args, "--json"], {
+  let prefix;
+  try {
+    prefix = JSON.parse(process.env.BRAIN_BIN_ARGS_JSON ?? "[]");
+    if (!Array.isArray(prefix) || prefix.some((arg) => typeof arg !== "string")) throw new Error();
+  } catch {
+    throw new Error("BRAIN_BIN_ARGS_JSON was not a string list");
+  }
+  const result = spawnSync(bin, [...prefix, ...args, "--json"], {
     env: process.env,
     encoding: "utf8",
     input,

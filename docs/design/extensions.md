@@ -48,10 +48,10 @@ brain ext install https://github.com/someone/brain-granola.git  # clones and sho
 brain granola import --since 2026-10-01            # runs the extension's executable
 ```
 
-The executable gets `BRAIN_VAULT`, `BRAIN_BIN` (an invocation-specific scoped brain launcher),
-`BRAIN_AS=<extension name>` and `BRAIN_EXT_DIR`, and does its work by calling
-`brain … --json` itself. Because it runs **as its own integration**, everything it reads
-and writes goes through the scope its manifest declares.
+The executable gets `BRAIN_VAULT`, `BRAIN_BIN` plus `BRAIN_BIN_ARGS_JSON` (an executable and
+argument prefix for invocation-specific scoped brain calls), `BRAIN_AS=<extension name>` and
+`BRAIN_EXT_DIR`, and does its work by calling `brain … --json` itself. Because it runs **as its
+own integration**, everything it reads and writes goes through the scope its manifest declares.
 
 Good fits: importers (Granola, Notion, Readwise, Kindle highlights → log entries),
 reports, one-off migrations, a `brain bench` for the benchmark.

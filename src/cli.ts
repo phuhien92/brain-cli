@@ -35,6 +35,7 @@ import { ingest } from "./source.js";
 import {
   ExtensionError,
   enabledExtensionNames,
+  extensionBrainProcess,
   extensionProcess,
   installExtension,
   installedManifest,
@@ -1014,10 +1015,11 @@ interface ExtensionInvocation {
   as?: string;
 }
 
-function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; path: string } {
+function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; file: string; args: string[] } {
   const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
   const path = join(directory, "brain.mjs");
-  const values = { ...locked, BRAIN_BIN: path };
+  const launch = extensionBrainProcess(path);
+  const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
   writeFileSync(path, `#!/usr/bin/env node
 const locked = ${JSON.stringify(values)};
 for (const [key, value] of Object.entries(locked)) {
@@ -1026,7 +1028,7 @@ for (const [key, value] of Object.entries(locked)) {
 }
 await import(${JSON.stringify(pathToFileURL(BIN).href)});
 `, { mode: 0o700 });
-  return { directory, path };
+  return { directory, file: launch.file, args: launch.args };
 }
 
 function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
@@ -1116,7 +1118,8 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   const env: NodeJS.ProcessEnv = {
     ...extensionEnvironment(installed.manifest),
     BRAIN_VAULT: vault,
-    BRAIN_BIN: childRunner.path,
+    BRAIN_BIN: childRunner.file,
+    BRAIN_BIN_ARGS_JSON: JSON.stringify(childRunner.args),
     BRAIN_AS: parentAs || installed.manifest.name,
     BRAIN_EXT_DIR: installed.directory,
     BRAIN_MACHINE: cfg.machine,

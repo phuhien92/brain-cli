@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { extensionProcess, resolveLauncher, type ExtensionManifest } from "../src/extensions.js";
+import { extensionBrainProcess, extensionProcess, resolveLauncher, type ExtensionManifest } from "../src/extensions.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BIN = resolve(HERE, "../../bin/brain.js");
@@ -434,6 +434,7 @@ test("extension scope is enforced and intersected with an existing BRAIN_AS scop
 import { spawnSync } from "node:child_process";
 const action=process.argv[2];
 const childEnv={...process.env};
+const brainPrefix=JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]");
 if(action==="tamper") {
   delete childEnv.BRAIN_EXTENSION_SCOPE;
   delete childEnv.BRAIN_EXTENSION_PARENT_AS;
@@ -445,12 +446,12 @@ if(action==="tamper") {
 }
 if(action==="write-allowed"||action==="write-denied") {
   const kind=action==="write-allowed"?"event":"secret";
-  const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add",kind,"extension write","--json"],{env:childEnv,encoding:"utf8"});
+  const r=spawnSync(process.env.BRAIN_BIN,[...brainPrefix,"log","add",kind,"extension write","--json"],{env:childEnv,encoding:"utf8"});
   process.stdout.write(r.stdout);
   process.stderr.write(r.stderr);
   process.exitCode=r.status;
 } else {
-  const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"search","shared-word","--json"],{env:childEnv,encoding:"utf8"});
+  const r=spawnSync(process.env.BRAIN_BIN,[...brainPrefix,"search","shared-word","--json"],{env:childEnv,encoding:"utf8"});
   const child=JSON.parse(r.stdout);
   process.stdout.write(JSON.stringify({schema:"brain.v1",command:"probe",ok:true,data:{as:process.env.BRAIN_AS,paths:child.data.results.map(x=>x.path)}})+"\\n");
 }`);
@@ -477,13 +478,14 @@ if(action==="write-allowed"||action==="write-denied") {
 import { spawnSync } from "node:child_process";
 const command=JSON.parse(Buffer.from(process.argv[2],"base64url").toString("utf8"));
 const args=command.includes("--json")?command:[...command,"--json"];
+const brainPrefix=JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]");
 const childEnv={...process.env,BRAIN_AS:""};
 delete childEnv.BRAIN_EXTENSION_SCOPE;
 delete childEnv.BRAIN_EXTENSION_PARENT_AS;
 delete childEnv.BRAIN_EXT_REDACT;
 childEnv.BRAIN_CONFIG="/does-not-exist";
 childEnv.BRAIN_EXTENSIONS_DIR="/does-not-exist";
-const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,...args],{env:childEnv,encoding:"utf8"});
+const r=spawnSync(process.env.BRAIN_BIN,[...brainPrefix,...args],{env:childEnv,encoding:"utf8"});
 process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
 `);
   assert.equal(interactiveInstall(f, adminSource).code, 0);
@@ -528,6 +530,7 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
   }, `
 import { spawnSync } from "node:child_process";
 const token=process.env.BRAIN_EXT_REDACT_TOKEN;
+const brainPrefix=JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]");
 const encoded=Buffer.from("private@example.com").toString("base64url");
 const nestedUrl=Buffer.from("https://app.example/meetings/alice%2540example.com").toString("base64url");
 const unsafeOriginUrl=Buffer.from("https://tenant-99887766.example/meetings/public").toString("base64url");
@@ -537,7 +540,7 @@ delete childEnv.BRAIN_EXTENSION_SCOPE;
 delete childEnv.BRAIN_EXTENSION_PARENT_AS;
 delete childEnv.BRAIN_EXT_REDACT;
 delete childEnv.BRAIN_EXT_REDACT_TOKEN;
-const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add","event","redaction probe","--tag","private@example.com","--tag","1234567","--body","-","--json"],{env:childEnv,encoding:"utf8",input:body});
+const r=spawnSync(process.env.BRAIN_BIN,[...brainPrefix,"log","add","event","redaction probe","--tag","private@example.com","--tag","1234567","--body","-","--json"],{env:childEnv,encoding:"utf8",input:body});
 process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
 `);
   assert.equal(interactiveInstall(f, redactionSource).code, 0);
@@ -741,7 +744,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.equal(readdirSync(meetingDir).length, 3, "concurrent imports create one source entry");
 });
 
-test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {
+test("Windows launcher convention resolves extension commands and scoped brain child calls", (t) => {
   const f = fixture(t);
   const directory = join(f.root, "windows %TEMP% extension");
   mkdirSync(join(directory, "bin"), { recursive: true });
@@ -770,6 +773,17 @@ test("Windows launcher convention resolves extensionless manifest commands to .e
     assert.equal(result.status, 0, result.stderr?.toString());
     assert.deepEqual(JSON.parse(readFileSync(join(directory, "bin", "result.json"), "utf8")), forwarded);
   }
+
+  const runner = join(directory, "scoped-runner.mjs");
+  writeFileSync(runner, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))\n');
+  const brainLaunch = extensionBrainProcess(runner, "win32");
+  assert.equal(brainLaunch.file, process.execPath);
+  assert.deepEqual(brainLaunch.args, ["--no-warnings=ExperimentalWarning", runner]);
+  const brainResult = spawnSync(brainLaunch.file, [...brainLaunch.args, ...forwarded], { encoding: "utf8" });
+  assert.equal(brainResult.status, 0, brainResult.stderr);
+  assert.deepEqual(JSON.parse(brainResult.stdout), forwarded);
+  assert.deepEqual(extensionBrainProcess(runner, "linux"), { file: runner, args: [] });
+
   writeFileSync(join(directory, "bin", "run.exe"), "fixture");
   assert.equal(resolveLauncher(directory, manifest, "win32"), join(directory, "bin", "run.exe"));
 });

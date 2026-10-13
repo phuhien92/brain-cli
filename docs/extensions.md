@@ -84,7 +84,8 @@ arguments. It sets:
 | Variable | Value |
 | --- | --- |
 | `BRAIN_VAULT` | real path of the current vault |
-| `BRAIN_BIN` | an invocation-specific brain launcher carrying the extension's scope |
+| `BRAIN_BIN` | executable for invocation-specific scoped brain child calls |
+| `BRAIN_BIN_ARGS_JSON` | JSON string list of arguments to prepend when invoking `BRAIN_BIN` |
 | `BRAIN_AS` | extension name, or the existing integration name when already scoped |
 | `BRAIN_EXT_DIR` | this extension's installed directory |
 | `BRAIN_MACHINE` | current machine name |
@@ -94,7 +95,9 @@ arguments. It sets:
 The process also receives a minimal runtime environment (`PATH`, home/temp, locale, terminal, and
 required Windows process variables) plus values explicitly approved in `permissions.environment`.
 
-Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
+Extensions should execute `BRAIN_BIN` with the arguments from `BRAIN_BIN_ARGS_JSON` followed by
+the brain arguments and `--json`, instead of reading the vault. The prefix is empty on Unix; on
+Windows it selects the scoped runner through the directly executable Node binary. Those child calls use
 the manifest scope; the launcher restores its trusted scope and redaction context before dispatch.
 If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
