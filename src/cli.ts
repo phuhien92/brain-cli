@@ -9,7 +9,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.7.0";
+export const VERSION = "0.7.1";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -19,7 +19,9 @@ USAGE
   brain <command> [args] [flags]
 
 COMMANDS
-  index [--rebuild]           Bring the index up to date (every command does this first)
+  index [--rebuild|--verify]  Bring the index up to date (every command does this first);
+                              --verify re-reads and hashes every note instead of trusting
+                              modification time and size; --rebuild starts from scratch
   search <query>              Ranked full-text search over titles, aliases, headings, tags, body
       --limit <n>             Max results (default 10, max 100)
       --path <folder>         Only notes under this folder
@@ -130,6 +132,7 @@ export async function main(argv: string[]): Promise<number> {
         version: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
         rebuild: { type: "boolean", default: false },
+        verify: { type: "boolean", default: false },
         limit: { type: "string" },
         path: { type: "string" },
         raw: { type: "boolean", default: false },
@@ -232,7 +235,7 @@ export async function main(argv: string[]): Promise<number> {
       if (!ok) throw new CliError("not_permitted", `integration '${cfg.as!.name}' may not ${what}`, 6);
     };
     store = Store.open(vault, { rebuild: command === "index" && flags.rebuild });
-    let index = store.refresh();
+    let index = store.refresh({ verify: command === "index" && flags.verify });
 
     switch (command) {
       case "index": {

@@ -1,10 +1,18 @@
-# brain-cli
+<p align="center">
+  <img src="assets/banner.svg" alt="brain-cli — headless memory for your markdown vault, for any agent, on any machine" width="100%">
+</p>
 
-Headless memory for a markdown vault, built for AI agents.
+<p align="center">
+  <a href="https://github.com/phuhien92/brain-cli/actions/workflows/ci.yml"><img src="https://github.com/phuhien92/brain-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/node-%E2%89%A522.13-3C873A" alt="Node 22.13+">
+  <img src="https://img.shields.io/badge/runtime%20deps-0-4338CA" alt="zero runtime dependencies">
+  <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
+</p>
 
-`brain` indexes a folder of markdown notes — an Obsidian vault, a docs folder, an
-agent's learnings — and gives any agent ranked search over it from the shell, with a
-stable JSON contract. No app has to be running, no API key, nothing leaves the machine.
+`brain` indexes a folder of markdown notes — an Obsidian vault, a docs folder, an agent's
+learnings — and gives any agent ranked search, memory that syncs across machines, and a
+warning when a note has gone stale. From the shell, with a stable JSON contract. No app
+running, no API key, nothing leaves the machine.
 
 ```console
 $ brain search "deploy gotchas on the mac mini" --limit 3
@@ -34,245 +42,50 @@ is the layer agents use while Obsidian is closed.
 
 ## Install
 
-Requires Node.js **22.13+** (it uses the built-in `node:sqlite`, so there are no native
-dependencies to compile).
+Requires Node.js **22.13+** (it uses the built-in `node:sqlite`, so nothing compiles).
 
 ```sh
 npm install -g github:phuhien92/brain-cli
-# or, from a clone
-npm install && npm run build && npm link
+brain agent install claude     # or: pi, agents — teach your agent harness about brain
 ```
 
-## Use
+## Quick start
 
 ```sh
-brain index                      # bring the index up to date (every command does this anyway)
-brain search "renewal deadline" # ranked search
-brain search pnpm --path firstmate --tag ops --limit 5
-brain search 'lease AND renewal' --raw   # SQLite FTS5 syntax: AND, NEAR, prefix*
-brain get "Projects/blog/runbook" # print a note by path, file name, title or alias
-brain get "Blog runbook" --meta  # frontmatter, tags, headings and links only
-brain get "Blog runbook" --section Deploy   # just that section — for long notes
-brain log add learning "..."     # record memory (see below)
-brain sync                       # share it with your other machines
+cd ~/my-vault                                   # any folder with .obsidian/ or brain.json
+brain search "renewal deadline"                 # ranked search
+brain get "Projects/blog/runbook" --section Deploy
+brain log add learning "pnpm cache breaks after macOS updates"
+brain lifecycle set "Finance/balances" --category current-state --as-of 2026-09-30
+brain doctor                                    # check this machine's setup
 ```
 
-The vault is `--vault <dir>`, else `$BRAIN_VAULT`, else the nearest parent folder holding
-`.obsidian/` or a `brain.json`.
+## How it fits together
 
-### Teaching an agent to use it
-
-An agent has to know brain exists before it can call it. `brain agent install` sets that
-up per harness, in two layers:
-
-- **A skill** (`skills/brain/SKILL.md`, the [Agent Skills](https://agentskills.io) format).
-  Only its one-paragraph description sits in the agent's context; the full instructions
-  load when a question matches — "what did I decide about…", "do I have notes on…". It
-  costs almost nothing until it is needed.
-- **A primer at session start** from `brain context`: what brain is, plus the five most
-  recent memory titles, so the agent starts each session knowing what it knows.
-
-| Harness | `brain agent install …` | Skill | Session primer |
-| --- | --- | --- | --- |
-| Claude Code | `claude` | `~/.claude/skills/brain/` | a `SessionStart` hook running `brain context` — printed for you to paste into `~/.claude/settings.json`; brain never edits your settings |
-| [Pi](https://pi.dev) | `pi` | `~/.agents/skills/brain/` (Pi reads it; not also `~/.pi/agent/skills`, which would collide) | `~/.pi/agent/extensions/brain-memory.ts`, injecting once per session — Pi persists injected messages, so once is the only safe cadence |
-| Others | `agents` | `~/.agents/skills/brain/`, for harnesses that read the Agent Skills shared location | add `brain context` to the harness's own startup hook |
-
-`brain context` prints nothing and exits 0 when there is no vault, so a hook can never
-break the agent that runs it. The installer refuses to replace a file it did not write
-(`--force` to override) and `--dry-run` shows what it would do.
-
-The Pi integration is checked end to end in CI: [`scripts/verify-pi.sh`](scripts/verify-pi.sh)
-runs a real Pi against a fake local model and asserts that the request lists the skill and
-carries exactly one primer on the first turn and on the second.
-
-For a harness without skills or hooks, one line in its always-loaded instructions works:
-
-```markdown
-For questions about my notes or past decisions, run `brain search "<question>" --json` first;
-use grep only for exact strings.
+```mermaid
+flowchart LR
+  A["Agents and tools<br/>Claude Code, Pi, firstmate, cron"] -- "brain ... --json" --> B["brain CLI<br/>checks freshness on every call"]
+  B -- "reads notes; writes only new log files" --> V[("Vault<br/>synced by git, iCloud, anything")]
+  B -- "keeps current" --> I[("Index<br/>per machine, never synced")]
 ```
 
-## The JSON contract
+The vault holds only markdown and stays the source of truth; the index is a per-machine
+cache; brain never edits a note. Full design, with the per-command flow and where every
+file lives: **[docs/architecture.md](docs/architecture.md)**.
 
-Every command takes `--json` and writes exactly one line to stdout:
+## Documentation
 
-```json
-{
-  "schema": "brain.v1",
-  "command": "search",
-  "ok": true,
-  "vault": "/Users/me/vault",
-  "index": { "added": 0, "updated": 1, "removed": 0, "unchanged": 126, "ms": 9 },
-  "data": {
-    "query": "pnpm cache",
-    "results": [
-      { "path": "firstmate/learnings/2026-10-13-pnpm-cache.md",
-        "title": "pnpm cache breaks after an OS update",
-        "score": 6.212, "snippet": "…the [pnpm] [cache] keeps a stale store…", "tags": ["ops"] }
-    ]
-  }
-}
-```
-
-Failures keep the same shape with `"ok": false` and an `error` object, and a distinct exit
-code, so an agent can branch without parsing prose:
-
-| Exit | `error.code` | Meaning |
-| --- | --- | --- |
-| 0 | — | ok (an empty result list is still ok) |
-| 1 | `no_vault`, `internal` | no vault found, or an unexpected failure |
-| 2 | `usage`, `bad_query` | bad arguments, or invalid `--raw` FTS5 syntax |
-| 3 | `not_found` | `get` matched no note |
-| 4 | `ambiguous` | `get` matched several notes; `error.candidates` lists their paths |
-| 5 | `sync_conflict`, `export_drift` | a note was edited on two machines (`error.files`), or an exported file was edited since brain wrote it |
-| 6 | `not_permitted` | the acting integration (`BRAIN_AS`) may not write that kind |
-| 7 | `lint_failed` | `brain lint --strict` found warnings |
-
-`schema` changes only on a breaking change to this shape.
-
-## One vault, many repos
-
-Several tools can share one vault — an agent orchestrator, a coaching skill, scheduled
-jobs — and more will come. Each is an **integration**, declared in the vault's
-`brain.json` with the folders it may read and the memory kinds it may write; its paths on
-each machine live in that machine's config; its agents run with `BRAIN_AS=<name>`.
-
-```json
-{ "integrations": {
-    "interview-coach": { "read": ["Career HQ/"], "write": ["interview"] },
-    "firstmate": { "read": ["firstmate/"], "write": ["learning"] } } }
-```
-
-A scoped agent's searches, reads and log only see its folders; anything else is "not
-found". Adding a repo is configuration, never code: [docs/integrations.md](docs/integrations.md).
-`brain integrations` lists who is connected; `brain doctor` checks this machine's setup.
-
-## Memory across machines
-
-An agent's memory is usually one file — `learnings.md`, `MEMORY.md` — that every session
-appends to. Put that file in git and use it from two machines, and the first sync is a
-merge conflict: both machines appended to the same place.
-
-`brain` stores memory as a **log of one file per entry** instead:
-
-```sh
-brain log add learning "pnpm cache breaks after macOS updates" --body "Run pnpm store prune." --tag ops
-# → log/learning/2026-10-13-mac-mini-pnpm-cache-breaks-after-macos-updates.md
-brain log 5                      # recent entries, any kind
-brain view learning              # every learning, oldest first, as one markdown list
-brain sync                       # commit new entries, pull --rebase, push, re-export
-```
-
-Two machines never create the same file, so `git` merges their logs with no conflict, ever.
-The single-file shape that existing tools expect is *generated* from the log, so it is
-never edited by two machines either. Each entry records which machine wrote it.
-
-- **`brain sync`** follows the vault's `"sync"` mode, because files reach other machines
-  in many ways: `git` (any remote) commits only the log folder and `brain.json` — never a
-  note you are halfway through — then pulls with rebase and pushes, stopping with exit 5
-  and the file names if a *note* was edited on both machines; `none` leaves moving files
-  to iCloud, Dropbox, Syncthing or Obsidian Sync; `{ "command": … }` runs yours. `auto`
-  (the default) picks git when the vault is a git repository.
-- **`brain export`** writes a view to a path outside the vault as a regular file (not a
-  symlink — some tools rightly refuse those). If that file was edited since brain last
-  wrote it, it refuses, because those edits are not in any entry yet. Capture them with
-  `brain log import`, then `brain export --force`.
-- **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
-  top-level list item, dropping HTML-comment markers from titles. Titles already recorded
-  are skipped, so importing on a second machine adds only what is new there.
-
-Configuration is split by what may travel:
-
-```jsonc
-// <vault>/brain.json — committed, the same on every machine (optional)
-{ "log": { "dir": "log" } }
-
-// ~/.config/brain/config.json — this machine only ($BRAIN_CONFIG overrides the path)
-{
-  "machine": "mac-mini",
-  "exports": [
-    { "kind": "learning", "path": "~/firstmate/data/learnings.md",
-      "header": "<!-- memory tiers: see the stow skill -->" }
-  ]
-}
-```
-
-[docs/firstmate.md](docs/firstmate.md) walks through moving
-[firstmate](https://github.com/kunchenguid/firstmate)'s fleet learnings onto two machines.
-
-## Keeping the vault true
-
-Notes go stale. A balance from July, a manager fee from before you switched — an agent
-will quote them with full confidence unless something says otherwise.
-
-```sh
-brain lifecycle set "Finance/robinhood" --category current-state --as-of 2026-07-24
-brain lifecycle review "Finance/robinhood"          # confirmed still true today
-brain lifecycle archive "Old plan" --reason "superseded by the split coaching state"
-brain lifecycle status --due                        # what needs a look
-brain lint                                          # broken links, conflict copies, overdue reviews…
-```
-
-| Category | Review after | For |
-| --- | --- | --- |
-| `memory`, `identity`, `preference`, `principle` | never | lasting facts, who you are, how you like things, rules |
-| `research` | 180 days | articles, plans, analysis |
-| `current-state` | 30 days | balances, statuses, who manages what |
-| `news` | 14 days | digests, announcements |
-
-Windows are configurable (`brain.json`: `"lifecycle": { "windows": { "current-state": 60 } }`).
-A category can also be written by hand in a note's frontmatter (`category:`, `as-of:`,
-`reviewed:`, `archived: true`).
-
-What changes for agents: search and `get` carry each note's `lifecycle`; an overdue note
-is marked stale, an archived one is hidden from search, and the session primer says how
-many notes are past review. The `brain` skill tells agents to say a fact may be out of
-date rather than state it.
-
-`lifecycle` commands never edit a note. Each change is a new entry in `log/lifecycle/`,
-so two machines reviewing notes never conflict, and every change has a date, a machine
-and a reason.
-
-`brain lint` reports, without changing anything: broken links (a link that names an
-existing file without its extension counts as resolved), notes nothing links to, sync
-conflict copies (`Note 2.md`, Dropbox "conflicted copy", Syncthing `.sync-conflict-`),
-overdue reviews and lifecycle problems, and per-file line limits you set
-(`"lint": { "maxLines": { "MEMORY.md": 150 } }`). `--strict` exits 7 on warnings, for a
-scheduled job.
-
-## How the index stays fresh
-
-The design is borrowed from [Serena](https://github.com/oraios/serena): index once up
-front, then keep the index current as a side effect of using it.
-
-- The index is a SQLite file **outside the vault**, at
-  `~/.local/state/brain/<vault-name>-<id>/index.db` (`$BRAIN_STATE_DIR` to move it). Vaults
-  get synced — by git, and just as often by iCloud, Dropbox or Obsidian Sync — and a live
-  SQLite database synced between two machines corrupts or forks into "index 2.db". So the
-  vault holds only markdown, and each machine builds its own index. Delete it and it
-  rebuilds.
-- Every command starts with a refresh: it `stat`s each note and compares modification
-  time and size with the index. Only changed files are read; of those, only files whose
-  **content hash** changed are re-parsed, so a `git checkout` that touches timestamps
-  costs nothing. Deleted notes are dropped.
-- There is no file watcher and no daemon. The index cannot be stale at the moment it is
-  read, and keeping it that way costs one `stat` per note: ~10 ms on a 127-note vault,
-  against ~130 ms for the first full build.
-
-Each note is parsed for its title (frontmatter `title`, else the first `# H1`, else the
-file name), aliases, headings, tags (frontmatter and inline `#tags`, ignoring code), and
-wiki-links (`[[target#heading|alias]]`, embeds included). Search is SQLite FTS5 with
-Porter stemming, so "designing" finds "design".
-
-### Why no vector database (yet)
-
-The caller is an LLM. When a keyword search comes back thin, it rephrases — "why did
-the build break" becomes "pnpm cache" — at almost no cost, which covers most of what
-embeddings would. Keyword search is also deterministic, explainable (the snippet shows
-why a note matched), needs no model download or API key, and never sends a note to a
-third party. If the benchmark below shows paraphrased questions failing, semantic search
-will arrive as an optional mode stored in the same SQLite file, not a separate service.
+| | |
+| --- | --- |
+| [Architecture](docs/architecture.md) | design, diagrams, guarantees, code map |
+| [Indexing](docs/indexing.md) | how the index stays up to date, measured costs, limits |
+| [Commands](docs/cli.md) | every command, the JSON contract, exit codes |
+| [Agents](docs/agents.md) | skills and session primers for Claude Code, Pi and others |
+| [Memory across machines](docs/memory.md) | one file per entry, views, export, sync |
+| [Keeping the vault true](docs/lifecycle.md) | lifecycle categories, review windows, lint |
+| [Integrations](docs/integrations.md) | many repos sharing one vault, scopes, sync modes |
+| [firstmate guide](docs/firstmate.md) | sharing firstmate's learnings across two machines |
+| [Extensions (design)](docs/design/extensions.md) | proposed plugin model and `brain ui` |
 
 ## Roadmap
 

@@ -1,6 +1,6 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
@@ -65,6 +65,23 @@ test("refresh is incremental: unchanged, touched, edited, added, deleted", () =>
 
   assert.equal(store.search("zebrafish")[0]?.path, "Reading/frontend.md");
   assert.equal(store.search("cobra").length, 0);
+  store.close();
+});
+
+test("verify catches an edit that kept the same size and modification time", () => {
+  const file = join(vault, "Reading/frontend.md");
+  const pinned = new Date("2026-10-13T10:00:00Z"); // whole seconds, so it round-trips exactly
+  utimesSync(file, pinned, pinned);
+  const store = Store.open(vault);
+  store.refresh();
+  const before = statSync(file);
+  writeFileSync(file, "# Reading list\nAn essay that mentions internals once.\n"); // "interview" → "internals": same length
+  utimesSync(file, pinned, pinned);
+  assert.equal(statSync(file).size, before.size);
+  assert.equal(statSync(file).mtimeMs, before.mtimeMs);
+  assert.equal(store.refresh().updated, 0, "the quick check cannot see it");
+  assert.equal(store.refresh({ verify: true }).updated, 1);
+  assert.equal(store.search("internals")[0]?.path, "Reading/frontend.md");
   store.close();
 });
 

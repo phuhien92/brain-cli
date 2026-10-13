@@ -129,7 +129,10 @@ export class Store {
       .run(String(SCHEMA_VERSION));
   }
 
-  refresh(): RefreshStats {
+  // verify: ignore the (mtime, size) shortcut and hash every note. For the
+  // rare edit that keeps both — a same-length change inside one timestamp
+  // tick, or a sync tool that restores mtimes — and for peace of mind.
+  refresh(opts: { verify?: boolean } = {}): RefreshStats {
     const started = performance.now();
     const stats: RefreshStats = { added: 0, updated: 0, removed: 0, unchanged: 0, offline: 0, ms: 0 };
     const offline = new Set<string>();
@@ -154,7 +157,7 @@ export class Store {
         seen.add(rel);
         const st = statSync(abs);
         const prev = known.get(rel);
-        if (prev && prev.mtime === st.mtimeMs && prev.size === st.size) {
+        if (!opts.verify && prev && prev.mtime === st.mtimeMs && prev.size === st.size) {
           stats.unchanged++;
           continue;
         }

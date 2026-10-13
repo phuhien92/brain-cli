@@ -1,6 +1,6 @@
 {
   "name": "brain-cli",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Headless, agent-agnostic memory for a markdown vault: incremental index, ranked search, JSON output.",
   "type": "module",
   "bin": {
