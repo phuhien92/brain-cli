@@ -245,6 +245,14 @@ will arrive as an optional mode stored in the same SQLite file, not a separate s
    `research`), archive, broken-link and orphan checks; and a published benchmark of grep
    vs. the Obsidian CLI vs. `brain` on real questions, measuring tokens read and whether
    the right note came back.
+5. **Extensions** — anyone can add a command (`brain <name>`) or a hook on brain's
+   events in any language, as a separate process speaking the `--json` contract, with a
+   manifest that declares what it reads, writes and contacts. Importers, embeddings and
+   new views belong here, not in the core.
+6. **`brain ui`** — a local web page (127.0.0.1 only) for status, integrations, this
+   machine's config, extensions and a search playground, like Serena's dashboard.
+
+Steps 5 and 6 are designed, not built: [docs/design/extensions.md](docs/design/extensions.md).
 
 ## Develop
 
