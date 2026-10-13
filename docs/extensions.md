@@ -89,7 +89,10 @@ arguments. It sets:
 Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
 the manifest scope. If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
-narrow a caller but cannot widen it. Inputs an extension sends through `brain log add` are run
+narrow a caller but cannot widen it. Extension children may call only `search`, `get`, `log`,
+`view`, `lifecycle`, and `context` (plus `help` and `--version`); machine administration,
+configuration, diagnostics, sync/export, feedback, telemetry, unrestricted index/lint data,
+path inspection, and other extensions are denied before dispatch. Inputs an extension sends through `brain log add` are run
 through core redaction before the new note is created. To retain a sanitized HTTP(S) source URL,
 remove credentials, query, and fragment, ensure its decoded path contains no redacted values, encode its
 canonical UTF-8 bytes as base64url, and place it inside

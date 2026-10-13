@@ -196,6 +196,7 @@ interface Out {
 // a user typed (a query, a note, feedback text) can never become a name.
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
 const BUILT_INS = new Set(COMMANDS);
+const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle", "context"]);
 const EXTENSION_TIMEOUT_MS = 30_000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
 const SUBCOMMANDS: Record<string, string[]> = {
@@ -228,6 +229,14 @@ export async function main(argv: string[]): Promise<number> {
   const position = commandPosition(argv);
   const first = position === -1 ? undefined : argv[position];
   const after = position === -1 ? undefined : argv[position + 1];
+  const extensionCaller = process.env.BRAIN_EXTENSION_SCOPE;
+  if (extensionCaller && first && !EXTENSION_CHILD_COMMANDS.has(first)) {
+    return fail(
+      { json, quiet: argv.includes("--quiet") || argv.includes("-q") },
+      first,
+      new CliError("not_permitted", `extension '${extensionCaller}' may not run '${first}'`, 6),
+    );
+  }
   if (telemetry.shouldAsk({ json, command: telemetryName(first ?? "help", after), userConfigTelemetry: userSettings().telemetry })) {
     try {
       await telemetry.ask();

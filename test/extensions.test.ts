@@ -347,6 +347,40 @@ if(action==="write-allowed"||action==="write-denied") {
   assert.deepEqual(narrowed.body.data.paths, [], "Allowed ∩ Private is empty; extension permission cannot widen the caller");
   assert.equal(narrowed.body.data.as, "narrow", "the parent scope is delivered through BRAIN_AS");
 
+  const adminSource = makeExtension(join(f.root, "admin-source"), {
+    name: "admin-probe",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: [], network: [] },
+  }, `
+import { spawnSync } from "node:child_process";
+const command=JSON.parse(Buffer.from(process.argv[2],"base64url").toString("utf8"));
+const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,...command,"--json"],{env:process.env,encoding:"utf8"});
+process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
+`);
+  assert.equal(interactiveInstall(f, adminSource).code, 0);
+  const deniedCommands = [
+    ["setup"],
+    ["telemetry", "show"],
+    ["feedback", "list"],
+    ["ext", "remove", "admin-probe"],
+    ["agent", "install", "claude", "--dry-run"],
+    ["index"],
+    ["export"],
+    ["sync"],
+    ["integrations"],
+    ["doctor"],
+    ["lint"],
+    ["path"],
+    ["probe"],
+  ];
+  for (const command of deniedCommands) {
+    const encoded = Buffer.from(JSON.stringify(command)).toString("base64url");
+    const deniedChild = json(f, ["admin-probe", encoded]);
+    assert.equal(deniedChild.code, 6, `${command.join(" ")} must be denied`);
+    assert.equal(deniedChild.body.error.code, "not_permitted");
+  }
+  assert.equal(json(f, ["admin-probe", Buffer.from(JSON.stringify(["search", "shared-word"])).toString("base64url")]).code, 0);
+
   const redactionSource = makeExtension(join(f.root, "redaction-source"), {
     name: "redaction-probe",
     command: "bin/command.mjs",
