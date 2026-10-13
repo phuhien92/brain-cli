@@ -2,7 +2,7 @@
 // codes are what an agent actually gets.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { after, before, test } from "node:test";
@@ -40,8 +40,21 @@ after(() => rmSync(vault, { recursive: true, force: true }));
 test("finds the vault from a nested folder via .obsidian/", () => {
   const { code, body } = json(["index"], { cwd: join(vault, "notes") });
   assert.equal(code, 0);
-  assert.equal(body.vault, vault);
+  assert.equal(body.vault, realpathSync(vault));
   assert.equal(body.data.notes, 3);
+});
+
+test("a vault reached through a symlink is reported by its real path (macOS /var → /private/var)", () => {
+  const link = join(tmpdir(), `brain-link-${process.pid}`);
+  symlinkSync(vault, link);
+  try {
+    const viaEnv = json(["index"], { env: { BRAIN_VAULT: link } });
+    const viaCwd = json(["index"], { cwd: join(link, "notes") });
+    assert.equal(viaEnv.body.vault, realpathSync(vault));
+    assert.equal(viaCwd.body.vault, realpathSync(vault));
+  } finally {
+    rmSync(link);
+  }
 });
 
 test("search --json returns the versioned envelope with ranked results", () => {

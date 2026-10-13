@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, slug, type Config } from "./config.js";
@@ -275,7 +275,14 @@ function driftMessage(drift: ExportResult[]): string {
   );
 }
 
+// Always the real path: on macOS /var is a symlink to /private/var, and a vault
+// found via the shell's cwd and one named in $BRAIN_VAULT must not be reported as
+// two different vaults.
 function findVault(flag: string | undefined): string {
+  return realpathSync(locateVault(flag));
+}
+
+function locateVault(flag: string | undefined): string {
   const explicit = flag ?? process.env.BRAIN_VAULT;
   if (explicit) {
     const dir = resolve(explicit);
