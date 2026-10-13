@@ -157,7 +157,7 @@ export function renderView(entries: Entry[], header?: string): string {
   // write a sync could fight over); the view shows the oldest once.
   const seen = new Set<string>();
   const unique = sorted.filter((e) => {
-    const key = entryKey(e);
+    const key = renderKey(e);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -266,19 +266,19 @@ export function importFile(
   const activeEntries = listEntries(store, cfg, { kind: entryKind });
   // A retired entry remains recorded: importing a stale generated file must
   // not silently recreate it as a new active entry.
-  const existing = new Set(allEntries.map(entryKey));
+  const existing = new Set(allEntries.map(importKey));
   const added: string[] = [];
   let skipped = 0;
   // A millisecond apart and ending now, so the view (oldest first) keeps the
   // file's original order and nothing imported sorts after a later entry.
   const items = parseImport(source);
-  const imported = new Set(items.map(entryKey));
+  const imported = new Set(items.map(importKey));
   const retirementCandidates = activeEntries
-    .filter((entry) => !imported.has(entryKey(entry)))
+    .filter((entry) => !imported.has(importKey(entry)))
     .map(({ path, title, body }) => ({ path, title, body }));
   const base = Date.now() - items.length;
   items.forEach((item, i) => {
-    const key = entryKey(item);
+    const key = importKey(item);
     if (existing.has(key)) {
       skipped++;
       return;
@@ -300,8 +300,14 @@ function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-function entryKey(entry: { title: string; body: string }): string {
+function renderKey(entry: { title: string; body: string }): string {
   return `${norm(entry.title)}\n${norm(entry.body)}`;
+}
+
+function importKey(entry: { title: string; body: string }): string {
+  const title = entry.title.replace(/\s+/g, " ").trim();
+  const body = entry.body.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
+  return `${title}\n${body}`;
 }
 
 export function sha(s: string): string {

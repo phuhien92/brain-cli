@@ -160,6 +160,30 @@ test("import captures a body-only rewording and offers the old entry for retirem
   assert.match(view, /new detail/);
 });
 
+test("import captures case-only title and body corrections", () => {
+  const oldBody = brain(["log", "add", "learning", "Body case", "--body", "run npm"]);
+  const oldTitle = brain(["log", "add", "learning", "title case", "--body", "same detail"]);
+  brain(["log", "add", "learning", "No change", "--body", "stable detail"]);
+  const imported = join(vault, "learnings.md");
+  writeFileSync(imported, ["- Body case", "  Run npm", "- Title Case", "  same detail", "- No change", "  stable detail", ""].join("\n"));
+
+  const result = brain(["log", "import", "learning", imported]);
+  assert.equal(result.code, 0);
+  assert.equal(result.body.data.added.length, 2);
+  assert.equal(result.body.data.skipped, 1);
+  assert.deepEqual(
+    result.body.data.retirementCandidates.map((candidate: { path: string }) => candidate.path).sort(),
+    [oldBody.body.data.path, oldTitle.body.data.path].sort(),
+  );
+
+  for (const candidate of result.body.data.retirementCandidates) {
+    assert.equal(brain(["log", "retire", candidate.path]).code, 0);
+  }
+  const view = brain(["view", "learning"]).body.data.markdown;
+  assert.match(view, /- Body case\n {2}Run npm/);
+  assert.match(view, /- Title Case\n {2}same detail/);
+});
+
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {
   write("brain.json", JSON.stringify({ lifecycle: { windows: { "current-state": 60 } } }));
   assert.equal(brain(["get", "Finance/kent"]).body.data.lifecycle.overdue, false);
