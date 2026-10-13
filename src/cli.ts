@@ -1186,7 +1186,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   if (envelope!.ok === false) {
     tError = "extension_failed";
   }
-  if (out.json || !out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
+  if (envelope!.ok === false || out.json || !out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
   return result.code ?? 1;
 }
 

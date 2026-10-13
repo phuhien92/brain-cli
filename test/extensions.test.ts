@@ -146,6 +146,9 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(quietJson.code, 0, quietJson.stderr);
   assert.equal(quietJson.stdout.trim().split("\n").length, 1);
   assert.equal(JSON.parse(quietJson.stdout).schema, "brain.v1");
+  const quiet = brain(f, ["echoer", "--quiet"]);
+  assert.equal(quiet.code, 0, quiet.stderr);
+  assert.equal(quiet.stdout, "");
 
   const secondVault = join(f.root, "second-vault");
   mkdirSync(join(secondVault, ".obsidian"), { recursive: true });
@@ -362,6 +365,11 @@ else if (action === "flood") {
   const events = readFileSync(join(f.state, "telemetry-queue.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
   assert.equal(events.at(-1).error, "extension_failed");
   assert.ok(!JSON.stringify(events).includes("customer_acme_private"));
+
+  const quietFailure = brain(f, ["broken", "private-error", "--quiet"]);
+  assert.equal(quietFailure.code, 1);
+  assert.equal(quietFailure.stdout.trim().split("\n").length, 1);
+  assert.equal(JSON.parse(quietFailure.stdout).error.code, "customer_acme_private");
 
   const hung = json(f, ["broken", "hang"]);
   assert.equal(hung.code, 1);
