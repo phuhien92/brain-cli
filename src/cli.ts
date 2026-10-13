@@ -39,6 +39,7 @@ import {
   installExtension,
   installedManifest,
   listExtensions,
+  publicExtensionSource,
   removeExtension,
   resolveLauncher,
   type ExtensionManifest,
@@ -1505,7 +1506,7 @@ function fail(out: Out, command: string, err: unknown): number {
     saveLastError({
       time: new Date().toISOString(),
       command,
-      args: process.argv.slice(2),
+      args: process.argv.slice(2).map(publicExtensionSource),
       code: e.code,
       exit: e.exit,
       message: e.message,

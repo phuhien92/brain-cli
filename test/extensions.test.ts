@@ -190,10 +190,16 @@ test("install rejects terminal controls in permission text and unsupported sourc
   assert.equal(alias.code, 3, alias.stdout + alias.stderr);
   assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);
 
-  const credentialFailure = interactiveInstall(f, "http://user:secret-token@127.0.0.1:1/private.git");
+  const credentialFailure = interactiveInstall(f, "http://user:secret-token@127.0.0.1:1/private.git?access_token=query-secret#fragment");
   assert.equal(credentialFailure.code, 1, credentialFailure.stdout + credentialFailure.stderr);
   assert.ok(!(credentialFailure.stdout + credentialFailure.stderr).includes("secret-token"));
+  assert.ok(!(credentialFailure.stdout + credentialFailure.stderr).includes("query-secret"));
   assert.match(credentialFailure.stdout + credentialFailure.stderr, /http:\/\/127\.0\.0\.1:1\/private\.git/);
+  const lastError = readFileSync(join(f.state, "last-error.json"), "utf8");
+  assert.ok(!lastError.includes("secret-token"));
+  assert.ok(!lastError.includes("query-secret"));
+  assert.ok(!lastError.includes("fragment"));
+  assert.match(lastError, /http:\/\/127\.0\.0\.1:1\/private\.git/);
 
   const linked = echoExtension(join(f.root, "linked-source"), "linked");
   const externalHelper = join(f.root, "external-helper.mjs");
@@ -215,7 +221,7 @@ test("git installation records its commit, remove is machine-local, and missing 
   execFileSync("git", ["-C", source, "commit", "-qm", "fixture"]);
   const commit = execFileSync("git", ["-C", source, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 
-  const credentialSource = "https://user:secret-token@example.invalid/private.git";
+  const credentialSource = "https://user:secret-token@example.invalid/private.git?access_token=query-secret";
   const installed = interactiveInstall(f, credentialSource, "y", {
     GIT_CONFIG_COUNT: "1",
     GIT_CONFIG_KEY_0: `url.${pathToFileURL(source).href}.insteadOf`,
@@ -228,6 +234,8 @@ test("git installation records its commit, remove is machine-local, and missing 
   assert.ok(!JSON.stringify(listed).includes("secret-token"));
   const metadata = JSON.parse(readFileSync(join(listed.directory, ".brain-install.json"), "utf8"));
   assert.equal(metadata.source, "https://example.invalid/private.git");
+  writeFileSync(join(listed.directory, ".brain-install.json"), JSON.stringify({ ...metadata, source: "deploy-token@example.invalid:private.git" }));
+  assert.equal(json(f, ["ext", "list"]).body.data.extensions[0].source, "example.invalid:private.git");
   assert.equal(json(f, ["from-git"]).code, 0);
 
   const removed = json(f, ["ext", "remove", "from-git"]);

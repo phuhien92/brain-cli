@@ -17,8 +17,8 @@ Installation works only in an interactive terminal. brain copies a local directo
 Git URL into this machine's extension data directory, shows the manifest's read, write, and
 network permissions, and asks the person to approve. There is no `--yes` or JSON-mode approval:
 agents, scripts, CI, and hooks cannot silently grant permissions. Credentials embedded in a Git
-URL are used only for cloning; install metadata, `ext list`, and errors retain only the URL with
-its credentials removed.
+URL are used only for cloning; install metadata, `ext list`, errors, and error diagnostics remove
+URL user information, query strings, fragments, and SCP-style usernames.
 
 Installed code is per machine (`~/.local/share/brain/extensions` by default, overridable with
 `BRAIN_EXTENSIONS_DIR`). A Git install records its exact commit; a local install is a copy, not a
