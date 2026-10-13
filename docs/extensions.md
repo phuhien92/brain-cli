@@ -92,7 +92,7 @@ Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Thos
 the manifest scope. If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
 narrow a caller but cannot widen it. Extension children may call only `search`, `get`, read-only
-`log`, `log add`, `view`, `lifecycle status`, and `context` (plus `help` and `--version`); `log import`,
+`log`, `log add`, `view`, and `lifecycle status` (plus `help` and `--version`); `log import`, `context`,
 mutating lifecycle commands, machine administration,
 configuration, diagnostics, sync/export, feedback, telemetry, unrestricted index/lint data,
 path inspection, and other extensions are denied before dispatch. Inputs an extension sends through `brain log add` are run

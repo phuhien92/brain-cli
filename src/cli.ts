@@ -197,7 +197,7 @@ interface Out {
 // a user typed (a query, a note, feedback text) can never become a name.
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
 const BUILT_INS = new Set(COMMANDS);
-const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle", "context"]);
+const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle"]);
 const DEFAULT_EXTENSION_TIMEOUT_MS = 30_000;
 const MAX_EXTENSION_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;

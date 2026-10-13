@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 const SCHEMA = "brain.v1";
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
 
 function envelope(command, ok, value) {
   process.stdout.write(JSON.stringify(ok
@@ -73,14 +74,23 @@ function sourceUrl(value) {
 
 function sourceCreated(value) {
   const raw = oneLine(value);
-  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
-  const instant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(raw);
-  if (!dateOnly && !instant) return "";
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const instant = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(raw);
+  const parts = dateOnly ?? instant;
+  if (!parts) return "";
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > days[month - 1]) return "";
+  if (instant) {
+    if (Number(instant[4]) > 23 || Number(instant[5]) > 59 || Number(instant[6] ?? 0) > 59) return "";
+    if (instant[7] !== undefined && (Number(instant[7]) > 23 || Number(instant[8]) > 59)) return "";
+  }
   const date = new Date(dateOnly ? `${raw}T00:00:00.000Z` : raw);
   if (Number.isNaN(date.getTime())) return "";
-  const canonical = date.toISOString();
-  if (dateOnly && canonical.slice(0, 10) !== raw) return "";
-  return canonical;
+  return date.toISOString();
 }
 
 function validateMeeting(value, index) {
@@ -94,6 +104,16 @@ function validateMeeting(value, index) {
   for (const field of ["attendees", "actionItems"]) {
     if (value[field] !== undefined && (!Array.isArray(value[field]) || value[field].some((item) => typeof item !== "string"))) {
       throw new Error(`meetings[${index}].${field} must be a list of strings`);
+    }
+  }
+  for (const field of ["id", "title", "date", "summary", "url"]) {
+    if (typeof value[field] === "string" && CONTROL_CHARACTERS.test(value[field])) {
+      throw new Error(`meetings[${index}].${field} cannot contain control characters`);
+    }
+  }
+  for (const field of ["attendees", "actionItems"]) {
+    if (Array.isArray(value[field]) && value[field].some((item) => CONTROL_CHARACTERS.test(item))) {
+      throw new Error(`meetings[${index}].${field} cannot contain control characters`);
     }
   }
   if (oneLine(value.url) && !sourceUrl(value.url)) throw new Error(`meetings[${index}].url must be an HTTP URL`);
