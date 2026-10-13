@@ -210,6 +210,19 @@ export class Store {
       .run(id, note.title, note.aliases.join(" "), note.headings.join("\n"), note.tags.join(" "), note.body);
   }
 
+  // Machine-local bookkeeping (e.g. the hash brain last exported to a path).
+  // It lives in the cache on purpose: losing it only makes exports cautious.
+  getMeta(key: string): string | null {
+    const row = this.db.prepare("SELECT value FROM meta WHERE key = ?").get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db
+      .prepare("INSERT INTO meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(key, value);
+  }
+
   count(): number {
     return (this.db.prepare("SELECT count(*) AS n FROM notes").get() as { n: number }).n;
   }

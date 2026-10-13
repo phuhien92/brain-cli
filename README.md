@@ -52,6 +52,8 @@ brain search pnpm --path firstmate --tag ops --limit 5
 brain search 'lease AND renewal' --raw   # SQLite FTS5 syntax: AND, NEAR, prefix*
 brain get "Projects/blog/runbook" # print a note by path, file name, title or alias
 brain get "Blog runbook" --meta  # frontmatter, tags, headings and links only
+brain log add learning "..."     # record memory (see below)
+brain sync                       # share it with your other machines
 ```
 
 The vault is `--vault <dir>`, else `$BRAIN_VAULT`, else the nearest parent folder holding
@@ -102,8 +104,60 @@ code, so an agent can branch without parsing prose:
 | 2 | `usage`, `bad_query` | bad arguments, or invalid `--raw` FTS5 syntax |
 | 3 | `not_found` | `get` matched no note |
 | 4 | `ambiguous` | `get` matched several notes; `error.candidates` lists their paths |
+| 5 | `sync_conflict`, `export_drift` | a note was edited on two machines (`error.files`), or an exported file was edited since brain wrote it |
 
 `schema` changes only on a breaking change to this shape.
+
+## Memory across machines
+
+An agent's memory is usually one file — `learnings.md`, `MEMORY.md` — that every session
+appends to. Put that file in git and use it from two machines, and the first sync is a
+merge conflict: both machines appended to the same place.
+
+`brain` stores memory as a **log of one file per entry** instead:
+
+```sh
+brain log add learning "pnpm cache breaks after macOS updates" --body "Run pnpm store prune." --tag ops
+# → log/learning/2026-10-13-mac-mini-pnpm-cache-breaks-after-macos-updates.md
+brain log 5                      # recent entries, any kind
+brain view learning              # every learning, oldest first, as one markdown list
+brain sync                       # commit new entries, pull --rebase, push, re-export
+```
+
+Two machines never create the same file, so `git` merges their logs with no conflict, ever.
+The single-file shape that existing tools expect is *generated* from the log, so it is
+never edited by two machines either. Each entry records which machine wrote it.
+
+- **`brain sync`** commits only the log folder and `brain.json` — never a note you are
+  halfway through — then `pull --rebase --autostash` and `push`. If a *note* was edited on
+  both machines, it stops with exit 5 and the file names, after aborting the rebase so the
+  vault is left as it was.
+- **`brain export`** writes a view to a path outside the vault as a regular file (not a
+  symlink — some tools rightly refuse those). If that file was edited since brain last
+  wrote it, it refuses, because those edits are not in any entry yet. Capture them with
+  `brain log import`, then `brain export --force`.
+- **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
+  top-level list item, dropping HTML-comment markers from titles. Titles already recorded
+  are skipped, so importing on a second machine adds only what is new there.
+
+Configuration is split by what may travel:
+
+```jsonc
+// <vault>/brain.json — committed, the same on every machine (optional)
+{ "log": { "dir": "log" } }
+
+// ~/.config/brain/config.json — this machine only ($BRAIN_CONFIG overrides the path)
+{
+  "machine": "mac-mini",
+  "exports": [
+    { "kind": "learning", "path": "~/firstmate/data/learnings.md",
+      "header": "<!-- memory tiers: see the stow skill -->" }
+  ]
+}
+```
+
+[docs/firstmate.md](docs/firstmate.md) walks through moving
+[firstmate](https://github.com/kunchenguid/firstmate)'s fleet learnings onto two machines.
 
 ## How the index stays fresh
 
@@ -136,14 +190,10 @@ will arrive as an optional mode stored in the same SQLite file, not a separate s
 
 ## Roadmap
 
-This is step 1 of four.
-
 1. **Core** — `index`, `search`, `get`, incremental indexing, `--json`. ✅
-2. **Memory that syncs across machines** — `brain log add` writes one file per entry so
-   two machines never edit the same file and git never conflicts; a generated
-   `learnings.md` view; `brain sync`. First consumer:
-   [firstmate](https://github.com/kunchenguid/firstmate), whose memory is currently local
-   to one machine.
+2. **Memory that syncs across machines** — one file per entry, generated views, `export`
+   with drift protection, `import`, `sync`. First consumer:
+   [firstmate](https://github.com/kunchenguid/firstmate). ✅
 3. **Scopes** — `brain search --scope engineering`, so a coding agent can read the
    engineering notes without being able to read the finance ones.
 4. **Lifecycle and lint** — review windows by category (`current-state`, `news`,

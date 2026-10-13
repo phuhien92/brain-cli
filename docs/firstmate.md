@@ -1,0 +1,110 @@
+# Sharing firstmate's memory across machines
+
+[firstmate](https://github.com/kunchenguid/firstmate) keeps its curated fleet knowledge in
+`data/learnings.md`, which is gitignored and local to one firstmate home. Run firstmate on
+a Mac mini and a laptop and each machine learns separately.
+
+This guide moves that knowledge into a brain vault so both machines share it, without
+changing firstmate. firstmate keeps reading an ordinary `data/learnings.md`; brain
+generates it from a log that syncs through git.
+
+## What moves, and what stays
+
+| firstmate file | Shared? | Why |
+| --- | --- | --- |
+| `data/learnings.md` | **yes**, generated from `log/learning/` | fleet knowledge is the same on every machine |
+| `data/captain.md` | not yet | you edit it by hand and rarely; copying it once is enough for now |
+| `state/`, `projects/`, worktrees | **no** | work in flight is tied to the machine running it |
+
+firstmate treats a **symlinked** memory file as unsafe (its startup check reports
+`unsafe memory data/learnings.md`), so brain writes `learnings.md` as a regular file
+instead of linking it.
+
+## Prerequisites
+
+- Your vault is a git repository with a remote, cloned on both machines, with `.brain/` in
+  its `.gitignore`.
+- `brain` installed on both machines (`npm install -g github:phuhien92/brain-cli`).
+
+## 1. Configure each machine
+
+`~/.config/brain/config.json` on the **Mac mini**:
+
+```json
+{
+  "machine": "mac-mini",
+  "exports": [
+    {
+      "kind": "learning",
+      "path": "~/firstmate/data/learnings.md",
+      "header": "<!-- memory tiers: see the stow skill -->"
+    }
+  ]
+}
+```
+
+The laptop's is the same with `"machine": "laptop"` and its own firstmate path. This file
+never syncs: it names the machine and paths that only exist there.
+
+Point brain at the vault in your shell profile on both machines:
+
+```sh
+export BRAIN_VAULT=~/vault
+```
+
+## 2. Capture what each machine already knows
+
+On the **Mac mini**:
+
+```sh
+brain log import learning ~/firstmate/data/learnings.md
+brain sync
+```
+
+Then on the **laptop** — sync first, so learnings the Mac mini already recorded are
+skipped rather than duplicated:
+
+```sh
+brain sync
+brain log import learning ~/firstmate/data/learnings.md
+brain sync
+```
+
+Each top-level bullet becomes one entry under `log/learning/`. stow's tier markers
+(`<!--a:2026-08-03-->`) are dropped from the titles.
+
+Run `brain sync` once more on the Mac mini. Both `learnings.md` files are now generated
+from the same log and are byte-identical.
+
+## 3. Tell firstmate to write through brain
+
+Add this to `data/captain.md` on each machine (it is firstmate's record of your
+preferences, read every session):
+
+```markdown
+- Record durable fleet learnings with `brain log add learning "<one line>" [--body "<detail>"]`.
+  Never edit data/learnings.md directly: brain regenerates it from the shared log.
+- Run `brain sync` at the start and end of each session.
+```
+
+Optionally, back it up with a cron job so a machine that was off catches up on its own:
+
+```cron
+17 * * * * BRAIN_VAULT=$HOME/vault /usr/local/bin/brain sync -q
+```
+
+## When something edits learnings.md anyway
+
+firstmate's `/stow` curates `learnings.md` in place. If it does, the next `brain sync` or
+`brain export` sees that the file changed since brain wrote it and **refuses to overwrite
+it** — those edits are not in the log yet. To capture new bullets and re-export:
+
+```sh
+brain log import learning ~/firstmate/data/learnings.md   # adds only what is new
+brain export --force
+```
+
+Know the limit: `import` captures *added* bullets. If stow *removed* or re-worded an entry,
+the log still holds the original, and the forced export brings it back. Retiring entries
+belongs to brain's lifecycle work (roadmap step 4); until then, prefer `brain log add` over
+`/stow` for learnings.
