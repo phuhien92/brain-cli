@@ -3,11 +3,13 @@ import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, inScope, loadConfig, readScope, slug, type Config } from "./config.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
+import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
+import { lint } from "./lint.js";
 import { addEntry, exportView, importFile, listEntries, renderView, type ExportResult } from "./log.js";
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.6.0";
+export const VERSION = "0.7.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -23,6 +25,7 @@ COMMANDS
       --path <folder>         Only notes under this folder
       --tag <tag>             Only notes carrying this tag
       --raw                   Treat <query> as SQLite FTS5 syntax (AND, NEAR, prefix*)
+      --include-archived      Also return archived notes
   get <note>                  Print a note by path, file name, title or alias
       --meta                  Frontmatter, tags, headings and links only, no body
       --section <heading>     Only that section: the heading and everything under it,
@@ -44,6 +47,20 @@ COMMANDS
                               vault's sync mode (brain.json "sync"): git commits the log,
                               pulls and pushes; none leaves it to iCloud/Dropbox/etc.;
                               { "command": … } runs yours. Then refreshes and exports
+
+  lifecycle set <note> --category <c> [--as-of YYYY-MM-DD]
+                              Classify how a note's truth changes over time:
+                              memory, identity, preference, principle (enduring);
+                              research 180d, current-state 30d, news 14d (time-bound)
+  lifecycle review <note> [--on YYYY-MM-DD] [--as-of YYYY-MM-DD]
+                              Confirm a time-bound note against current evidence
+  lifecycle archive <note> --reason "..."
+                              Hide an obsolete or misplaced note from search and recall
+  lifecycle restore <note>    Undo an archive
+  lifecycle status [--due]    Every note with lifecycle data; --due: only overdue ones
+  lint [--strict]             Report broken links, orphans, sync conflict copies, overdue
+                              reviews, lifecycle problems and line limits (--strict: exit 7
+                              if anything is reported at warn level)
 
   integrations                List the repos/tools connected to this vault, what each may
                               read and write, and their view paths on this machine
@@ -80,7 +97,7 @@ CONFIG
 EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
   5 conflict: sync hit notes edited on two machines, or export found unrecorded edits
-  6 not permitted: outside the acting integration's scope
+  6 not permitted: outside the acting integration's scope · 7 lint --strict found warnings
 `;
 
 class CliError extends Error {
@@ -126,6 +143,13 @@ export async function main(argv: string[]): Promise<number> {
         "no-push": { type: "boolean", default: false },
         "dry-run": { type: "boolean", default: false },
         as: { type: "string" },
+        category: { type: "string" },
+        "as-of": { type: "string" },
+        on: { type: "string" },
+        reason: { type: "string" },
+        due: { type: "boolean", default: false },
+        strict: { type: "boolean", default: false },
+        "include-archived": { type: "boolean", default: false },
       },
     });
   } catch (err) {
@@ -198,7 +222,7 @@ export async function main(argv: string[]): Promise<number> {
 
   let store: Store | null = null;
   try {
-    if (!["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor"].includes(command)) {
+    if (!["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
       throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
     }
     const vault = findVault(flags.vault);
@@ -226,7 +250,11 @@ export async function main(argv: string[]): Promise<number> {
         if (!Number.isInteger(limit) || limit < 1) throw new CliError("usage", "--limit must be a positive integer", 2);
         let hits;
         try {
-          hits = store.search(query, { limit, path: flags.path, tag: flags.tag?.[0], raw: flags.raw, scope });
+          const states = lifecycleStates(store, cfg);
+          const hidden = [...states.values()].filter((st) => st.archived && !flags["include-archived"]).map((st) => st.path);
+          hits = store
+            .search(query, { limit, path: flags.path, tag: flags.tag?.[0], raw: flags.raw, scope, exclude: hidden, excludePrefix: `${cfg.logDir}/${LIFECYCLE_KIND}/` })
+            .map((h) => ({ ...h, lifecycle: brief(states.get(h.path)) }));
         } catch (err) {
           if (flags.raw) throw new CliError("bad_query", `invalid FTS5 query: ${(err as Error).message}`, 2);
           throw err;
@@ -234,7 +262,7 @@ export async function main(argv: string[]): Promise<number> {
         print(out, command, { query, results: hits }, { vault, index }, () =>
           hits.length
             ? hits
-                .map((h, i) => `${i + 1}. ${h.path}  (${h.score})\n   ${h.title !== stem(h.path) ? h.title + " — " : ""}${h.snippet}`)
+                .map((h, i) => `${i + 1}. ${h.path}  (${h.score})${staleMark(h)}\n   ${h.title !== stem(h.path) ? h.title + " — " : ""}${h.snippet}`)
                 .join("\n")
             : `no results for '${query}'`,
         );
@@ -253,7 +281,7 @@ export async function main(argv: string[]): Promise<number> {
             candidates: matches,
           });
         }
-        const note = store.get(matches[0]!)!;
+        const note = { ...store.get(matches[0]!)!, lifecycle: brief(lifecycleStates(store, cfg).get(matches[0]!)) };
         const maxLines = flags.lines === undefined ? undefined : Number(flags.lines);
         if (maxLines !== undefined && (!Number.isInteger(maxLines) || maxLines < 1)) {
           throw new CliError("usage", "--lines must be a positive integer", 2);
@@ -370,6 +398,85 @@ export async function main(argv: string[]): Promise<number> {
         return 0;
       }
 
+      case "lifecycle": {
+        const [sub, ...rest] = args;
+        const states = lifecycleStates(store, cfg);
+        if (sub === "status") {
+          if (rest.length) throw new CliError("usage", "usage: brain lifecycle status [--due]", 2);
+          const list = [...states.values()]
+            .filter((st) => inScope(st.path, scope))
+            .filter((st) => !flags.due || st.overdue)
+            .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.path.localeCompare(b.path));
+          print(out, "lifecycle.status", { today: today(), notes: list }, { vault, index }, () =>
+            list.length
+              ? list
+                  .map((st) =>
+                    `${st.overdue ? "OVERDUE " : st.archived ? "archived" : "        "} ${(st.category ?? "-").padEnd(13)} due ${st.due ?? "-         "}  ${st.path}` +
+                    (st.problems.length ? `\n         ! ${st.problems.join("; ")}` : ""),
+                  )
+                  .join("\n")
+              : flags.due
+                ? "nothing is overdue"
+                : "no notes have lifecycle data yet — start with: brain lifecycle set <note> --category <category>",
+          );
+          return 0;
+        }
+        if (!["set", "review", "archive", "restore"].includes(sub ?? "")) {
+          throw new CliError("usage", "usage: brain lifecycle set|review|archive|restore <note> … | lifecycle status [--due]", 2);
+        }
+        const ref = rest.join(" ").trim();
+        if (!ref) throw new CliError("usage", `usage: brain lifecycle ${sub} <note>`, 2);
+        const matches = store.resolve(ref).filter((p) => inScope(p, scope));
+        if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
+        if (matches.length > 1) {
+          throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, { candidates: matches });
+        }
+        const target = matches[0]!;
+        if (cfg.as) permit(cfg.as.write.includes(LIFECYCLE_KIND), `record lifecycle changes (add "${LIFECYCLE_KIND}" to its write kinds)`);
+        const date = (flag: string, v: string | undefined) => {
+          if (v !== undefined && !isDate(v)) throw new CliError("usage", `--${flag} must be a YYYY-MM-DD date`, 2);
+          return v;
+        };
+        let change;
+        if (sub === "set") {
+          const category = flags.category;
+          if (!category || !(CATEGORIES as readonly string[]).includes(category)) {
+            throw new CliError("usage", `--category must be one of: ${CATEGORIES.join(", ")}`, 2);
+          }
+          const asOf = date("as-of", flags["as-of"]);
+          const w = windows(cfg)[category as Category];
+          if (w !== null && !asOf && !states.get(target)?.asOf) {
+            throw new CliError("usage", `${category} is time-bound: give --as-of YYYY-MM-DD (when the note was true)`, 2);
+          }
+          change = { action: "set" as const, category: category as Category, asOf };
+        } else if (sub === "review") {
+          change = { action: "review" as const, on: date("on", flags.on) ?? today(), asOf: date("as-of", flags["as-of"]) };
+        } else if (sub === "archive") {
+          if (!flags.reason?.trim()) throw new CliError("usage", 'archive needs --reason "..." (why it is no longer active)', 2);
+          change = { action: "archive" as const, reason: flags.reason.trim().replace(/\s+/g, " ") };
+        } else {
+          change = { action: "restore" as const };
+        }
+        const entry = recordLifecycle(vault, cfg, target, change);
+        index = store.refresh();
+        const st = lifecycleStates(store, cfg).get(target)!;
+        print(out, `lifecycle.${sub}`, { entry, state: st }, { vault, index }, () =>
+          `${target}: ${st.archived ? "archived" : st.category ?? "no category"}${st.due ? `, next review ${st.due}` : ""}  (${entry})`,
+        );
+        return 0;
+      }
+
+      case "lint": {
+        const findings = lint(store, cfg);
+        const counts = { warn: findings.filter((f) => f.severity === "warn").length, info: findings.filter((f) => f.severity === "info").length };
+        if (flags.strict && counts.warn) {
+          if (!out.json && !out.quiet) process.stdout.write(formatFindings(findings) + "\n");
+          throw new CliError("lint_failed", `${counts.warn} warning(s)`, 7, { findings, counts });
+        }
+        print(out, command, { findings, counts }, { vault, index }, () => (findings.length ? formatFindings(findings) : "no findings"));
+        return 0;
+      }
+
       case "integrations": {
         const list = Object.values(cfg.integrations).map((i) => ({
           name: i.name,
@@ -409,6 +516,31 @@ export async function main(argv: string[]): Promise<number> {
   } finally {
     store?.close();
   }
+}
+
+function brief(st: LifecycleState | undefined) {
+  if (!st) return null;
+  return { category: st.category, asOf: st.asOf, reviewed: st.reviewed, due: st.due, overdue: st.overdue, archived: st.archived, reason: st.reason };
+}
+
+function staleMark(h: { lifecycle?: ReturnType<typeof brief> }): string {
+  if (!h.lifecycle) return "";
+  if (h.lifecycle.archived) return "  [archived]";
+  return h.lifecycle.overdue ? `  [stale: review was due ${h.lifecycle.due}]` : "";
+}
+
+function formatFindings(findings: { rule: string; severity: string; path: string; message: string }[]): string {
+  const lines: string[] = [];
+  let rule = "";
+  for (const f of findings) {
+    if (f.rule !== rule) {
+      rule = f.rule;
+      const n = findings.filter((x) => x.rule === rule).length;
+      lines.push(`${lines.length ? "\n" : ""}${f.severity.toUpperCase()} ${rule} (${n})`);
+    }
+    lines.push(`  ${f.path}: ${f.message}`);
+  }
+  return lines.join("\n");
 }
 
 interface Check {

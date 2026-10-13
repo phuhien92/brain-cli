@@ -25,6 +25,10 @@ phrase).
    layoff"), a synonym, or a narrower term. Try two or three phrasings.
 4. Narrow when results are noisy: `--path "<folder>"`, `--tag <tag>`.
 5. Cite the note path you relied on, so the user can open it.
+6. **Check freshness before you state a fact.** A result or `get` may carry `lifecycle`:
+   if `overdue` is true, the note was due for review on `due` — say the fact may be out of
+   date and give its `asOf` date. Archived notes are hidden from search unless you pass
+   `--include-archived`; do not present an archived note as current.
 
 For a long note, read only what you need: `brain get "<path>" --section "<heading>" --json`
 (repeatable; `--meta` lists the headings first; `--lines <n>` keeps only the first n lines
@@ -46,6 +50,10 @@ Use `decision` or another short kind when `learning` does not fit. Each entry is
 file, so this is always safe, even from two machines. Never edit an existing entry, and
 never edit a file the user has told you brain generates (for example a `learnings.md`
 exported for another tool): add an entry instead.
+
+When the user confirms a time-bound note is still true, record it:
+`brain lifecycle review "<path>"`. When something is obsolete: `brain lifecycle archive
+"<path>" --reason "<why>"`. Both create log entries; neither edits the note.
 
 `brain log 10` shows recent entries; `brain sync` shares them with the user's other
 machines (commit, pull, push). Run `brain sync` only if the user's setup says to.

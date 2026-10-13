@@ -3,6 +3,8 @@
 // <vault>/brain.json — travels with the vault, identical everywhere:
 //   { "log": { "dir": "log" },
 //     "sync": "auto",                      // "auto" | "git" | "none" | { "command": "…" }
+//     "lifecycle": { "windows": { "current-state": 30 } },   // review windows in days
+//     "lint": { "maxLines": { "MEMORY.md": 150 } },
 //     "integrations": {                    // one block per repo/tool that uses the vault
 //       "firstmate": { "read": ["firstmate/"], "write": ["learning"],
 //                      "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } } } } }
@@ -49,6 +51,8 @@ export interface Config {
   sync: SyncSpec;
   integrations: Record<string, Integration>;
   as: Integration | null; // the integration this process acts as ($BRAIN_AS / --as)
+  lifecycleWindows: Record<string, number | null>; // brain.json lifecycle.windows overrides (days; null = never)
+  lintMaxLines: Record<string, number>; // brain.json lint.maxLines: vault path → line limit
   userConfigPath: string;
 }
 
@@ -129,7 +133,22 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
     }
   }
 
-  return { logDir, machine, exports, sync, integrations, as, userConfigPath };
+  const lifecycleWindows: Record<string, number | null> = {};
+  for (const [cat, days] of Object.entries(objectAt(objectAt(vaultCfg, "lifecycle"), "windows"))) {
+    if (days !== null && !(typeof days === "number" && Number.isInteger(days) && days > 0)) {
+      throw new ConfigError(`brain.json: lifecycle.windows.${cat} must be a positive number of days or null`);
+    }
+    lifecycleWindows[cat] = days as number | null;
+  }
+  const lintMaxLines: Record<string, number> = {};
+  for (const [path, n] of Object.entries(objectAt(objectAt(vaultCfg, "lint"), "maxLines"))) {
+    if (!(typeof n === "number" && Number.isInteger(n) && n > 0)) {
+      throw new ConfigError(`brain.json: lint.maxLines["${path}"] must be a positive integer`);
+    }
+    lintMaxLines[path] = n;
+  }
+
+  return { logDir, machine, exports, sync, integrations, as, lifecycleWindows, lintMaxLines, userConfigPath };
 }
 
 // What the acting integration may read: its declared folders plus the log

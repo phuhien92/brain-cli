@@ -48,6 +48,8 @@ export interface SearchOptions {
   tag?: string;
   raw?: boolean; // query is FTS5 syntax, passed through
   scope?: string[] | null; // folder prefixes the caller may read; null/undefined = all
+  exclude?: string[]; // exact paths to leave out (archived notes)
+  excludePrefix?: string; // a folder to leave out (lifecycle events)
 }
 
 export interface NoteRecord {
@@ -259,6 +261,14 @@ export class Store {
       if (!opts.scope.length) return [];
       where.push("(" + opts.scope.map(() => "n.path LIKE ? ESCAPE '\\'").join(" OR ") + ")");
       for (const prefix of opts.scope) params.push(escapeLike(prefix) + "%");
+    }
+    if (opts.exclude?.length) {
+      where.push(`n.path NOT IN (${opts.exclude.map(() => "?").join(", ")})`);
+      params.push(...opts.exclude);
+    }
+    if (opts.excludePrefix) {
+      where.push("n.path NOT LIKE ? ESCAPE '\\'");
+      params.push(escapeLike(opts.excludePrefix) + "%");
     }
     if (opts.tag) {
       where.push("EXISTS (SELECT 1 FROM json_each(n.tags) WHERE value = ?)");

@@ -18,6 +18,8 @@ const cfg = (machine = "mini", exports: Config["exports"] = []): Config => ({
   sync: "none",
   integrations: {},
   as: null,
+  lifecycleWindows: {},
+  lintMaxLines: {},
 });
 
 beforeEach(() => {

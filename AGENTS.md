@@ -11,7 +11,7 @@ holds the rules an agent changing the code must not break.
    what was last exported to each path, whose loss only makes `export` refuse until
    `--force`, never overwrite.
 2. **Create, never edit.** The only writes into the vault are new files under the log
-   folder (`log add`, `log import`), opened with the `wx` flag so an existing file can
+   folder (`log add`, `log import`, `lifecycle …`), opened with the `wx` flag so an existing file can
    never be replaced. No command edits, moves or deletes a note. This is what keeps two
    machines conflict-free; an "edit an entry" feature would break it.
 3. **`sync` commits only what brain owns**: the log folder and `brain.json`. A conflict
@@ -48,6 +48,9 @@ holds the rules an agent changing the code must not break.
   integrations, `BRAIN_AS`, read scope.
 - `src/log.ts` — log entries: add, list, import, render a view, export with drift check.
 - `src/sync.ts` — sync modes: git (commit the log, pull --rebase, push), none, command.
+- `src/lifecycle.ts` — categories, review windows, lifecycle events (`log/lifecycle/`) and
+  each note's state (frontmatter, then events, latest wins).
+- `src/lint.ts` — read-only vault health rules.
 - `src/agent.ts` — `brain context` (the session primer) and `brain agent install` per harness.
 - `src/cli.ts` — argument parsing, vault discovery, output and exit codes.
 - `skills/brain/SKILL.md` — the skill every harness installs; its `description` decides

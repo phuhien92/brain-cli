@@ -8,6 +8,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { inScope, readScope, type Config } from "./config.js";
+import { lifecycleStates } from "./lifecycle.js";
 import { listEntries } from "./log.js";
 import type { Store } from "./store.js";
 
@@ -43,6 +44,12 @@ export function context(store: Store, cfg: Config, limit = 5): string {
     "and read the top results with `brain get <path> --json`; rephrase and search again before concluding something is not recorded.",
     'Record durable lessons with `brain log add learning "<one line>"`. See the `brain` skill for details.',
   ];
+  const overdue = [...lifecycleStates(store, cfg).values()].filter((st) => st.overdue && inScope(st.path, scope));
+  if (overdue.length) {
+    lines.push(
+      `${overdue.length} note(s) are past their review date (\`brain lifecycle status --due\`): treat facts from them as possibly stale and say so.`,
+    );
+  }
   if (entries.length) {
     lines.push("", "Recent memory (newest first):");
     for (const e of entries) lines.push(`- ${e.created.slice(0, 10)} [${e.kind}] ${e.title}`);

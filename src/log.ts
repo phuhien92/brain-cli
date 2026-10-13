@@ -27,6 +27,7 @@ export interface NewEntry {
   body?: string;
   tags?: string[];
   created?: Date;
+  fields?: Record<string, string>; // extra frontmatter, e.g. a lifecycle event's target
 }
 
 export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
@@ -45,6 +46,10 @@ export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   const tags = [...new Set((input.tags ?? []).map((t) => t.replace(/^#/, "").trim().toLowerCase()).filter(Boolean))];
   const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${cfg.machine}`];
   if (tags.length) lines.push(`tags: [${tags.join(", ")}]`);
+  for (const [key, value] of Object.entries(input.fields ?? {})) {
+    if (!/^[a-z][a-z0-9-]*$/.test(key) || /["\n\r]/.test(value)) throw new Error(`invalid entry field ${key}`);
+    lines.push(`${key}: "${value}"`);
+  }
   lines.push("---", `# ${title}`, "");
   const body = (input.body ?? "").replace(/\r\n/g, "\n").trim();
   const content = lines.join("\n") + (body ? `\n${body}\n` : "");
