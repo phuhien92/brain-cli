@@ -1,9 +1,13 @@
 ---
 name: brain
 description: Search and update the user's personal notes and long-term memory with the `brain` CLI. Use when the user asks about their notes, past decisions, preferences, plans, people, projects, or anything they have told you or written down before ("what did I decide about…", "do I have notes on…", "remind me…"); before answering from general knowledge something that may be recorded in their vault; and when you learn a durable fact or lesson worth keeping across sessions and machines.
+compatibility: Requires the brain CLI (Node.js 22.13+) — npm install -g github:phuhien92/brain-cli — and a vault set with $BRAIN_VAULT or found from the working directory.
 ---
 
 # brain — the user's notes and memory
+
+> Source of truth: [phuhien92/brain-cli](https://github.com/phuhien92/brain-cli/blob/main/skills/brain/SKILL.md).
+> If `brain` is not installed (`command -v brain` fails), say so and fall back to `grep`.
 
 `brain` is a CLI over the user's markdown vault (an Obsidian vault or similar). It ranks
 notes by relevance, keeps its own index fresh, and needs no app running. Prefer it to
