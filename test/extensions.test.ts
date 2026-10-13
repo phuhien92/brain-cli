@@ -243,6 +243,15 @@ test("install rejects terminal controls in permission text and unsupported sourc
     assert.match(result.stdout + result.stderr, /environment permission/);
   }
 
+  const builtIn = makeExtension(join(f.root, "ingest"), {
+    name: "ingest",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: [], network: [] },
+  }, "");
+  const reserved = interactiveInstall(f, builtIn);
+  assert.equal(reserved.code, 2, reserved.stdout + reserved.stderr);
+  assert.match(reserved.stdout + reserved.stderr, /'ingest' is a built-in command/);
+
   const alias = interactiveInstall(f, "github:example/brain-example");
   assert.equal(alias.code, 3, alias.stdout + alias.stderr);
   assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);

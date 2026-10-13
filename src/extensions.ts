@@ -71,7 +71,7 @@ const METADATA = ".brain-install.json";
 const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
 const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 const RESERVED = new Set([
-  "setup", "index", "search", "get", "log", "view", "export", "sync", "lifecycle", "lint",
+  "setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "lifecycle", "lint",
   "integrations", "doctor", "path", "context", "agent", "feedback", "telemetry", "ext", "help",
 ]);
 const RESERVED_ENVIRONMENT = new Set([
