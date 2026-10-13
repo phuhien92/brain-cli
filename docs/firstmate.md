@@ -135,7 +135,7 @@ brain log replace log/learning/<entry-id>.md --text 'the corrected learning
 supporting detail'
 ```
 
-Both commands leave the original entry untouched and add lifecycle files under
+`retire` and `replace` leave the original entry untouched and add lifecycle files under
 `log/lifecycle/`. After `brain sync`, every machine's generated view omits the retired
 entry. If two machines retire the same entry before syncing, both events remain valid and
 do not conflict.
