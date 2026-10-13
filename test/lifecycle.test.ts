@@ -68,11 +68,13 @@ test("set requires --as-of for time-bound categories; review clears overdue; all
 
 test("archive hides a note from search (and lifecycle events never appear in search); restore brings it back", () => {
   assert.equal(brain(["lifecycle", "archive", "Finance/kent"]).code, 2, "archive needs --reason");
-  assert.equal(brain(["lifecycle", "archive", "Finance/kent", "--reason", "Property sold"]).code, 0);
+  const reason = 'Property sold to "Buyer"';
+  assert.equal(brain(["lifecycle", "archive", "Finance/kent", "--reason", reason]).code, 0);
   assert.equal(brain(["search", "kent"]).body.data.results.length, 0);
   const all = brain(["search", "kent", "--include-archived"]).body.data.results;
   assert.deepEqual(all.map((h: { path: string }) => h.path), ["Finance/kent.md"]);
   assert.equal(all[0].lifecycle.archived, true);
+  assert.equal(all[0].lifecycle.reason, reason);
   assert.equal(brain(["lifecycle", "status", "--due"]).body.data.notes.length, 0, "archived notes are never overdue");
   brain(["lifecycle", "restore", "Finance/kent"]);
   assert.equal(brain(["search", "kent"]).body.data.results.length, 1);
@@ -82,14 +84,15 @@ test("log retire and replace append lifecycle events while views omit retired en
   const retired = brain(["log", "add", "learning", "Old wording", "--body", "Keep this detail", "--tag", "ops"]);
   const retiredPath = retired.body.data.path as string;
   const original = readFileSync(join(vault, retiredPath), "utf8");
+  const reason = 'superseded by "v2" at C:\\temp';
 
-  const retirement = brain(["log", "retire", retiredPath, "--reason", "No longer true"]);
+  const retirement = brain(["log", "retire", retiredPath, "--reason", reason]);
   assert.equal(retirement.code, 0);
   assert.equal(retirement.body.data.target, retiredPath);
   assert.equal(readFileSync(join(vault, retiredPath), "utf8"), original, "retiring never edits the entry");
   const event = readFileSync(join(vault, retirement.body.data.event), "utf8");
   assert.match(event, /action: "retire"/);
-  assert.match(event, /reason: "No longer true"/);
+  assert.equal(brain(["get", retirement.body.data.event, "--meta"]).body.data.frontmatter.reason, reason);
   assert.equal(brain(["view", "learning"]).body.data.entries, 0);
   assert.ok(
     brain(["lifecycle", "status"]).body.data.notes.every((note: { path: string }) => note.path !== retiredPath),
@@ -111,6 +114,21 @@ test("log retire and replace append lifecycle events while views omit retired en
   assert.equal(readdirSync(join(vault, "log/lifecycle")).length, 2);
 });
 
+test("replace completes with quoted log paths", () => {
+  write("brain.json", JSON.stringify({ log: { dir: 'memory/"quoted"' } }));
+  const original = brain(["log", "add", "learning", "Original wording"]);
+  const originalPath = original.body.data.path as string;
+  assert.match(originalPath, /"quoted"/);
+
+  const replaced = brain(["log", "replace", originalPath, "--text", "Replacement wording"]);
+  assert.equal(replaced.code, 0);
+  const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
+  assert.deepEqual(active.map((entry: { title: string }) => entry.title), ["Replacement wording"]);
+  const event = brain(["get", replaced.body.data.event, "--meta"]).body.data.frontmatter;
+  assert.equal(event.target, originalPath);
+  assert.equal(event.replacement, replaced.body.data.replacement);
+});
+
 test("import does not claim an absent active entry was removed", () => {
   brain(["log", "add", "learning", "Never exported"]);
   const imported = join(vault, "learnings.md");
@@ -119,8 +137,8 @@ test("import does not claim an absent active entry was removed", () => {
   const result = brainText(["log", "import", "learning", imported]);
   assert.equal(result.status, 0);
   assert.match(result.stdout, /active logged entries are not present in this file/);
-  assert.match(result.stdout, /brain log retire "log\/learning\//);
-  assert.doesNotMatch(result.stdout, /--reason|removed from imported file/);
+  assert.match(result.stdout, /path: "log\/learning\//);
+  assert.doesNotMatch(result.stdout, /brain log retire|--reason|removed from imported file/);
 });
 
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {

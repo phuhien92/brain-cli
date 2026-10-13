@@ -55,8 +55,8 @@ export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${cfg.machine}`];
   if (tags.length) lines.push(`tags: [${tags.join(", ")}]`);
   for (const [key, value] of Object.entries(input.fields ?? {})) {
-    if (!/^[a-z][a-z0-9-]*$/.test(key) || /["\n\r]/.test(value)) throw new Error(`invalid entry field ${key}`);
-    lines.push(`${key}: "${value}"`);
+    if (!/^[a-z][a-z0-9-]*$/.test(key)) throw new Error(`invalid entry field ${key}`);
+    lines.push(`${key}: ${JSON.stringify(value)}`);
   }
   lines.push("---", `# ${title}`, "");
   const body = (input.body ?? "").replace(/\r\n/g, "\n").trim();

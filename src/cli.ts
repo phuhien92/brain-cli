@@ -552,7 +552,7 @@ async function run(argv: string[]): Promise<number> {
               summary,
               `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
               ...result.retirementCandidates.map((candidate) =>
-                `  brain log retire ${JSON.stringify(candidate.path)}  # ${candidate.title}`,
+                `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}`,
               ),
             ].join("\n");
           });
