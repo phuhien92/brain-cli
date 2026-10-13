@@ -116,11 +116,11 @@ code, so an agent can branch without parsing prose:
 | Exit | `error.code` | Meaning |
 | --- | --- | --- |
 | 0 | — | ok (an empty result list is still ok) |
-| 1 | `no_vault`, `internal` | no vault found, or an unexpected failure |
-| 2 | `usage`, `bad_query` | bad arguments, or invalid `--raw` FTS5 syntax |
-| 3 | `not_found` | `get` matched no note |
+| 1 | `no_vault`, `internal`, `install_failed`, `extension_failed`, `extension_protocol`, `extension_timeout`, `extension_output_limit` | no vault, an unexpected failure, or an extension install/runtime failure |
+| 2 | `usage`, `bad_query`, `invalid_manifest` | bad arguments, invalid `--raw` FTS5 syntax, or an invalid extension manifest |
+| 3 | `not_found` | a note, extension installation, or vault enablement was not found |
 | 4 | `ambiguous` | `get` matched several notes; `error.candidates` lists their paths |
-| 5 | `sync_conflict`, `export_drift` | a note was edited on two machines (`error.files`), or an exported file was edited since brain wrote it |
+| 5 | `sync_conflict`, `export_drift`, `install_conflict`, `enablement_conflict` | synced or installed content conflicts with existing content, or an exported file drifted |
 | 6 | `not_permitted`, `permission_confirmation_required` | the acting integration may not write that kind, or extension installation needs an interactive person |
 | 7 | `lint_failed` | `brain lint --strict` found warnings |
 

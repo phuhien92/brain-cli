@@ -16,9 +16,12 @@ brain view learning              # every active learning, oldest first, as one m
 brain sync                       # commit new entries, pull --rebase, push, re-export
 ```
 
-Two machines never create the same file, so `git` merges their logs with no conflict, ever.
-The single-file shape that existing tools expect is *generated* from the log, so it is
-never edited by two machines either. Each entry records which machine wrote it.
+Ordinary entries include the machine and timestamp in their paths, so two machines do not
+create the same file. The single-file shape that existing tools expect is *generated* from
+the log, so it is never edited by two machines either. Each entry records which machine
+wrote it. Source importers can instead request a deterministic, create-only path with
+`--source-id`; matching imports then merge as the same file, while different content for one
+source ID deliberately produces a sync conflict. See [Command extensions](extensions.md#process-contract).
 
 - **`brain sync`** follows the vault's `"sync"` mode, because files reach other machines
   in many ways: `git` (any remote) commits only the log folder, ingested `sources/` pairs and

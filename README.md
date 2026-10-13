@@ -12,8 +12,10 @@
 `brain` indexes a folder of markdown notes — an Obsidian vault, a docs folder, an agent's
 learnings — and gives any agent ranked search, memory that syncs across machines, and a
 warning when a note has gone stale. From the shell, with a stable JSON contract. No app
-running, no API key, and your notes never leave the machine. Anonymous usage data is
-off unless you say yes when brain asks, once ([telemetry](docs/telemetry.md)).
+running and no API key. brain itself never sends your notes anywhere except through your
+configured sync; installed extensions are separately approved local programs and may use
+the network (declared hosts are shown during approval, not enforced). Anonymous usage data
+is off unless you say yes when brain asks, once ([telemetry](docs/telemetry.md)).
 
 ```console
 $ brain search "deploy gotchas on the mac mini" --limit 3

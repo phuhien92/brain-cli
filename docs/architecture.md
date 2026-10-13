@@ -63,8 +63,9 @@ flowchart LR
 
 ## What happens on every command
 
-Every command, before it does anything else, makes the index match the files. There is no
-watcher and no daemon; see [indexing.md](indexing.md) for costs and limits.
+Every command that reads notes first makes the index match the files. Extension-management
+commands do not read notes and do not need the index. There is no watcher and no daemon; see
+[indexing.md](indexing.md) for costs and limits.
 
 ```mermaid
 sequenceDiagram
@@ -93,7 +94,8 @@ sequenceDiagram
 | What | Where | Synced? | Why there |
 | --- | --- | --- | --- |
 | Notes | the vault | yes, by your sync | they are yours; brain only reads them |
-| Memory entries, lifecycle changes | `<vault>/log/<kind>/<date>-<machine>-<slug>.md` | yes | one new file each, so two machines never write the same file |
+| Memory entries, lifecycle changes | `<vault>/log/<kind>/<date>-<machine>-<slug>.md`, or `source-<sha256>.md` for idempotent imports | yes | ordinary writes have machine-specific paths; source imports intentionally share a deterministic path |
+| Extension enablement | `<vault>/<log.dir>/extensions/<name>.md` | yes | immutable markers enable installed code independently for each vault and stay out of normal note surfaces |
 | Immutable sources and metadata | `<vault>/sources/<date>-<machine>-<slug>.<ext>` and `.source.md` | yes | originals remain checkable; sidecars carry searchable provenance |
 | Vault config: integrations, sync mode, lifecycle windows, lint limits | `<vault>/brain.json` | yes | the same on every machine |
 | The index | `~/.local/state/brain/<vault>-<id>/index.db` | **never** | a live SQLite database corrupts when a sync service copies it; each machine builds its own |
@@ -130,7 +132,7 @@ extension installation invoke Git, and installed extension processes may use the
 | Guarantee | Held by | Tested in |
 | --- | --- | --- |
 | The index is never stale when read | refresh before every command | `test/store.test.ts` |
-| Two machines never conflict on brain's own writes | log entries and source pairs are new files only, opened with `wx` | `test/sync.test.ts` (two machines, one remote) |
+| Ordinary writes from two machines do not conflict | machine-specific log entries and source pairs are new files only, opened with `wx`; source-ID imports use one deterministic path and conflict if their content differs | `test/sync.test.ts`, `test/extensions.test.ts` |
 | An exported file is never overwritten after someone edited it | hash of the last export, compared before writing | `test/log.test.ts` |
 | A scoped agent cannot see outside its folders through brain | filters inside the SQL query; out of scope is "not found" | `test/integrations.test.ts` |
 | A hook can never break the agent that runs it | `brain context` prints nothing and exits 0 on any error | `test/agent.test.ts`, `scripts/verify-pi.sh` |
