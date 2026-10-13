@@ -14,10 +14,10 @@
 
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { homedir } from "node:os";
 import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
+import { stateRoot, vaultStateDir } from "./paths.js";
 
 const SCHEMA_VERSION = 1;
 
@@ -358,11 +358,7 @@ export class Store {
 }
 
 export function indexDir(vault: string, stateDir?: string): string {
-  const root = stateDir || process.env.BRAIN_STATE_DIR || join(homedir(), ".local", "state", "brain");
-  const name = vault.split(/[\\/]/).filter(Boolean).pop() ?? "vault";
-  const id = createHash("sha256").update(vault).digest("hex").slice(0, 12);
-  // Readable and unique: "COWORK-OS-3f9a1c2b7d4e".
-  return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
+  return vaultStateDir(vault, stateDir || stateRoot());
 }
 
 // Turn a natural-language query into an FTS5 expression. Terms are OR-ed and

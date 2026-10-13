@@ -102,6 +102,7 @@ sequenceDiagram
 | --- | --- |
 | [`src/note.ts`](../src/note.ts) | Parse one note: frontmatter (own small YAML subset), title, headings, tags, aliases, wiki-links |
 | [`src/store.ts`](../src/store.ts) | The SQLite index: schema, incremental refresh, BM25 search, wiki-link-style resolve, `get` |
+| [`src/paths.ts`](../src/paths.ts) | Where brain keeps things; one resolver for `brain path`, `doctor`, the index and telemetry |
 | [`src/config.ts`](../src/config.ts) | `brain.json` + machine config: sync mode, integrations, `BRAIN_AS` scope |
 | [`src/log.ts`](../src/log.ts) | Memory entries: add, list, import, render a view, export with drift check |
 | [`src/lifecycle.ts`](../src/lifecycle.ts) | Categories, review windows, lifecycle events, each note's state |

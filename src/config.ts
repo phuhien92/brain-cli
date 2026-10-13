@@ -22,6 +22,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { userConfigFile } from "./paths.js";
+
+export { userConfigFile };
 
 export interface ExportTarget {
   kind: string;
@@ -60,7 +63,7 @@ export class ConfigError extends Error {}
 
 export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
   const vaultCfg = readJson(join(vault, "brain.json")) ?? {};
-  const userConfigPath = process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
+  const userConfigPath = userConfigFile();
   const userCfg = readJson(userConfigPath) ?? {};
 
   const logDir = String(objectAt(vaultCfg, "log").dir ?? "log")
@@ -190,7 +193,7 @@ export interface UserSettings {
 }
 
 export function userSettings(): UserSettings {
-  const path = process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
+  const path = userConfigFile();
   let cfg: Record<string, unknown> = {};
   try {
     cfg = readJson(path) ?? {};
@@ -202,10 +205,6 @@ export function userSettings(): UserSettings {
     telemetry: typeof cfg.telemetry === "boolean" ? cfg.telemetry : null,
     feedbackPost: post === "allow" ? "allow" : "ask",
   };
-}
-
-export function userConfigFile(): string {
-  return process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
 }
 
 export function readUserConfig(): Record<string, unknown> {

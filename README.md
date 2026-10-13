@@ -61,6 +61,7 @@ brain get "Projects/blog/runbook" --section Deploy
 brain log add learning "pnpm cache breaks after macOS updates"
 brain lifecycle set "Finance/balances" --category current-state --as-of 2026-09-30
 brain doctor                                    # check this machine's setup
+brain path log                                  # where things live: log, index, configs
 ```
 
 ## How it fits together

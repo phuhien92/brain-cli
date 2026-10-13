@@ -12,7 +12,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { arch, homedir, platform } from "node:os";
 import { join } from "node:path";
-import { stateRoot } from "./telemetry.js";
+import { stateRoot } from "./paths.js";
 
 export const KINDS = ["bug", "idea", "docs"] as const;
 export type Kind = (typeof KINDS)[number];

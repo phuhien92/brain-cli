@@ -14,6 +14,7 @@
 | `lifecycle set\|review\|archive\|restore\|status` | how long a note stays true | [lifecycle.md](lifecycle.md) |
 | `lint [--strict]` | vault health, read-only | [lifecycle.md](lifecycle.md#lint) |
 | `integrations`, `doctor` | who is connected; this machine's setup | [integrations.md](integrations.md) |
+| `path [<name>]` | where brain keeps things on this machine; reads only | [below](#where-things-are) |
 | `context`, `agent install <harness>` | session primer; teach a harness about brain | [agents.md](agents.md) |
 
 ## Setup
@@ -52,6 +53,34 @@ brain sync                       # share it with your other machines
 
 The vault is `--vault <dir>`, else `$BRAIN_VAULT`, else the nearest parent folder holding
 `.obsidian/` or a `brain.json`.
+
+## Where things are
+
+`brain path` prints the locations brain uses, resolved the same way every command
+resolves them (`--vault`, `BRAIN_VAULT`, `BRAIN_CONFIG`, `BRAIN_STATE_DIR`, `brain.json`'s
+`log.dir`). Scripts and agents should ask rather than hard-code a path: the state
+directory's name is derived from the vault's real path, and every one of these can be
+overridden.
+
+| Name | What it is |
+| --- | --- |
+| `vault` | the vault in use |
+| `log` | the log folder: one file per memory entry |
+| `config` | the vault's `brain.json`, synced with it |
+| `user-config` | this machine's config |
+| `state` | this vault's state directory, outside the vault and never synced |
+| `index` | the search index inside it |
+| `telemetry-queue` | anonymous usage events waiting to be sent, if you opted in |
+
+```sh
+cd "$(brain path log)"          # one name: the bare path, nothing else
+brain path                      # all of them, marking any not created yet
+brain path --json               # { "paths": { "log": { "path": "…", "exists": true }, … } }
+```
+
+It only reads. Printing a location never creates it, and an unknown name exits 2 with
+the list of valid ones. Under `--as`, the paths are the same and `--json` adds `"as"`, so
+an agent knows its reads through brain are scoped.
 
 ## The JSON contract
 

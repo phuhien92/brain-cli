@@ -18,8 +18,9 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createInterface } from "node:readline";
-import { homedir, platform, arch } from "node:os";
+import { platform, arch } from "node:os";
 import { join } from "node:path";
+import { stateRoot } from "./paths.js";
 
 export const TELEMETRY_SCHEMA = "brain.telemetry.v1";
 
@@ -99,9 +100,7 @@ export interface Context {
   scoped?: boolean;
 }
 
-export function stateRoot(): string {
-  return process.env.BRAIN_STATE_DIR || join(homedir(), ".local", "state", "brain");
-}
+export { stateRoot };
 
 const file = (name: string) => join(stateRoot(), name);
 

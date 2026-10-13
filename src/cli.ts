@@ -25,10 +25,11 @@ import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, LIFECYCLE_KIND, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
 import { addEntry, exportView, importFile, listEntries, renderView, type ExportResult } from "./log.js";
-import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
+import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
+import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.9.2";
+export const VERSION = "0.10.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -93,6 +94,9 @@ COMMANDS
                               read and write, and their view paths on this machine
   doctor                      Check this machine's setup: vault, index location, sync
                               mode, iCloud placeholders, git inside a synced folder
+  path [<name>]               Print where brain keeps things, one absolute path per name:
+                              ${PATH_NAMES.join(", ")}.
+                              No name: all of them. Reads only; creates nothing
 
   context [--limit n]         Print a short primer for an agent: what brain is, plus the n most
                               recent memory titles. Prints nothing (exit 0) without a vault,
@@ -156,7 +160,7 @@ interface Out {
 
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -370,6 +374,32 @@ async function run(argv: string[]): Promise<number> {
       ctxStore?.close();
     }
     return 0;
+  }
+
+  if (command === "path") {
+    // Before Store.open on purpose: printing a location must not create it.
+    try {
+      const name = args[0];
+      if (args.length > 1 || (name !== undefined && !(PATH_NAMES as readonly string[]).includes(name))) {
+        throw new CliError("usage", `usage: brain path [${PATH_NAMES.join("|")}]`, 2, { names: [...PATH_NAMES] });
+      }
+      const vault = findVault(flags.vault);
+      const cfg = loadConfig(vault, { as: flags.as });
+      const all = describePaths(brainPaths(vault, cfg.logDir));
+      const as = cfg.as ? { as: cfg.as.name } : {};
+      if (name) {
+        const p = all[name as PathName];
+        print(out, command, { name, ...p, ...as }, null, () => p.path);
+      } else {
+        const width = Math.max(...PATH_NAMES.map((n) => n.length));
+        print(out, command, { paths: all, ...as }, null, () =>
+          PATH_NAMES.map((n) => `${n.padEnd(width)}  ${all[n].path}${all[n].exists ? "" : "  (not created yet)"}`).join("\n"),
+        );
+      }
+      return 0;
+    } catch (err) {
+      return fail(out, command, err);
+    }
   }
 
   let store: Store | null = null;
@@ -873,13 +903,14 @@ interface Check {
 // changes anything: doctor only reads.
 function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number): Check[] {
   const checks: Check[] = [];
+  const state = brainPaths(vault, cfg.logDir).state;
   const synced = /\/Library\/Mobile Documents\/|\/Library\/CloudStorage\/|\/Dropbox\/|\/OneDrive\//.test(vault + "/");
   const mode = resolveSyncMode(vault, cfg);
   checks.push({ check: "vault", status: "ok", detail: `${vault} (${notes} notes)` });
   checks.push({
     check: "index",
-    status: indexDir(vault).startsWith(vault + "/") ? "warn" : "ok",
-    detail: `${indexDir(vault)}${indexDir(vault).startsWith(vault + "/") ? " is inside the vault; set BRAIN_STATE_DIR outside it" : " (outside the vault, never synced)"}`,
+    status: state.startsWith(vault + "/") ? "warn" : "ok",
+    detail: `${state}${state.startsWith(vault + "/") ? " is inside the vault; set BRAIN_STATE_DIR outside it" : " (outside the vault, never synced)"}`,
   });
   checks.push({
     check: "sync",

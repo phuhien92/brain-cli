@@ -19,7 +19,7 @@ holds the rules an agent changing the code must not break.
 4. **Exports never lose an edit.** A file outside the vault is overwritten only if it is
    byte-identical to what brain last wrote there (or `--force`). Exports are regular files,
    written atomically (tmp + rename).
-5. **Fresh on every read.** Every command calls `Store.refresh()` before it answers. No
+5. **Fresh on every read.** Every command that reads notes calls `Store.refresh()` before it answers. No
    watcher, no daemon, no "run index first" requirement.
 6. **The `--json` envelope is a contract.** One JSON line on stdout, `schema: "brain.v1"`,
    `ok`, and either `data` or `error.code`. Changing its shape means bumping `SCHEMA` in
@@ -50,6 +50,8 @@ holds the rules an agent changing the code must not break.
 
 - `src/note.ts` — parse one note: frontmatter, title, headings, tags, aliases, wiki-links.
 - `src/store.ts` — the SQLite index: schema, incremental refresh, search, resolve, get.
+- `src/paths.ts` — where brain keeps things (state, index, configs, log). The one resolver
+  behind `brain path`, `doctor`, the index and telemetry; it never creates anything.
 - `src/config.ts` — `brain.json` (synced) and the machine-local user config: sync mode,
   integrations, `BRAIN_AS`, read scope.
 - `src/log.ts` — log entries: add, list, import, render a view, export with drift check.
