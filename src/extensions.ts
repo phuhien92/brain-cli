@@ -193,17 +193,15 @@ export interface ExtensionProcess {
 // than `shell: true`, which would interpolate extension arguments.
 export function extensionProcess(launcher: string, args: string[], platform = process.platform): ExtensionProcess {
   if (platform !== "win32" || extname(launcher).toLowerCase() !== ".cmd") return { file: launcher, args };
-  const meta = /([()%!^"<>&|])/g;
-  const escapeCommand = (value: string) => value.replace(meta, "^$1");
-  const escapeArgument = (value: string) => {
+  const quote = (value: string) => {
     let escaped = value.replace(/(?=(\\+?))\1"/g, "$1$1\\\"");
     escaped = escaped.replace(/(?=(\\+?))\1$/g, "$1$1");
-    return `"${escaped}"`.replace(meta, "^$1");
+    return `"${escaped}"`;
   };
-  const command = [escapeCommand(launcher), ...args.map(escapeArgument)].join(" ");
+  const command = `"${[quote(launcher), ...args.map(quote)].join(" ")}"`;
   return {
     file: process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
-    args: ["/d", "/s", "/v:off", "/c", `"${command}"`],
+    args: ["/d", "/s", "/v:off", "/c", command],
     windowsVerbatimArguments: true,
   };
 }

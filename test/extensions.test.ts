@@ -1,7 +1,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -135,6 +135,13 @@ test("install needs human permission approval and exposes the declared permissio
   assert.match(invoked.body.data.dir, /extensions\/echoer$/);
   assert.deepEqual(invoked.body.data.args, ["hello", "--json"]);
 
+  const leadingJson = brain(f, ["--json", "echoer", "leading"]);
+  assert.equal(leadingJson.code, 0, leadingJson.stderr);
+  assert.deepEqual(JSON.parse(leadingJson.stdout).data.args, ["leading", "--json"]);
+  const leadingVault = json(f, ["--vault", f.vault, "echoer", "vault-first"]);
+  assert.equal(leadingVault.code, 0, leadingVault.stderr);
+  assert.deepEqual(leadingVault.body.data.args, ["vault-first", "--json"]);
+
   const secondVault = join(f.root, "second-vault");
   mkdirSync(join(secondVault, ".obsidian"), { recursive: true });
   writeFileSync(join(secondVault, "brain.json"), '{\n  "log": { "dir": "memory" }\n}\n');
@@ -203,7 +210,7 @@ test("git installation records its commit, remove is machine-local, and missing 
   assert.equal(missing.body.error.code, "not_found");
 });
 
-test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extension is isolated", { skip: process.platform === "win32" }, (t) => {
+test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extension is isolated", { skip: process.platform === "win32" }, async (t) => {
   const f = fixture(t);
   mkdirSync(join(f.vault, "notes"));
   writeFileSync(join(f.vault, "notes", "answer.md"), "# Answer\nneedle built-in proof\n");
@@ -212,11 +219,19 @@ test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extens
     command: "bin/command.mjs",
     permissions: { read: [], write: [], network: [] },
   }, `
+import { spawn } from "node:child_process";
 const action = process.argv[2];
 if (action === "hang") setInterval(() => {}, 1000);
 else if (action === "flood") {
   process.stdout.write("x".repeat(2 * 1024 * 1024));
   setInterval(() => {}, 1000);
+} else if (action === "descendant-flood") {
+  spawn(process.execPath, ["-e", "setTimeout(()=>require('fs').writeFileSync(process.argv[1], 'survived'), 500)", process.argv[3]], { stdio: "ignore" });
+  process.stdout.write("x".repeat(2 * 1024 * 1024));
+  setInterval(() => {}, 1000);
+} else if (action === "bad-error") {
+  process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: false, error: {} }) + "\\n");
+  process.exitCode = 1;
 } else process.stdout.write("not json\\nextra line\\n");`);
   assert.equal(interactiveInstall(f, brokenSource).code, 0);
 
@@ -242,6 +257,17 @@ else if (action === "flood") {
   assert.equal(flooded.code, 1);
   assert.equal(flooded.body.error.code, "extension_output_limit");
   assert.match(flooded.body.error.message, /1 MiB/);
+
+  const sideEffect = join(f.root, "descendant-side-effect");
+  const descendant = json(f, ["broken", "descendant-flood", sideEffect]);
+  assert.equal(descendant.code, 1);
+  assert.equal(descendant.body.error.code, "extension_output_limit");
+  await new Promise((done) => setTimeout(done, 800));
+  assert.equal(existsSync(sideEffect), false, "limit termination must kill extension descendants before delayed work runs");
+
+  const badError = json(f, ["broken", "bad-error"]);
+  assert.equal(badError.code, 1);
+  assert.equal(badError.body.error.code, "extension_protocol");
 
   const hung = json(f, ["broken", "hang"]);
   assert.equal(hung.code, 1);
@@ -306,16 +332,17 @@ test("meetings imports redacted summaries and links from a fake server, never tr
       title: "Weekly planning",
       date: "2026-10-13",
       attendees: ["Alice <alice@example.com>", "Bob"],
-      summary: "Reviewed private account 1234567 and selected the launch plan.",
+      summary: "Reviewed private account 1234567 with literal brain-extension-url-0 and <!-- brain-source-marker-0 -->.",
       actionItems: ["Bob sends the plan to alice@example.com"],
       url: "https://app.granola.example/meetings/1234567",
       transcript: "NEVER-SYNC-THIS-TRANSCRIPT",
     }],
   };
+  let responsePayload: unknown = payload;
   const server = createServer((req, res) => {
     requested = req.url ?? "";
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(payload));
+    res.end(JSON.stringify(responsePayload));
   });
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done));
   t.after(() => server.close());
@@ -349,6 +376,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
   assert.match(note, /Reviewed private account <number>/);
+  assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
   assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/1234567\)/);
   assert.match(note, /brain-source-id: [0-9a-f]{64}/);
@@ -377,11 +405,16 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.equal(thirdBody.data.added.length, 0);
   assert.equal(thirdBody.data.skipped, 1);
   assert.equal(readdirSync(meetingDir).length, 2);
+
+  responsePayload = payload.meetings;
+  const undocumentedArray = await invoke();
+  assert.equal(undocumentedArray.code, 1);
+  assert.equal(JSON.parse(undocumentedArray.stdout).error.code, "source_failed");
 });
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {
   const f = fixture(t);
-  const directory = join(f.root, "windows-extension");
+  const directory = join(f.root, "windows extension");
   mkdirSync(join(directory, "bin"), { recursive: true });
   const manifest: ExtensionManifest = {
     name: "windows-test",
@@ -389,13 +422,21 @@ test("Windows launcher convention resolves extensionless manifest commands to .e
     command: "bin/run",
     permissions: { read: [], write: [], network: [] },
   };
-  writeFileSync(join(directory, "bin", "run.cmd"), "@echo off\r\n");
+  writeFileSync(
+    join(directory, "bin", "run.cmd"),
+    '@echo off\r\nnode -e "require(\'fs\').writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))" "%~dp0result.json" %*\r\n',
+  );
   const cmd = resolveLauncher(directory, manifest, "win32");
   assert.equal(cmd, join(directory, "bin", "run.cmd"));
-  const process = extensionProcess(cmd, ["an argument", "& unsafe"], "win32");
-  assert.match(process.file.toLowerCase(), /cmd\.exe$/);
-  assert.deepEqual(process.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
-  assert.match(process.args[4]!, /\^&/);
+  const launch = extensionProcess(cmd, ["an argument", "& unsafe"], "win32");
+  assert.match(launch.file.toLowerCase(), /cmd\.exe$/);
+  assert.deepEqual(launch.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
+  assert.equal(launch.args[4], `""${cmd}" "an argument" "& unsafe""`);
+  if (process.platform === "win32") {
+    const result = spawnSync(launch.file, launch.args, { windowsVerbatimArguments: true });
+    assert.equal(result.status, 0, result.stderr?.toString());
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "bin", "result.json"), "utf8")), ["an argument", "& unsafe"]);
+  }
   writeFileSync(join(directory, "bin", "run.exe"), "fixture");
   assert.equal(resolveLauncher(directory, manifest, "win32"), join(directory, "bin", "run.exe"));
 });

@@ -106,7 +106,7 @@ async function main() {
   const response = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error(`meeting source answered ${response.status}`);
   const payload = await response.json();
-  const meetings = Array.isArray(payload) ? payload : payload?.meetings;
+  const meetings = payload?.meetings;
   if (!Array.isArray(meetings)) throw new Error("meeting source response needs a meetings list");
 
   const current = brain(["log", "100000", "--kind", "meeting"]);

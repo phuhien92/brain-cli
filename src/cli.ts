@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -223,8 +223,9 @@ export async function main(argv: string[]): Promise<number> {
   tError = null;
   tContext = {};
   const json = argv.includes("--json");
-  const first = argv.find((a) => !a.startsWith("-"));
-  const after = first ? argv[argv.indexOf(first) + 1] : undefined;
+  const position = commandPosition(argv);
+  const first = position === -1 ? undefined : argv[position];
+  const after = position === -1 ? undefined : argv[position + 1];
   if (telemetry.shouldAsk({ json, command: telemetryName(first ?? "help", after), userConfigTelemetry: userSettings().telemetry })) {
     try {
       await telemetry.ask();
@@ -250,11 +251,12 @@ async function run(argv: string[]): Promise<number> {
   // strict built-in parser rejects flags it does not know (for example
   // `brain meetings import --since 7d`). The first positional is the command
   // in brain's documented syntax, and built-ins always take precedence.
-  const leading = argv[0];
+  const position = commandPosition(argv);
+  const leading = position === -1 ? undefined : argv[position];
   if (leading && !leading.startsWith("-") && !BUILT_INS.has(leading)) {
     const out: Out = { json: argv.includes("--json"), quiet: argv.includes("--quiet") || argv.includes("-q") };
     try {
-      return await runExtensionCommand(leading, argv.slice(1), out);
+      return await runExtensionCommand(leading, [...argv.slice(position + 1), ...argv.slice(0, position)], out);
     } catch (err) {
       return fail(out, leading, err);
     }
@@ -581,22 +583,27 @@ async function run(argv: string[]): Promise<number> {
             const redact = redactor({ vault });
             title = redact(title);
             if (body !== undefined) {
-              const markers: string[] = [];
-              const urls: string[] = [];
-              const protectedBody = String(body)
+              const original = String(body);
+              const protectedValues: string[] = [];
+              let guard = "brain-protected-value";
+              while (original.includes(guard)) guard += "-x";
+              const protect = (value: string) => {
+                protectedValues.push(value);
+                return `${guard}-${protectedValues.length - 1}-end`;
+              };
+              const protectedBody = original
                 .replace(/<!-- brain-source-id: [0-9a-f]{64} -->/g, (marker) => {
-                  markers.push(marker);
-                  return `<!-- brain-source-marker-${markers.length - 1} -->`;
+                  return protect(marker);
                 })
                 // A source link is deliberately retained so the redacted note
                 // still leads back to the private system holding the details.
                 .replace(/https?:\/\/[^\s<>)]+/g, (url) => {
-                  urls.push(url);
-                  return `brain-extension-url-${urls.length - 1}`;
+                  return protect(url);
                 });
-              body = redact(protectedBody)
-                .replace(/brain-extension-url-(\d+)/g, (_all, index: string) => urls[Number(index)] ?? "")
-                .replace(/<!-- brain-source-marker-(\d+) -->/g, (_all, index: string) => markers[Number(index)] ?? "");
+              body = redact(protectedBody).replace(
+                new RegExp(`${guard}-(\\d+)-end`, "g"),
+                (_all, index: string) => protectedValues[Number(index)] ?? "",
+              );
             }
           }
           const path = addEntry(vault, cfg, { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag });
@@ -923,6 +930,34 @@ interface ExtensionInvocation {
   as?: string;
 }
 
+function commandPosition(argv: string[]): number {
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === "--vault" || arg === "--as") {
+      if (i + 1 >= argv.length) return -1;
+      i++;
+    } else if (arg === "--json" || arg === "--quiet" || arg === "-q" || arg.startsWith("--vault=") || arg.startsWith("--as=")) {
+      continue;
+    } else {
+      return arg.startsWith("-") ? -1 : i;
+    }
+  }
+  return -1;
+}
+
+function killExtensionTree(child: ChildProcess): void {
+  if (child.pid && process.platform === "win32") {
+    const killed = spawnSync("taskkill", ["/pid", String(child.pid), "/t", "/f"], { stdio: "ignore", windowsHide: true });
+    if (killed.status === 0) return;
+  } else if (child.pid) {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+      return;
+    } catch {}
+  }
+  child.kill("SIGKILL");
+}
+
 function extensionInvocation(args: string[]): ExtensionInvocation {
   const forwarded: string[] = [];
   let vault: string | undefined;
@@ -980,6 +1015,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     const launch = extensionProcess(launcher, invocation.args);
     const child = spawn(launch.file, launch.args, {
       cwd: installed.directory,
+      detached: process.platform !== "win32",
       env,
       stdio: ["inherit", "pipe", "pipe"],
       windowsVerbatimArguments: launch.windowsVerbatimArguments,
@@ -994,7 +1030,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
       policyError = error;
       child.stdout.destroy();
       child.stderr.destroy();
-      child.kill("SIGKILL");
+      killExtensionTree(child);
     };
     const capture = (chunks: Buffer[]) => (chunk: Buffer) => {
       outputBytes += chunk.length;
@@ -1038,10 +1074,17 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
       // Report a protocol error below without echoing arbitrary extension output.
     }
   }
+  const envelopeError = envelope?.error;
+  const validError = !!envelopeError
+    && typeof envelopeError === "object"
+    && !Array.isArray(envelopeError)
+    && typeof (envelopeError as Record<string, unknown>).code === "string"
+    && (envelopeError as Record<string, unknown>).code !== ""
+    && typeof (envelopeError as Record<string, unknown>).message === "string";
   const valid = envelope?.schema === SCHEMA
     && typeof envelope.command === "string"
     && typeof envelope.ok === "boolean"
-    && (envelope.ok === true ? Object.hasOwn(envelope, "data") : !!envelope.error && typeof envelope.error === "object");
+    && (envelope.ok === true ? Object.hasOwn(envelope, "data") : validError);
   if (!valid) {
     throw new ExtensionError(
       "extension_protocol",
@@ -1053,7 +1096,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   }
   if (envelope!.ok === false) {
     const error = envelope!.error as Record<string, unknown>;
-    tError = typeof error.code === "string" ? error.code : "extension_failed";
+    tError = error.code as string;
   }
   if (!out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
   return result.code ?? 1;
