@@ -1,6 +1,8 @@
-// Anonymous usage telemetry. On by default; off with any of:
-//   brain telemetry disable · BRAIN_TELEMETRY=0 · DO_NOT_TRACK=1 ·
-//   "telemetry": false in ~/.config/brain/config.json
+// Anonymous usage telemetry. OFF by default. brain asks once, the first time
+// a person runs it in a terminal; agents, scripts and CI are never asked and
+// stay off. Opt in any time with `brain telemetry enable`, BRAIN_TELEMETRY=1
+// or "telemetry": true in ~/.config/brain/config.json. DO_NOT_TRACK=1 always
+// wins.
 //
 // What an event holds is fixed by `Event` below and nothing else: the command
 // name, its outcome, coarse buckets, versions, and a random install id. Never
@@ -15,6 +17,7 @@
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { createInterface } from "node:readline";
 import { homedir, platform, arch } from "node:os";
 import { join } from "node:path";
 
@@ -55,8 +58,8 @@ const file = (name: string) => join(stateRoot(), name);
 
 interface Settings {
   install: string;
-  enabled: boolean | null; // null = default (on)
-  notified: boolean;
+  enabled: boolean | null; // null = never decided → off
+  asked: boolean; // the one-time question has been shown
   lastFlush: number;
 }
 
@@ -66,11 +69,11 @@ function readSettings(): Settings {
     return {
       install: typeof s.install === "string" ? s.install : randomUUID(),
       enabled: typeof s.enabled === "boolean" ? s.enabled : null,
-      notified: s.notified === true,
+      asked: s.asked === true,
       lastFlush: typeof s.lastFlush === "number" ? s.lastFlush : 0,
     };
   } catch {
-    return { install: randomUUID(), enabled: null, notified: false, lastFlush: 0 };
+    return { install: randomUUID(), enabled: null, asked: false, lastFlush: 0 };
   }
 }
 
@@ -95,17 +98,21 @@ export function status(userConfigTelemetry?: unknown): Status {
   const collector = process.env.BRAIN_TELEMETRY_URL || null;
   const queued = queue().length;
   const off = (reason: string): Status => ({ enabled: false, reason, collector, queued, install: s.install });
-  if (["0", "false", "off", "no"].includes(env)) return off("BRAIN_TELEMETRY is off");
+  const on = (reason: string): Status => ({ enabled: true, reason, collector, queued, install: s.install });
   if (process.env.DO_NOT_TRACK && process.env.DO_NOT_TRACK !== "0") return off("DO_NOT_TRACK is set");
+  if (["0", "false", "off", "no"].includes(env)) return off("BRAIN_TELEMETRY is off");
+  if (["1", "true", "on", "yes"].includes(env)) return on("BRAIN_TELEMETRY is on");
   if (userConfigTelemetry === false) return off('"telemetry": false in the user config');
-  if (s.enabled === false) return off("disabled with brain telemetry disable");
-  return { enabled: true, reason: s.enabled === true ? "enabled" : "on by default", collector, queued, install: s.install };
+  if (userConfigTelemetry === true) return on('"telemetry": true in the user config');
+  if (s.enabled === true) return on("you opted in");
+  if (s.enabled === false) return off("you opted out");
+  return off("off by default — never opted in");
 }
 
 export function setEnabled(enabled: boolean): void {
   const s = readSettings();
   s.enabled = enabled;
-  s.notified = true;
+  s.asked = true;
   writeSettings(s);
 }
 
@@ -175,13 +182,6 @@ export function record(
   try {
     if (!status(userConfigTelemetry).enabled) return;
     const s = readSettings();
-    if (!s.notified) {
-      process.stderr.write(
-        "brain collects anonymous usage data (command names, outcomes, versions; never paths, queries or note content).\n" +
-          "See exactly what is sent with `brain telemetry show`; turn it off with `brain telemetry disable` or DO_NOT_TRACK=1.\n",
-      );
-      s.notified = true;
-    }
     mkdirSync(stateRoot(), { recursive: true });
     appendFileSync(file("telemetry-queue.jsonl"), JSON.stringify(buildEvent(s.install, r, ctx)) + "\n");
     const q = queue();
@@ -224,4 +224,41 @@ export async function flush(): Promise<{ sent: number; error: string | null }> {
   } catch (err) {
     return { sent: 0, error: (err as Error).message };
   }
+}
+
+// Whether to show the one-time question: only to a person at a terminal who
+// has not decided by any route, and never in --json mode, CI, or a hook.
+export function shouldAsk(opts: { json: boolean; command: string; userConfigTelemetry: unknown; tty?: boolean }): boolean {
+  const tty = opts.tty ?? (process.stdin.isTTY === true && process.stderr.isTTY === true);
+  if (!tty || opts.json || process.env.CI) return false;
+  if (["telemetry", "help", "context", "unknown"].includes(opts.command.split(".")[0]!)) return false;
+  if (process.env.DO_NOT_TRACK || process.env.BRAIN_TELEMETRY || typeof opts.userConfigTelemetry === "boolean") return false;
+  const s = readSettings();
+  return !s.asked && s.enabled === null;
+}
+
+export function parseAnswer(answer: string): boolean {
+  return /^\s*(y|yes)\s*$/i.test(answer);
+}
+
+// Ask once, on stderr. No answer within a minute, or anything but yes, is no.
+export async function ask(): Promise<boolean> {
+  process.stderr.write(
+    "\nHelp improve brain? Share anonymous usage data: command names, outcomes and versions —\n" +
+      "never paths, queries, note titles or content. Details: docs/telemetry.md.\n" +
+      "Change your mind any time: brain telemetry enable | disable.\n",
+  );
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  const answer = await new Promise<string>((resolve) => {
+    const timer = setTimeout(() => resolve(""), 60_000);
+    rl.question("Share anonymous usage data? [y/N] ", (a) => {
+      clearTimeout(timer);
+      resolve(a);
+    });
+  });
+  rl.close();
+  const yes = parseAnswer(answer);
+  setEnabled(yes);
+  process.stderr.write(yes ? "Thanks — telemetry is on.\n\n" : "Telemetry stays off.\n\n");
+  return yes;
 }

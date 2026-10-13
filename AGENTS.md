@@ -38,7 +38,9 @@ holds the rules an agent changing the code must not break.
    error it prints nothing and exits 0. The installer never edits a harness's settings
    file; it prints the snippet.
 12. **Notes never leave the machine** except through the user's own `brain sync` to the
-   vault's remote. Two other things may: anonymous telemetry (on by default) whose fields are
+   vault's remote. Two other things may: anonymous telemetry — off unless a person said yes
+   to the one-time terminal question or opted in explicitly; never asked of agents, scripts,
+   CI or hooks — whose fields are
    exactly `Event` in `src/telemetry.ts` and docs/telemetry.md — adding a field means updating
    both and the test that searches events for private strings; and feedback, only as a
    redacted draft a person submits, or posted with their permission. Never in the foreground

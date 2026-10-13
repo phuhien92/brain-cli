@@ -26,7 +26,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.8.0";
+export const VERSION = "0.8.1";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -101,8 +101,8 @@ COMMANDS
       --post                  post with the gh CLI instead — only with the user's permission:
                               --user-approved, or "feedback": { "post": "allow" } in config
   telemetry [status|show|enable|disable|reset]
-                              Anonymous usage data — on by default; show prints exactly what
-                              is queued; DO_NOT_TRACK=1 or BRAIN_TELEMETRY=0 also turn it off
+                              Anonymous usage data — off unless you opt in (brain asks once,
+                              in a terminal); show prints exactly what is queued
 
   help                        Show this help
 
@@ -174,8 +174,19 @@ export async function main(argv: string[]): Promise<number> {
   tCommand = "unknown";
   tError = null;
   tContext = {};
+  const json = argv.includes("--json");
+  const first = argv.find((a) => !a.startsWith("-"));
+  const after = first ? argv[argv.indexOf(first) + 1] : undefined;
+  if (telemetry.shouldAsk({ json, command: telemetryName(first ?? "help", after), userConfigTelemetry: userSettings().telemetry })) {
+    try {
+      await telemetry.ask();
+    } catch {
+      // a broken terminal never blocks the command
+    }
+  }
   const exit = await run(argv);
-  if (tCommand !== "telemetry.flush") {
+  // Managing telemetry is not usage of brain; it is never itself recorded.
+  if (!tCommand.startsWith("telemetry")) {
     telemetry.record(
       { command: tCommand, exit, error: tError, ms: Date.now() - started, json: argv.includes("--json"), version: VERSION },
       tContext,

@@ -1,21 +1,35 @@
 # Telemetry
 
-brain collects **anonymous usage data, on by default**. This page lists everything that is
-sent, so you can decide; the CLI shows the same thing on your machine with
-`brain telemetry show`.
+brain can collect **anonymous usage data, only if you agree**. It is off by default. The
+first time you run brain yourself in a terminal, it asks once:
 
-## Turn it off
-
-Any one of these:
-
-```sh
-brain telemetry disable            # remembered on this machine
-export DO_NOT_TRACK=1              # the cross-tool convention
-export BRAIN_TELEMETRY=0
+```text
+Help improve brain? Share anonymous usage data: command names, outcomes and versions —
+never paths, queries, note titles or content. Details: docs/telemetry.md.
+Change your mind any time: brain telemetry enable | disable.
+Share anonymous usage data? [y/N]
 ```
 
-or `"telemetry": false` in `~/.config/brain/config.json`. `brain telemetry` shows whether it
-is on, why, and how many events are waiting.
+Only `y` or `yes` turns it on; Enter, anything else, or no answer within a minute leaves it
+off. Your answer is remembered and the question never comes back.
+
+**Agents, scripts, CI and session hooks are never asked** (no terminal, `--json`, `CI` set,
+or `brain context`), so they stay off unless a person opted in on that machine. The question
+is not asked during `npm install -g`: npm runs install scripts without a terminal to answer
+in, and an agent or CI install would hang waiting.
+
+## Change your mind
+
+```sh
+brain telemetry enable             # opt in
+brain telemetry disable            # opt out
+export DO_NOT_TRACK=1              # always off, whatever else is set
+export BRAIN_TELEMETRY=1           # opt in without being asked (or =0 to keep it off)
+```
+
+or `"telemetry": true | false` in `~/.config/brain/config.json`. `brain telemetry` shows
+whether it is on, why, and how many events are waiting. Managing telemetry is never itself
+recorded.
 
 ## Exactly what one event contains
 
@@ -55,5 +69,4 @@ machine name appears anywhere in the queued events.
   clears it. If that fails, the events stay queued (at most 500; the oldest are dropped).
 - **No collector is configured in this version**, so nothing is sent yet: events stay in the
   local queue until a collector exists. The collector's URL will be listed here when it does.
-- The first time brain records an event, it says so once on stderr (never stdout, so `--json`
-  output stays clean).
+- The question is written to stderr, never stdout, so `--json` output is never affected.

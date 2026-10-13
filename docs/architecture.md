@@ -115,7 +115,7 @@ sequenceDiagram
 Zero runtime dependencies: `node:sqlite` (FTS5 with Porter stemming), `node:util`
 `parseArgs`, `node:crypto`. That is why `npm install -g` never compiles anything and why
 brain runs inside an agent's sandbox without network access: the only network use, the
-daily telemetry send ([telemetry.md](telemetry.md)), happens in a detached background
+daily telemetry send when a person has opted in ([telemetry.md](telemetry.md)), happens in a detached background
 process and its failure is invisible to commands.
 
 ## Guarantees and how they are held

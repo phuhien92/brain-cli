@@ -8,6 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { telemetryName } from "../src/cli.js";
+import { parseAnswer, shouldAsk } from "../src/telemetry.js";
 
 const BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../../bin/brain.js");
 let root: string;
@@ -39,12 +40,48 @@ beforeEach(() => {
 });
 after(() => rmSync(root, { recursive: true, force: true }));
 
-test("on by default; an event holds only the documented fields and nothing typed or stored by the user", () => {
+test("off by default: nothing is recorded, and nobody is asked without a terminal", () => {
+  const r = brain(["search", "secret severance figures", "--json"]);
+  assert.equal(r.code, 0);
+  assert.equal(r.stderr, "", "no question, no notice: an agent's output is untouched");
+  const st = shown();
+  assert.equal(st.enabled, false);
+  assert.match(st.reason, /off by default/);
+  assert.equal(st.events.length, 0);
+});
+
+test("the one-time question: only for a person at a terminal who has not decided", () => {
+  const base = { json: false, command: "search", userConfigTelemetry: null, tty: true };
+  process.env.BRAIN_STATE_DIR = state;
+  const saved = { DO_NOT_TRACK: process.env.DO_NOT_TRACK, BRAIN_TELEMETRY: process.env.BRAIN_TELEMETRY, CI: process.env.CI };
+  delete process.env.DO_NOT_TRACK;
+  delete process.env.BRAIN_TELEMETRY;
+  delete process.env.CI;
+  try {
+    assert.equal(shouldAsk(base), true);
+    assert.equal(shouldAsk({ ...base, tty: false }), false, "agents and scripts: never");
+    assert.equal(shouldAsk({ ...base, json: true }), false);
+    assert.equal(shouldAsk({ ...base, command: "context" }), false, "never inside a session hook");
+    assert.equal(shouldAsk({ ...base, userConfigTelemetry: false }), false, "already decided in config");
+    process.env.CI = "true";
+    assert.equal(shouldAsk(base), false, "never in CI");
+    delete process.env.CI;
+    brain(["telemetry", "disable"]);
+    assert.equal(shouldAsk(base), false, "asked once, never again");
+  } finally {
+    Object.assign(process.env, Object.fromEntries(Object.entries(saved).filter(([, v]) => v !== undefined)));
+  }
+  assert.equal(parseAnswer("y"), true);
+  assert.equal(parseAnswer(" Yes "), true);
+  assert.equal(parseAnswer(""), false, "no answer is no");
+  assert.equal(parseAnswer("sure"), false);
+});
+
+test("opted in: an event holds only the documented fields and nothing typed or stored by the user", () => {
+  brain(["telemetry", "enable"]);
   const r = brain(["search", "secret severance figures", "--json"]);
   assert.equal(r.code, 0);
   assert.equal(r.stdout.trim().split("\n").length, 1, "stdout stays one JSON line");
-  assert.match(r.stderr, /anonymous usage data/, "first run explains itself, on stderr");
-  assert.doesNotMatch(brain(["search", "x", "--json"]).stderr, /anonymous usage data/, "only once");
 
   const { enabled, events } = shown();
   assert.equal(enabled, true);
@@ -65,13 +102,15 @@ test("free text never becomes a command name", () => {
 });
 
 test("errors are recorded by code only", () => {
+  brain(["telemetry", "enable"]);
   brain(["get", "Finance/severance-plan", "--json"]);
   const e = shown().events.at(-1);
   assert.equal(e.error, "not_found");
   assert.ok(!JSON.stringify(e).includes("severance"));
 });
 
-test("every off switch works: DO_NOT_TRACK, BRAIN_TELEMETRY=0, disable, user config", () => {
+test("every switch works: DO_NOT_TRACK beats an opt-in; BRAIN_TELEMETRY; disable; user config", () => {
+  brain(["telemetry", "enable"]);
   brain(["index"], { DO_NOT_TRACK: "1" });
   brain(["index"], { BRAIN_TELEMETRY: "0" });
   assert.equal(shown({ DO_NOT_TRACK: "1" }).events.length, 0);
@@ -80,16 +119,20 @@ test("every off switch works: DO_NOT_TRACK, BRAIN_TELEMETRY=0, disable, user con
   brain(["telemetry", "disable"]);
   brain(["index"]);
   assert.equal(shown().events.length, 0);
-  assert.match(shown().reason, /disable/);
+  assert.match(shown().reason, /opted out/);
   brain(["telemetry", "enable"]);
 
   writeFileSync(join(root, "config.json"), JSON.stringify({ telemetry: false }));
   brain(["index"]);
   assert.equal(shown().enabled, false);
   rmSync(join(root, "config.json"));
+
+  brain(["telemetry", "disable"]);
+  assert.equal(shown({ BRAIN_TELEMETRY: "1" }).enabled, true, "BRAIN_TELEMETRY=1 opts in without asking");
 });
 
 test("flush posts the queue to the collector and clears it; no collector means nothing leaves", async () => {
+  brain(["telemetry", "enable"]);
   brain(["index"]);
   brain(["search", "x"]);
   const noCollector = JSON.parse(brain(["telemetry", "flush", "--json"]).stdout).data;

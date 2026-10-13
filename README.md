@@ -12,9 +12,8 @@
 `brain` indexes a folder of markdown notes — an Obsidian vault, a docs folder, an agent's
 learnings — and gives any agent ranked search, memory that syncs across machines, and a
 warning when a note has gone stale. From the shell, with a stable JSON contract. No app
-running, no API key, and your notes never leave the machine. (brain does collect
-anonymous usage data by default — command names and outcomes, never content; see
-[telemetry](docs/telemetry.md), off with `DO_NOT_TRACK=1`.)
+running, no API key, and your notes never leave the machine. Anonymous usage data is
+off unless you say yes when brain asks, once ([telemetry](docs/telemetry.md)).
 
 ```console
 $ brain search "deploy gotchas on the mac mini" --limit 3
@@ -88,7 +87,7 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [Integrations](docs/integrations.md) | many repos sharing one vault, scopes, sync modes |
 | [firstmate guide](docs/firstmate.md) | sharing firstmate's learnings across two machines |
 | [Feedback](docs/feedback.md) | bug reports and ideas from people and agents, redacted, posted only with permission |
-| [Telemetry](docs/telemetry.md) | exactly what anonymous usage data is collected, and how to turn it off |
+| [Telemetry](docs/telemetry.md) | opt-in anonymous usage data: what is collected, how the one-time question works |
 | [Extensions (design)](docs/design/extensions.md) | proposed plugin model and `brain ui` |
 
 ## Roadmap
