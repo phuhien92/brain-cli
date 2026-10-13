@@ -27,7 +27,8 @@ phrase).
 5. Cite the note path you relied on, so the user can open it.
 
 For a long note, read only what you need: `brain get "<path>" --section "<heading>" --json`
-(repeatable; `--meta` lists the headings first).
+(repeatable; `--meta` lists the headings first; `--lines <n>` keeps only the first n lines
+of each section, which is all you need from a newest-first log).
 
 `brain get` accepts a path, a file name, a note title or an alias. Exit code 4 means the
 name matched several notes; pick one from `error.candidates`.

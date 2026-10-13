@@ -136,3 +136,13 @@ test("get --section returns only those sections, exit 3 when none match", () => 
   assert.equal(none.code, 3);
   assert.deepEqual(none.body.error.headings, ["State", "Profile", "History"]);
 });
+
+test("get --lines caps each section (or the whole note) at n lines", () => {
+  writeFileSync(join(vault, "notes/log.md"), "# Log\n## Recent\n- newest\n- older\n- oldest\n## Other\nx\n");
+  const sec = json(["get", "notes/log", "--section", "recent", "--lines", "2"]);
+  assert.equal(sec.body.data.content, "## Recent\n- newest\n");
+  const whole = json(["get", "notes/log", "--lines", "1"]);
+  assert.equal(whole.body.data.content, "# Log\n");
+  assert.equal(whole.body.data.truncated, true);
+  assert.equal(json(["get", "notes/log", "--lines", "0"]).code, 2);
+});

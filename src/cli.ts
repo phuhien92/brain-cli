@@ -7,7 +7,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { Store, type RefreshStats } from "./store.js";
 import { sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.5.0";
+export const VERSION = "0.5.1";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -28,6 +28,8 @@ COMMANDS
       --section <heading>     Only that section: the heading and everything under it,
                               up to the next heading of the same or higher level
                               (repeatable; matched case-insensitively, by prefix)
+      --lines <n>             Only the first n lines of each section (or of the note) —
+                              enough for a newest-first log
 
   log add <kind> <title>      Record an entry as a new file: <log>/<kind>/<date>-<machine>-<slug>.md
       --body <text|->         Entry body (- reads stdin)
@@ -105,6 +107,7 @@ export async function main(argv: string[]): Promise<number> {
         raw: { type: "boolean", default: false },
         meta: { type: "boolean", default: false },
         section: { type: "string", multiple: true },
+        lines: { type: "string" },
         body: { type: "string" },
         tag: { type: "string", multiple: true },
         kind: { type: "string" },
@@ -233,8 +236,19 @@ export async function main(argv: string[]): Promise<number> {
           });
         }
         const note = store.get(matches[0]!)!;
+        const maxLines = flags.lines === undefined ? undefined : Number(flags.lines);
+        if (maxLines !== undefined && (!Number.isInteger(maxLines) || maxLines < 1)) {
+          throw new CliError("usage", "--lines must be a positive integer", 2);
+        }
+        if (maxLines !== undefined && !flags.section?.length) {
+          const all = note.content.split("\n");
+          const content = all.slice(0, maxLines).join("\n") + "\n";
+          const truncated = all.length > maxLines;
+          print(out, command, { ...note, content, truncated }, { vault, index }, () => content);
+          return 0;
+        }
         if (flags.section?.length) {
-          const { content, found, missing } = extractSections(note.content, flags.section);
+          const { content, found, missing } = extractSections(note.content, flags.section, maxLines);
           if (!found.length) {
             throw new CliError("not_found", `no section in ${note.path} matches ${flags.section.map((x) => `'${x}'`).join(", ")}`, 3, {
               headings: note.headings,
@@ -447,6 +461,7 @@ function formatMeta(note: NonNullable<ReturnType<Store["get"]>>): string {
 export function extractSections(
   markdown: string,
   wanted: string[],
+  maxLines?: number,
 ): { content: string; found: string[]; missing: string[] } {
   const lines = markdown.split("\n");
   const headings: { line: number; level: number; text: string }[] = [];
@@ -471,7 +486,9 @@ export function extractSections(
   const blocks = order.map((idx) => {
     const h = headings[idx]!;
     const next = headings.slice(idx + 1).find((n) => n.level <= h.level);
-    return lines.slice(h.line, next ? next.line : lines.length).join("\n").trimEnd();
+    const end = next ? next.line : lines.length;
+    const stop = maxLines === undefined ? end : Math.min(end, h.line + maxLines);
+    return lines.slice(h.line, stop).join("\n").trimEnd();
   });
   return { content: blocks.join("\n\n") + (blocks.length ? "\n" : ""), found: order.map((i) => picked.get(i)!), missing };
 }
