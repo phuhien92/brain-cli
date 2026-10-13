@@ -93,7 +93,8 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [firstmate guide](docs/firstmate.md) | sharing firstmate's learnings across two machines |
 | [Feedback](docs/feedback.md) | bug reports and ideas from people and agents, redacted, posted only with permission |
 | [Telemetry](docs/telemetry.md) | opt-in anonymous usage data: what is collected, how the one-time question works |
-| [Extensions (design)](docs/design/extensions.md) | proposed plugin model and `brain ui` |
+| [Extensions](docs/extensions.md) | install and build process-isolated commands; permissions and scopes |
+| [Extensions and UI design](docs/design/extensions.md) | proposed hooks and local web interface |
 
 ## Roadmap
 
@@ -106,14 +107,14 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 4. **Lifecycle and lint** — review windows by category, archive, and `brain lint`. ✅
    Still to come in this step: the published benchmark of grep vs. the Obsidian CLI vs.
    `brain` on real questions, measuring tokens read and whether the right note came back.
-5. **Extensions** — anyone can add a command (`brain <name>`) or a hook on brain's
-   events in any language, as a separate process speaking the `--json` contract, with a
-   manifest that declares what it reads, writes and contacts. Importers, embeddings and
-   new views belong here, not in the core.
+5. **Extensions** — anyone can add a command (`brain <name>`) in any language, as a
+   separate process speaking the `--json` contract, with a manifest that declares what it
+   reads, writes and contacts. Command extensions and the meetings reference are built;
+   event hooks remain next. [Use or build an extension](docs/extensions.md). 🚧
 6. **`brain ui`** — a local web page (127.0.0.1 only) for status, integrations, this
    machine's config, extensions and a search playground, like Serena's dashboard.
 
-Steps 5 and 6 are designed, not built: [docs/design/extensions.md](docs/design/extensions.md).
+Hooks and step 6 remain design work: [docs/design/extensions.md](docs/design/extensions.md).
 
 ## Develop
 

@@ -22,6 +22,7 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { ExtensionError, enabledExtensionNames, installedManifest, type ExtensionManifest } from "./extensions.js";
 import { userConfigFile } from "./paths.js";
 
 export { userConfigFile };
@@ -125,9 +126,42 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
     }
   }
 
+  let enabledExtensions: string[];
+  try {
+    enabledExtensions = enabledExtensionNames(vault);
+  } catch (err) {
+    throw new ConfigError((err as Error).message);
+  }
+
   const asName = opts.as ?? process.env.BRAIN_AS ?? "";
   let as: Integration | null = null;
-  if (asName) {
+  const extensionName = process.env.BRAIN_EXTENSION_SCOPE ?? "";
+  if (extensionName) {
+    if (!enabledExtensions.includes(extensionName)) {
+      throw new ConfigError(`extension '${extensionName}' is not enabled in brain.json`);
+    }
+    let installed;
+    try {
+      installed = installedManifest(extensionName);
+    } catch (err) {
+      throw new ConfigError((err as ExtensionError).message);
+    }
+    if (!installed) throw new ConfigError(`extension '${extensionName}' is not installed on this machine`);
+    const extension = extensionIntegration(installed.manifest);
+    const parentName = process.env.BRAIN_EXTENSION_PARENT_AS ?? "";
+    if (parentName) {
+      const parent = integrations[parentName];
+      if (!parent) {
+        const known = Object.keys(integrations);
+        throw new ConfigError(
+          `BRAIN_AS='${parentName}' is not an integration in brain.json` + (known.length ? ` (known: ${known.join(", ")})` : ""),
+        );
+      }
+      as = intersectIntegrations(parent, extension, logDir);
+    } else {
+      as = extension;
+    }
+  } else if (asName) {
     as = integrations[asName] ?? null;
     if (!as) {
       const known = Object.keys(integrations);
@@ -166,6 +200,44 @@ export function readScope(cfg: Config): string[] | null {
 
 export function inScope(path: string, scope: string[] | null): boolean {
   return scope === null || scope.some((prefix) => path.startsWith(prefix));
+}
+
+function extensionIntegration(manifest: ExtensionManifest): Integration {
+  return {
+    name: manifest.name,
+    read: manifest.permissions.read.includes("*") ? null : manifest.permissions.read,
+    write: manifest.permissions.write,
+    views: [],
+  };
+}
+
+function integrationScope(integration: Integration, logDir: string): string[] | null {
+  if (integration.read === null) return null;
+  return [...integration.read, ...integration.write.map((kind) => `${logDir}/${kind}/`)];
+}
+
+// A command launched from an already scoped integration gets the intersection
+// of that scope and the extension manifest. An extension can narrow a caller,
+// never use its own permissions to widen one.
+function intersectIntegrations(parent: Integration, extension: Integration, logDir: string): Integration {
+  const a = integrationScope(parent, logDir);
+  const b = integrationScope(extension, logDir);
+  let read: string[] | null;
+  if (a === null) read = b;
+  else if (b === null) read = a;
+  else {
+    read = [...new Set(a.flatMap((left) => b.flatMap((right) => {
+      if (left.startsWith(right)) return [left];
+      if (right.startsWith(left)) return [right];
+      return [];
+    })))];
+  }
+  return {
+    name: extension.name,
+    read,
+    write: extension.write.filter((kind) => parent.write.includes(kind)),
+    views: [],
+  };
 }
 
 function parseSync(raw: unknown, source: string): SyncSpec {

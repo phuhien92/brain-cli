@@ -1,6 +1,8 @@
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ConfigError, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
@@ -29,6 +31,17 @@ import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 import { ingest } from "./source.js";
+import {
+  ExtensionError,
+  enabledExtensionNames,
+  extensionProcess,
+  installExtension,
+  installedManifest,
+  listExtensions,
+  removeExtension,
+  resolveLauncher,
+  type ExtensionManifest,
+} from "./extensions.js";
 
 export const VERSION = "0.10.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
@@ -127,6 +140,12 @@ COMMANDS
                               Anonymous usage data — off unless you opt in (brain asks once,
                               in a terminal); show prints exactly what is queued
 
+  ext install <path|git-url>  Review permissions, then install on this machine and enable
+                              for this vault (interactive terminal only)
+  ext list                    List installed extensions and this vault's enablement
+  ext remove <name>           Remove an extension from this machine; other machines and the
+                              vault's enabled list are unchanged
+
   help                        Show this help
 
 GLOBAL FLAGS
@@ -146,6 +165,8 @@ CONFIG
   $BRAIN_MACHINE              Overrides the machine name (default: hostname)
   $BRAIN_STATE_DIR            Where indexes live (default ~/.local/state/brain); never
                               inside the vault, so iCloud/Dropbox never sync a live database
+  $BRAIN_EXTENSIONS_DIR       Installed extensions (default ~/.local/share/brain/extensions)
+  $BRAIN_NO_EXTENSIONS=1      Disable extension discovery for this process
 
 EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
@@ -171,13 +192,15 @@ interface Out {
 
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
+const BUILT_INS = new Set(COMMANDS);
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
   agent: ["install"],
   feedback: ["list", "show", "submit", "add"],
   telemetry: ["status", "show", "enable", "disable", "reset", "flush"],
+  ext: ["install", "list", "remove"],
 };
 
 export function telemetryName(command: string, sub: string | undefined): string {
@@ -221,6 +244,20 @@ export async function main(argv: string[]): Promise<number> {
 }
 
 async function run(argv: string[]): Promise<number> {
+  // Extension arguments are owned by the extension, so dispatch before the
+  // strict built-in parser rejects flags it does not know (for example
+  // `brain meetings import --since 7d`). The first positional is the command
+  // in brain's documented syntax, and built-ins always take precedence.
+  const leading = argv[0];
+  if (leading && !leading.startsWith("-") && !BUILT_INS.has(leading)) {
+    const out: Out = { json: argv.includes("--json"), quiet: argv.includes("--quiet") || argv.includes("-q") };
+    try {
+      return await runExtensionCommand(leading, argv.slice(1), out);
+    } catch (err) {
+      return fail(out, leading, err);
+    }
+  }
+
   let parsed;
   try {
     parsed = parseArgs({
@@ -334,6 +371,14 @@ async function run(argv: string[]): Promise<number> {
   if (command === "feedback") {
     try {
       return await feedbackCommand(args, flags, out);
+    } catch (err) {
+      return fail(out, tCommand, err);
+    }
+  }
+
+  if (command === "ext") {
+    try {
+      return await extensionManagementCommand(args, flags, out);
     } catch (err) {
       return fail(out, tCommand, err);
     }
@@ -526,11 +571,34 @@ async function run(argv: string[]): Promise<number> {
         const [sub, ...rest] = args;
         if (sub === "add") {
           const [kind = "", ...titleWords] = rest;
-          const title = titleWords.join(" ").trim();
+          let title = titleWords.join(" ").trim();
           if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t]', 2);
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
-          const body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
-          const path = addEntry(vault, cfg, { kind, title, body, tags: flags.tag });
+          let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
+          if (process.env.BRAIN_EXT_REDACT === "1") {
+            const notes = store.db.prepare("SELECT path, title FROM notes").all() as { path: string; title: string }[];
+            const redact = redactor({ vault, notes });
+            title = redact(title);
+            if (body !== undefined) {
+              const markers: string[] = [];
+              const urls: string[] = [];
+              const protectedBody = String(body)
+                .replace(/<!-- brain-source-id: [0-9a-f]{64} -->/g, (marker) => {
+                  markers.push(marker);
+                  return `<!-- brain-source-marker-${markers.length - 1} -->`;
+                })
+                // A source link is deliberately retained so the redacted note
+                // still leads back to the private system holding the details.
+                .replace(/https?:\/\/[^\s<>)]+/g, (url) => {
+                  urls.push(url);
+                  return `brain-extension-url-${urls.length - 1}`;
+                });
+              body = redact(protectedBody)
+                .replace(/brain-extension-url-(\d+)/g, (_all, index: string) => urls[Number(index)] ?? "")
+                .replace(/<!-- brain-source-marker-(\d+) -->/g, (_all, index: string) => markers[Number(index)] ?? "");
+            }
+          }
+          const path = addEntry(vault, cfg, { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag });
           index = store.refresh();
           print(out, "log.add", { path, kind: slug(kind), machine: cfg.machine }, { vault, index }, () => path);
           return 0;
@@ -770,6 +838,185 @@ async function run(argv: string[]): Promise<number> {
   } finally {
     store?.close();
   }
+}
+
+async function extensionManagementCommand(args: string[], flags: Record<string, unknown>, out: Out): Promise<number> {
+  const [sub = "list", ...rest] = args;
+  const vault = findVault(flags.vault as string | undefined);
+
+  if (sub === "install") {
+    if (rest.length !== 1) throw new CliError("usage", "usage: brain ext install <path|git-url>", 2);
+    // Permission approval is a human decision. JSON callers, redirected
+    // processes, hooks and CI are never prompted and have no bypass flag.
+    if (out.json || process.stdin.isTTY !== true || process.stderr.isTTY !== true || process.env.CI) {
+      throw new CliError(
+        "permission_confirmation_required",
+        "extension install requires a person at an interactive terminal to review and approve its permissions",
+        6,
+      );
+    }
+    const result = await installExtension(rest[0]!, vault, confirmExtensionInstall);
+    print(out, "ext.install", result, null, () =>
+      result.installed
+        ? `installed ${result.manifest.name} ${result.manifest.version} in ${result.directory}\nenabled for ${vault}`
+        : `cancelled; ${result.manifest.name} was not installed`,
+    );
+    return 0;
+  }
+
+  if (sub === "list") {
+    if (rest.length) throw new CliError("usage", "usage: brain ext list", 2);
+    const extensions = listExtensions(vault);
+    print(out, "ext.list", { extensions }, null, () =>
+      extensions.length
+        ? extensions.map((extension) => {
+            const version = extension.manifest?.version ? ` ${extension.manifest.version}` : "";
+            const status = extension.installed ? (extension.enabled ? "enabled" : "disabled") : "missing";
+            return `${extension.name}${version}  ${status}${extension.error ? `  (${extension.error})` : ""}`;
+          }).join("\n")
+        : "no extensions installed",
+    );
+    return 0;
+  }
+
+  if (sub === "remove") {
+    if (rest.length !== 1) throw new CliError("usage", "usage: brain ext remove <name>", 2);
+    const result = removeExtension(rest[0]!);
+    const stillEnabled = enabledExtensionNames(vault).includes(result.name);
+    print(out, "ext.remove", { ...result, stillEnabled }, null, () =>
+      `removed ${result.name} from this machine${stillEnabled ? "; it remains enabled for this vault and on other machines" : ""}`,
+    );
+    return 0;
+  }
+
+  throw new CliError("usage", "usage: brain ext install <path|git-url> | ext list | ext remove <name>", 2);
+}
+
+async function confirmExtensionInstall(manifest: ExtensionManifest): Promise<boolean> {
+  const show = (values: string[], empty: string) => values.length ? values.join(", ") : empty;
+  process.stderr.write(
+    [
+      "",
+      `Extension: ${manifest.name} ${manifest.version}`,
+      ...(manifest.description ? [`  ${manifest.description}`] : []),
+      `  reads:    ${show(manifest.permissions.read, "nothing")}`,
+      `  writes:   ${show(manifest.permissions.write, "nothing")}`,
+      `  contacts: ${show(manifest.permissions.network, "no hosts declared")}`,
+      "",
+      "This is code that runs with your operating-system permissions. brain enforces its",
+      "read/write scope when it calls brain; declared network hosts are not sandboxed.",
+    ].join("\n") + "\n",
+  );
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = await new Promise<string>((done) => rl.question(`Install and enable ${manifest.name} for this vault? [y/N] `, done));
+    return /^\s*(y|yes)\s*$/i.test(answer);
+  } finally {
+    rl.close();
+  }
+}
+
+interface ExtensionInvocation {
+  args: string[];
+  vault?: string;
+  as?: string;
+}
+
+function extensionInvocation(args: string[]): ExtensionInvocation {
+  const forwarded: string[] = [];
+  let vault: string | undefined;
+  let as: string | undefined;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === "--vault" || arg === "--as") {
+      const value = args[++i];
+      if (!value) throw new CliError("usage", `${arg} needs a value`, 2);
+      if (arg === "--vault") vault = value;
+      else as = value;
+    } else if (arg.startsWith("--vault=")) vault = arg.slice("--vault=".length);
+    else if (arg.startsWith("--as=")) as = arg.slice("--as=".length);
+    else forwarded.push(arg);
+  }
+  return { args: forwarded, vault, as };
+}
+
+async function runExtensionCommand(name: string, rawArgs: string[], out: Out): Promise<number> {
+  if (process.env.BRAIN_NO_EXTENSIONS === "1") {
+    throw new CliError("usage", `unknown command '${name}' — extensions are disabled by BRAIN_NO_EXTENSIONS`, 2);
+  }
+  const invocation = extensionInvocation(rawArgs);
+  const vault = findVault(invocation.vault);
+  const parentAs = invocation.as ?? process.env.BRAIN_AS ?? "";
+  const cfg = loadConfig(vault, { as: parentAs || undefined });
+  const installed = installedManifest(name);
+  if (!enabledExtensionNames(vault).includes(name)) {
+    if (!installed) throw new CliError("usage", `unknown command '${name}' — run 'brain help'`, 2);
+    throw new CliError("not_found", `extension '${name}' is not enabled for this vault`, 3);
+  }
+  if (!installed) throw new CliError("not_found", `extension '${name}' is not installed on this machine`, 3);
+  const launcher = resolveLauncher(installed.directory, installed.manifest);
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    BRAIN_VAULT: vault,
+    BRAIN_BIN: BIN,
+    BRAIN_AS: parentAs || installed.manifest.name,
+    BRAIN_EXT_DIR: installed.directory,
+    BRAIN_MACHINE: cfg.machine,
+    BRAIN_EXTENSION_SCOPE: installed.manifest.name,
+    BRAIN_EXT_REDACT: "1",
+  };
+  if (parentAs) env.BRAIN_EXTENSION_PARENT_AS = parentAs;
+  else delete env.BRAIN_EXTENSION_PARENT_AS;
+
+  const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string; error?: Error }>((done) => {
+    const launch = extensionProcess(launcher, invocation.args);
+    const child = spawn(launch.file, launch.args, {
+      cwd: installed.directory,
+      env,
+      stdio: ["inherit", "pipe", "pipe"],
+      windowsVerbatimArguments: launch.windowsVerbatimArguments,
+    });
+    let stdout = "";
+    let stderr = "";
+    let spawnError: Error | undefined;
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    child.on("error", (err) => (spawnError = err));
+    child.on("close", (code, signal) => done({ code, signal, stdout, stderr, ...(spawnError ? { error: spawnError } : {}) }));
+  });
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) throw new ExtensionError("extension_failed", `${name} could not start: ${result.error.message}`);
+  if (result.signal) throw new ExtensionError("extension_failed", `${name} was terminated by ${result.signal}`);
+
+  const lines = result.stdout.split(/\r?\n/).filter((line) => line.trim() !== "");
+  let envelope: Record<string, unknown> | null = null;
+  if (lines.length === 1) {
+    try {
+      const parsed = JSON.parse(lines[0]!) as unknown;
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) envelope = parsed as Record<string, unknown>;
+    } catch {
+      // Report a protocol error below without echoing arbitrary extension output.
+    }
+  }
+  const valid = envelope?.schema === SCHEMA
+    && typeof envelope.command === "string"
+    && typeof envelope.ok === "boolean"
+    && (envelope.ok === true ? Object.hasOwn(envelope, "data") : !!envelope.error && typeof envelope.error === "object");
+  if (!valid) {
+    throw new ExtensionError(
+      "extension_protocol",
+      `${name} must print exactly one ${SCHEMA} JSON envelope; received ${lines.length} non-empty stdout line(s)`,
+    );
+  }
+  if ((envelope!.ok === true && result.code !== 0) || (envelope!.ok === false && result.code === 0)) {
+    throw new ExtensionError("extension_protocol", `${name} returned an exit code that disagrees with its envelope`);
+  }
+  if (envelope!.ok === false) {
+    const error = envelope!.error as Record<string, unknown>;
+    tError = typeof error.code === "string" ? error.code : "extension_failed";
+  }
+  if (!out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
+  return result.code ?? 1;
 }
 
 async function setupCommand(flags: Record<string, unknown>, out: Out): Promise<number> {
@@ -1101,6 +1348,8 @@ function fail(out: Out, command: string, err: unknown): number {
       ? err
       : err instanceof SyncError
         ? new CliError(err.code, err.message, err.code === "sync_conflict" ? 5 : 1, err.files.length ? { files: err.files } : undefined)
+        : err instanceof ExtensionError
+          ? new CliError(err.code, err.message, err.exit, err.details)
         : err instanceof ConfigError
           ? new CliError("config", err.message, 1)
           : err instanceof OfflineNoteError

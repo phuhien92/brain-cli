@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+
+// Reference kind-1 extension. The source API is deliberately small so tests
+// can supply a local fake server through BRAIN_MEETINGS_API_URL. Production
+// credentials and live account setup are outside this example.
+
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+
+const SCHEMA = "brain.v1";
+
+function envelope(command, ok, value) {
+  process.stdout.write(JSON.stringify(ok
+    ? { schema: SCHEMA, command, ok: true, data: value }
+    : { schema: SCHEMA, command, ok: false, error: value }) + "\n");
+}
+
+function fail(code, message, exit = 1) {
+  envelope("meetings.import", false, { code, message });
+  process.exitCode = exit;
+}
+
+function brain(args, input) {
+  const bin = process.env.BRAIN_BIN;
+  if (!bin) throw new Error("BRAIN_BIN was not provided by brain");
+  const result = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", bin, ...args, "--json"], {
+    env: process.env,
+    encoding: "utf8",
+    input,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  let body;
+  try {
+    body = JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`brain ${args.slice(0, 2).join(" ")} did not return JSON${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
+  }
+  if (result.status !== 0 || body.schema !== SCHEMA || body.ok !== true) {
+    throw new Error(body?.error?.message || `brain ${args.slice(0, 2).join(" ")} failed`);
+  }
+  return body.data;
+}
+
+function marker(id) {
+  return createHash("sha256").update(String(id)).digest("hex");
+}
+
+function oneLine(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function sourceUrl(value) {
+  const raw = oneLine(value);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return "";
+  }
+}
+
+function bodyFor(meeting, key) {
+  const attendees = Array.isArray(meeting.attendees) ? meeting.attendees.map(oneLine).filter(Boolean) : [];
+  const actions = Array.isArray(meeting.actionItems) ? meeting.actionItems.map(oneLine).filter(Boolean) : [];
+  const summary = oneLine(meeting.summary);
+  const source = sourceUrl(meeting.url);
+  const lines = [
+    `<!-- brain-source-id: ${key} -->`,
+    `Date: ${oneLine(meeting.date) || "unknown"}`,
+    `Attendees: ${attendees.join(", ") || "not listed"}`,
+    "",
+    "## Summary",
+    summary || "No source summary was provided.",
+    "",
+    "## Action items",
+    ...(actions.length ? actions.map((item) => `- ${item}`) : ["- None listed."]),
+    "",
+    "## Source",
+    source ? `[Open in the meeting source](${source.replace(/[()]/g, (c) => `\\${c}`)})` : "No source link was provided.",
+  ];
+  return lines.join("\n");
+}
+
+async function main() {
+  const args = process.argv.slice(2).filter((arg) => !["--json", "--quiet", "-q"].includes(arg));
+  if (args[0] !== "import") {
+    fail("usage", "usage: brain meetings import [--since <duration>]", 2);
+    return;
+  }
+  let since = "7d";
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--since" && args[i + 1]) since = args[++i];
+    else if (args[i].startsWith("--since=")) since = args[i].slice("--since=".length);
+    else {
+      fail("usage", `unknown meetings argument '${args[i]}'`, 2);
+      return;
+    }
+  }
+
+  const endpoint = new URL(process.env.BRAIN_MEETINGS_API_URL || "https://api.granola.ai/v1/meetings");
+  endpoint.searchParams.set("since", since);
+  const response = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`meeting source answered ${response.status}`);
+  const payload = await response.json();
+  const meetings = Array.isArray(payload) ? payload : payload?.meetings;
+  if (!Array.isArray(meetings)) throw new Error("meeting source response needs a meetings list");
+
+  const current = brain(["log", "100000", "--kind", "meeting"]);
+  const seen = new Set();
+  for (const entry of current.entries ?? []) {
+    for (const match of String(entry.body ?? "").matchAll(/<!-- brain-source-id: ([0-9a-f]{64}) -->/g)) seen.add(match[1]);
+  }
+
+  const added = [];
+  let skipped = 0;
+  for (const meeting of meetings) {
+    if (meeting?.id === undefined || !oneLine(meeting.title)) throw new Error("each meeting needs an id and title");
+    const key = marker(meeting.id);
+    if (seen.has(key)) {
+      skipped++;
+      continue;
+    }
+    const result = brain(["log", "add", "meeting", oneLine(meeting.title), "--body", "-"], bodyFor(meeting, key));
+    added.push(result.path);
+    seen.add(key);
+  }
+  envelope("meetings.import", true, { added, skipped, received: meetings.length, since });
+}
+
+try {
+  await main();
+} catch (err) {
+  fail("source_failed", err instanceof Error ? err.message : String(err));
+}

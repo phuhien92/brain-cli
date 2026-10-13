@@ -1,11 +1,12 @@
 # Design: extensions and a local web interface
 
-*Status: proposed (2026-10-13). Nothing here is built yet. Comments welcome as issues.*
+*Status: command extensions (kind 1) are implemented. Hooks (kind 2) and the local UI
+remain proposed. See [the extension documentation](../extensions.md) for the shipped contract.*
 
 brain's core should stay small: index, search, get, log, sync, scopes. Most good ideas —
 a Granola importer, embeddings, a Readwise sync, a lint rule, a view for a new tool —
-belong to the people who want them. This document proposes how anyone can add those
-**without changing brain's code**, and a local web page for editing configuration.
+belong to the people who want them. This document records the implemented command model and
+proposes hooks and a local web page for editing configuration.
 
 ## What we can learn from tools that already do this
 
@@ -37,9 +38,10 @@ Why that and not plugins loaded into brain:
 The cost is process start-up time, so extensions hook **events that are rare relative to
 a search**: a note changed, an entry added, a sync finished — not every query.
 
-### Kind 1 — commands: `brain <name>`
+### Kind 1 — commands: `brain <name>` (implemented)
 
-The gh model. An extension adds a subcommand:
+The shipped contract is documented in [`docs/extensions.md`](../extensions.md). The gh model:
+an extension adds a subcommand:
 
 ```sh
 brain ext install github:someone/brain-granola     # clones, pins to a commit, shows the manifest
@@ -145,10 +147,9 @@ Rules it must follow:
 
 ## Order of work
 
-1. **Lifecycle, lint and the benchmark** (roadmap step 4) first: `lint.run` and
-   `brain bench` are the first consumers of the extension contract, so the contract is
-   designed against real needs.
+1. **Lifecycle and lint** (roadmap step 4). Done; the benchmark remains future work.
 2. **Extension commands** (kind 1) and the manifest, with `brain ext install/list/remove`.
+   Done, designed against the meetings reference extension.
 3. **Hooks** (kind 2), one event at a time, starting with `context.build` and `log.added`.
 4. **`brain ui`**, once there is enough configuration to deserve a page.
 
@@ -156,5 +157,7 @@ Rules it must follow:
 
 - Should hook output that changes ranking (`search.after`) ever be on by default, or only
   per call? Proposed: per call, so search stays explainable.
-- Windows: extension executables need a launcher convention (`.cmd`/`.exe`).
 - Does a hosted index of extensions ever make sense, or is a GitHub topic enough?
+
+Windows is settled for kind 1: manifests name an extensionless path; Windows resolves `.exe`
+then `.cmd`, while Unix executes the unsuffixed file. See [the extension docs](../extensions.md#windows-launchers).

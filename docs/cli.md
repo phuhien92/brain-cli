@@ -18,6 +18,7 @@
 | `integrations`, `doctor` | who is connected; this machine's setup | [integrations.md](integrations.md) |
 | `path [<name>]` | where brain keeps things on this machine; reads only | [below](#where-things-are) |
 | `context`, `agent install <harness>` | session primer; teach a harness about brain | [agents.md](agents.md) |
+| `ext install\|list\|remove` | manage per-machine command extensions and per-vault enablement | [extensions.md](extensions.md) |
 
 ## Setup
 
@@ -72,6 +73,7 @@ overridden.
 | `sources` | immutable originals and their metadata sidecars |
 | `config` | the vault's `brain.json`, synced with it |
 | `user-config` | this machine's config |
+| `extensions` | per-machine installed extension code |
 | `state` | this vault's state directory, outside the vault and never synced |
 | `index` | the search index inside it |
 | `telemetry-queue` | anonymous usage events waiting to be sent, if you opted in |
@@ -119,7 +121,7 @@ code, so an agent can branch without parsing prose:
 | 3 | `not_found` | `get` matched no note |
 | 4 | `ambiguous` | `get` matched several notes; `error.candidates` lists their paths |
 | 5 | `sync_conflict`, `export_drift` | a note was edited on two machines (`error.files`), or an exported file was edited since brain wrote it |
-| 6 | `not_permitted` | the acting integration (`BRAIN_AS`) may not write that kind |
+| 6 | `not_permitted`, `permission_confirmation_required` | the acting integration may not write that kind, or extension installation needs an interactive person |
 | 7 | `lint_failed` | `brain lint --strict` found warnings |
 
 `schema` changes only on a breaking change to this shape.

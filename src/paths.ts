@@ -17,6 +17,12 @@ export function userConfigFile(): string {
   return process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
 }
 
+// Installed extension code is machine-local data, not a rebuildable cache.
+// Keep it out of stateRoot(), which users may delete to rebuild indexes.
+export function extensionsRoot(): string {
+  return process.env.BRAIN_EXTENSIONS_DIR || join(process.env.XDG_DATA_HOME || join(homedir(), ".local", "share"), "brain", "extensions");
+}
+
 // One state directory per vault, named after it and its real path:
 // "COWORK-OS-3f9a1c2b7d4e".
 export function vaultStateDir(vault: string, root = stateRoot()): string {
@@ -25,7 +31,7 @@ export function vaultStateDir(vault: string, root = stateRoot()): string {
   return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
 }
 
-export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "state", "index", "telemetry-queue"] as const;
+export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "extensions", "state", "index", "telemetry-queue"] as const;
 export type PathName = (typeof PATH_NAMES)[number];
 
 
@@ -37,6 +43,7 @@ export function brainPaths(vault: string, logDir: string): Record<PathName, stri
     sources: join(vault, "sources"),
     config: join(vault, "brain.json"),
     "user-config": userConfigFile(),
+    extensions: extensionsRoot(),
     state,
     index: join(state, "index.db"),
     "telemetry-queue": join(stateRoot(), "telemetry-queue.jsonl"),
