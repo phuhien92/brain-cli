@@ -16,9 +16,8 @@
     "node": ">=22.13"
   },
   "scripts": {
-    "build": "tsc -p .",
-    "prepare": "tsc -p .",
-    "test": "npm run build && node --no-warnings=ExperimentalWarning --test \"dist/test/*.test.js\"",
+    "compile": "tsc -p .",
+    "test": "npm run compile && node --no-warnings=ExperimentalWarning --test \"dist/test/*.test.js\"",
     "typecheck": "tsc -p . --noEmit"
   },
   "keywords": [
