@@ -11,8 +11,8 @@
 //
 // Sending never touches a command's latency or result: events are appended to
 // a local queue, and at most once a day a detached background process posts
-// them. No collector configured (BRAIN_TELEMETRY_URL) → nothing is sent and
-// the queue stays capped on this machine.
+// them to PostHog. No collector (BRAIN_POSTHOG_KEY set to "") → nothing is
+// sent and the queue stays capped on this machine.
 
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
@@ -25,8 +25,8 @@ export const TELEMETRY_SCHEMA = "brain.telemetry.v1";
 
 // The collector: PostHog. A project API key ("phc_…") can only send events,
 // never read them, and PostHog documents it as safe to publish in client
-// code. Empty = not configured yet: opted-in events stay queued locally.
-export const POSTHOG_KEY = "";
+// code. This is the brain-cli project, US cloud.
+export const POSTHOG_KEY = "phc_pbi4HceCUBBVC5GEFQr9JHSPqHkEEdvKocJmuTPMZdbo";
 export const POSTHOG_HOST = "https://us.i.posthog.com";
 
 interface Collector {
@@ -37,10 +37,12 @@ interface Collector {
 
 // BRAIN_TELEMETRY_URL points at a custom collector that receives the raw
 // brain.telemetry.v1 batch (self-hosting, tests). Otherwise PostHog, when a
-// key is set (built in, or BRAIN_POSTHOG_KEY for a fork's own project).
+// key is set: built in, or BRAIN_POSTHOG_KEY for a fork's own project. Setting
+// BRAIN_POSTHOG_KEY to "" turns PostHog off (tests and CI do, so they never
+// send to the real project).
 export function collector(): Collector | null {
   if (process.env.BRAIN_TELEMETRY_URL) return { kind: "custom", url: process.env.BRAIN_TELEMETRY_URL };
-  const key = process.env.BRAIN_POSTHOG_KEY || POSTHOG_KEY;
+  const key = process.env.BRAIN_POSTHOG_KEY ?? POSTHOG_KEY;
   if (!key) return null;
   const host = (process.env.BRAIN_POSTHOG_HOST || POSTHOG_HOST).replace(/\/+$/, "");
   return { kind: "posthog", url: `${host}/batch/`, key };

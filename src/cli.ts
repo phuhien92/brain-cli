@@ -28,7 +28,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.9.1";
+export const VERSION = "0.9.2";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 

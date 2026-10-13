@@ -20,8 +20,8 @@ function env(extra: Record<string, string> = {}) {
   delete e.DO_NOT_TRACK;
   delete e.BRAIN_TELEMETRY;
   delete e.BRAIN_TELEMETRY_URL;
-  delete e.BRAIN_POSTHOG_KEY;
   delete e.BRAIN_POSTHOG_HOST;
+  e.BRAIN_POSTHOG_KEY = ""; // never the real project from a test
   return { ...e, ...extra };
 }
 function brain(args: string[], extra: Record<string, string> = {}) {
@@ -141,6 +141,9 @@ test("flush posts the queue to the collector and clears it; no collector means n
   assert.equal(noCollector.sent, 0);
   assert.match(noCollector.error, /no collector/);
   assert.equal(JSON.parse(brain(["telemetry", "--json"]).stdout).data.collector, null);
+  // Built in: the brain-cli project on PostHog's US cloud (status only, nothing is sent).
+  const builtIn = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, "telemetry", "--json"], { cwd: vault, env: (({ BRAIN_POSTHOG_KEY, ...rest }) => rest)(env()), encoding: "utf8" });
+  assert.equal(JSON.parse(builtIn.stdout).data.collector, "PostHog (us.i.posthog.com)");
 
   let received: { schema: string; events: unknown[] } | null = null;
   const server = createServer((req, res) => {

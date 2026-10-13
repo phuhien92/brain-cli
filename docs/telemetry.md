@@ -71,9 +71,9 @@ machine name appears anywhere in the queued events.
 
 Nothing is written there unless you opted in, apart from your choice itself.
 
-**Remotely: [PostHog](https://posthog.com)**, once the project key is published in a release
-(`POSTHOG_KEY` in `src/telemetry.ts`; until then nothing is sent and `brain telemetry` says
-`collector: not configured`). Each event becomes a PostHog event named `brain_command`:
+**Remotely: [PostHog](https://posthog.com)** US cloud (`us.i.posthog.com`), the brain-cli
+project whose key is `POSTHOG_KEY` in `src/telemetry.ts`. Each event becomes a PostHog event
+named `brain_command`:
 
 - **anonymous** — the random install id is the distinct id, and `$process_person_profile:
   false` means PostHog creates no person profile;
@@ -87,7 +87,8 @@ stored. The project key in the code can only send events, never read them; PostH
 such keys as safe to publish.
 
 A fork can send to its own PostHog project with `BRAIN_POSTHOG_KEY` and `BRAIN_POSTHOG_HOST`
-(EU cloud: `https://eu.i.posthog.com`), or to any collector that accepts the raw
+(EU cloud: `https://eu.i.posthog.com`), turn PostHog off with `BRAIN_POSTHOG_KEY=""`, or send
+to any collector that accepts the raw
 `brain.telemetry.v1` batch with `BRAIN_TELEMETRY_URL`.
 
 ## How it is sent
@@ -97,6 +98,6 @@ A fork can send to its own PostHog project with `BRAIN_POSTHOG_KEY` and `BRAIN_P
   — which matters inside agent sandboxes that have no network at all.
 - At most **once a day**, a detached background process posts the queue to the collector and
   clears it. If that fails, the events stay queued (at most 500; the oldest are dropped).
-- The collector is PostHog (see [Where it is saved](#where-it-is-saved)). Until a release
-  carries its project key, nothing is sent: events stay in the local queue.
+- The collector is PostHog (see [Where it is saved](#where-it-is-saved)). The test suite and CI
+  set `BRAIN_POSTHOG_KEY=""`, so nothing they generate reaches it.
 - The question is written to stderr, never stdout, so `--json` output is never affected.
