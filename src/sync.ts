@@ -13,9 +13,10 @@ import { join } from "node:path";
 import type { Config } from "./config.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
 
-// Only sources not yet committed go on git's command line, so argv stays
-// bounded; past this a sync refuses rather than failing with E2BIG.
-const MAX_SOURCE_PATHSPEC_BYTES = 100_000;
+// Only sources not yet committed go on git's command line. A sync whose
+// longest git command would not fit under Windows' 32,767-character limit
+// (quotes and separators included) refuses rather than failing to spawn.
+const MAX_COMMAND_CHARS = 30_000;
 
 export interface SyncResult {
   mode: "git" | "none" | "command";
@@ -82,13 +83,14 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
     ...git("diff", "--cached", "--name-only", "--relative", "-z", "--", SOURCES_DIR).split("\0"),
   ];
   const sources = [...new Set(pending)].filter((p) => managed.has(p) && existsSync(join(vault, p)));
-  if (sources.join(" ").length > MAX_SOURCE_PATHSPEC_BYTES) {
+  const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
+  const longest = ["git", "-C", vault, "commit", "--quiet", "-m", `brain: ${owned.length} owned files from ${cfg.machine}`, "--", ...owned];
+  if (longest.reduce((n, arg) => n + arg.length + 3, 0) > MAX_COMMAND_CHARS) {
     throw new SyncError(
       "git_failed",
       `${sources.length} new source files are too many to commit in one sync; commit them in ${SOURCES_DIR}/ with git, then run brain sync again`,
     );
   }
-  const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
   let committed = 0;
   if (owned.length) {
     git("add", "--", ...owned);
