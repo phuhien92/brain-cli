@@ -217,10 +217,8 @@ export function extensionProcess(launcher: string, args: string[], platform = pr
   };
 }
 
-export function extensionBrainProcess(runner: string, platform = process.platform): ExtensionProcess {
-  return platform === "win32"
-    ? { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] }
-    : { file: runner, args: [] };
+export function extensionBrainProcess(runner: string): ExtensionProcess {
+  return { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] };
 }
 
 export function extensionDirectory(name: string): string {
@@ -288,7 +286,7 @@ function enable(vault: string, name: string): void {
   if (existsSync(path)) return acceptExisting();
   mkdirSync(directory, { recursive: true });
   try {
-    writeFileSync(path, `---\nkind: extension\nextension: ${name}\n---\n# ${name}\n`, { flag: "wx" });
+    writeFileSync(path, `---\nkind: extension\nextension: ${JSON.stringify(name)}\n---\n# ${name}\n`, { flag: "wx" });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     acceptExisting();

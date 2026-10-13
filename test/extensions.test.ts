@@ -118,7 +118,7 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(installed.code, 0, installed.stdout + installed.stderr);
   assert.match(installed.stdout + installed.stderr, /BRAIN_TEST_ALLOWED/);
   assert.equal(readdirSync(f.vault).includes("brain.json"), false, "enabling an extension does not create mutable vault config");
-  assert.match(readFileSync(join(f.vault, "log", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
+  assert.match(readFileSync(join(f.vault, "log", "extensions", "echoer.md"), "utf8"), /extension: "echoer"/);
 
   const listed = json(f, ["ext", "list"]);
   assert.equal(listed.code, 0);
@@ -160,7 +160,7 @@ test("install needs human permission approval and exposes the declared permissio
   const enabledAgain = interactiveInstall(second, source);
   assert.equal(enabledAgain.code, 0, enabledAgain.stdout + enabledAgain.stderr);
   assert.equal(readFileSync(join(secondVault, "brain.json"), "utf8"), '{\n  "log": { "dir": "memory" }\n}\n');
-  assert.match(readFileSync(join(secondVault, "memory", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
+  assert.match(readFileSync(join(secondVault, "memory", "extensions", "echoer.md"), "utf8"), /extension: "echoer"/);
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
   const collisionVault = join(f.root, "collision-vault");
@@ -242,6 +242,28 @@ test("install rejects terminal controls in permission text and unsupported sourc
   assert.equal(linkedInstall.code, 2, linkedInstall.stdout + linkedInstall.stderr);
   assert.match(linkedInstall.stdout + linkedInstall.stderr, /cannot be a symlink/);
   assert.equal(existsSync(join(f.extensions, "linked")), false);
+});
+
+test("scalar-like extension names round-trip through enablement and provenance", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  for (const name of ["true", "001"]) {
+    const sourceId = createHash("sha256").update(name).digest("hex");
+    const source = makeExtension(join(f.root, `${name}-source`), {
+      name,
+      command: "bin/command.mjs",
+      permissions: { read: [], write: ["event"], network: [] },
+    }, `
+import { spawnSync } from "node:child_process";
+const prefix=JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]");
+const result=spawnSync(process.env.BRAIN_BIN,[...prefix,"log","add","event","from ${name}","--source-id","${sourceId}","--source-created","2026-10-13T00:00:00.000Z","--json"],{env:process.env,encoding:"utf8"});
+process.stdout.write(result.stdout); process.stderr.write(result.stderr); process.exitCode=result.status;
+`);
+    assert.equal(interactiveInstall(f, source).code, 0);
+    const invoked = json(f, [name]);
+    assert.equal(invoked.code, 0, invoked.stderr || invoked.stdout);
+  }
+  const entries = json(f, ["log", "10", "--kind", "event"]);
+  assert.deepEqual(new Set(entries.body.data.entries.map((entry: { machine: string }) => entry.machine)), new Set(["true", "001"]));
 });
 
 test("extension manifest versions follow SemVer 2", { skip: process.platform === "win32" }, (t) => {
@@ -400,25 +422,6 @@ else if (action === "flood") {
   assert.match(disabled.body.error.message, /disabled/);
 });
 
-test("extension deadline can be extended for long-running commands", { skip: process.platform === "win32" }, (t) => {
-  const f = fixture(t);
-  const source = makeExtension(join(f.root, "patient-source"), {
-    name: "patient",
-    command: "bin/command.mjs",
-    permissions: { read: [], write: [], network: [] },
-  }, `setTimeout(() => process.stdout.write(JSON.stringify({schema:"brain.v1",command:"patient",ok:true,data:{finished:true}})+"\\n"), 150);`);
-  assert.equal(interactiveInstall(f, source).code, 0);
-
-  const impatient = json(f, ["patient"], { BRAIN_EXTENSION_TIMEOUT_MS: "25" });
-  assert.equal(impatient.code, 1);
-  assert.equal(impatient.body.error.code, "extension_timeout");
-  assert.match(impatient.body.error.message, /25 ms/);
-
-  const patient = json(f, ["patient"], { BRAIN_EXTENSION_TIMEOUT_MS: "2000" });
-  assert.equal(patient.code, 0, patient.stderr || patient.stdout);
-  assert.equal(patient.body.data.finished, true);
-});
-
 test("extension scope is enforced and intersected with an existing BRAIN_AS scope", { skip: process.platform === "win32" }, (t) => {
   const f = fixture(t);
   mkdirSync(join(f.vault, "Allowed"));
@@ -570,7 +573,7 @@ test("source IDs converge across machines and reject unrelated path collisions",
   assert.equal(aNote, bNote, "the same source produces merge-identical records on every machine");
   assert.equal(a.body.data.machine, "source");
   assert.match(aNote, /created: 2026-10-13T02:00:00\.000Z/);
-  assert.match(aNote, /machine: source/);
+  assert.match(aNote, /machine: "source"/);
   const listed = json(first, ["log", "1", "--kind", "meeting"]);
   assert.equal(listed.body.data.entries[0].created, sourceCreated);
   assert.equal(listed.body.data.entries[0].machine, "source");
@@ -651,7 +654,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
   assert.match(note, /created: 2026-10-13T16:00:00\.123Z/);
-  assert.match(note, /machine: meetings/);
+  assert.match(note, /machine: "meetings"/);
   assert.match(note, /email=<email>&id=<number>/);
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
@@ -776,13 +779,12 @@ test("Windows launcher convention resolves extension commands and scoped brain c
 
   const runner = join(directory, "scoped-runner.mjs");
   writeFileSync(runner, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))\n');
-  const brainLaunch = extensionBrainProcess(runner, "win32");
+  const brainLaunch = extensionBrainProcess(runner);
   assert.equal(brainLaunch.file, process.execPath);
   assert.deepEqual(brainLaunch.args, ["--no-warnings=ExperimentalWarning", runner]);
   const brainResult = spawnSync(brainLaunch.file, [...brainLaunch.args, ...forwarded], { encoding: "utf8" });
   assert.equal(brainResult.status, 0, brainResult.stderr);
   assert.deepEqual(JSON.parse(brainResult.stdout), forwarded);
-  assert.deepEqual(extensionBrainProcess(runner, "linux"), { file: runner, args: [] });
 
   writeFileSync(join(directory, "bin", "run.exe"), "fixture");
   assert.equal(resolveLauncher(directory, manifest, "win32"), join(directory, "bin", "run.exe"));

@@ -96,8 +96,8 @@ The process also receives a minimal runtime environment (`PATH`, home/temp, loca
 required Windows process variables) plus values explicitly approved in `permissions.environment`.
 
 Extensions should execute `BRAIN_BIN` with the arguments from `BRAIN_BIN_ARGS_JSON` followed by
-the brain arguments and `--json`, instead of reading the vault. The prefix is empty on Unix; on
-Windows it selects the scoped runner through the directly executable Node binary. Those child calls use
+the brain arguments and `--json`, instead of reading the vault. The executable is brain's current
+Node runtime and the prefix selects the scoped runner without relying on `PATH`. Those child calls use
 the manifest scope; the launcher restores its trusted scope and redaction context before dispatch.
 If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
@@ -126,9 +126,7 @@ The process must write exactly one JSON line to stdout using the existing envelo
 
 On failure it uses `ok: false`, an `error` object, and a non-zero exit. Diagnostics may go to
 stderr. brain validates the envelope and exit code before forwarding it. A command's process tree is killed
-after 30 seconds by default or after stdout and stderr together exceed 1 MiB. Set
-`BRAIN_EXTENSION_TIMEOUT_MS` to a positive deadline of at most 86400000 milliseconds when a known
-long-running import needs more time. Invalid output, a crash, or either limit fails only that
+after 30 seconds or after stdout and stderr together exceed 1 MiB. Invalid output, a crash, or either limit fails only that
 extension command; built-ins and `brain context` continue normally.
 
 ## Reference: meetings
@@ -138,7 +136,6 @@ extension command; built-ins and `brain context` continue normally.
 ```sh
 brain ext install ./examples/meetings
 BRAIN_MEETINGS_API_URL=http://127.0.0.1:3000/meetings \
-  BRAIN_EXTENSION_TIMEOUT_MS=300000 \
   brain meetings import --since 7d
 ```
 

@@ -112,7 +112,7 @@ function prepareEntry(
   mkdirSync(dir, { recursive: true });
 
   const tags = [...new Set((input.tags ?? []).map((t) => t.replace(/^#/, "").trim().toLowerCase()).filter(Boolean))];
-  const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${machine}`];
+  const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${JSON.stringify(machine)}`];
   if (tags.length) lines.push(`tags: [${tags.join(", ")}]`);
   for (const [key, value] of Object.entries(input.fields ?? {})) {
     if (!/^[a-z][a-z0-9-]*$/.test(key)) throw new Error(`invalid entry field ${key}`);

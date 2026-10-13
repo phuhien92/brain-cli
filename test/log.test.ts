@@ -41,7 +41,7 @@ test("addEntry writes a new file with kind, created, machine, tags and an H1 tit
   assert.equal(path, "log/learning/2026-10-13-mini-pnpm-cache-breaks-after-updates.md");
   assert.equal(
     readFileSync(join(vault, path), "utf8"),
-    "---\nkind: learning\ncreated: 2026-10-13T02:00:00.123Z\nmachine: mini\ntags: [ops]\n---\n# pnpm cache breaks after updates\n\nRun pnpm store prune.\n",
+    "---\nkind: learning\ncreated: 2026-10-13T02:00:00.123Z\nmachine: \"mini\"\ntags: [ops]\n---\n# pnpm cache breaks after updates\n\nRun pnpm store prune.\n",
   );
 });
 
