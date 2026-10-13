@@ -44,6 +44,8 @@ before(() => {
   write("Claims/wiki.md", "# Cited with a link\n[[sources/evidence.pdf]]\n");
   write("Claims/missing.md", "---\nsources: [[sources/gone.pdf]]\n---\n# Missing source\n");
   write("Claims/none.md", "# No citation\n");
+  write("sources/reading-list.md", "# Reading list\n");
+  write("Claims/hand-written.md", "# Links a hand-written note\n[[sources/reading-list]]\n");
   write("Other/no-source-needed.md", "# No citation needed\n");
   write("brain.json", JSON.stringify({ lint: { maxLines: { "MEMORY.md": 5 }, unsourced: ["Claims/"] } }));
   write("Finance/old.md", "---\ncategory: news\nas-of: 2026-01-01\n---\n# Old news\n");
@@ -66,7 +68,7 @@ test("lint finds broken links, conflict copies, overdue and undated reviews, lin
   assert.ok(by("lifecycle").some((x) => x.startsWith("Finance/undated.md") && /no as-of/.test(x)));
   assert.deepEqual(by("max-lines"), ["MEMORY.md: 12 lines, over this vault's limit of 5"]);
   assert.deepEqual(by("source-missing"), ["Claims/missing.md: source [[sources/gone.pdf]] does not resolve to any note or file"]);
-  assert.deepEqual(by("unsourced"), ["Claims/none.md: no source citation"]);
+  assert.deepEqual(by("unsourced"), ["Claims/hand-written.md: no source citation", "Claims/none.md: no source citation"]);
   assert.deepEqual(by("source-modified"), []);
   const orphans = by("orphan").map((x) => x.split(":")[0]);
   assert.ok(orphans.includes("Career/lonely.md"));

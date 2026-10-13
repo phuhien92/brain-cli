@@ -5,12 +5,12 @@
 // things that make answers wrong or links dead, "info" for housekeeping.
 
 import { createHash } from "node:crypto";
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { inScope, readScope, type Config } from "./config.js";
 import { LIFECYCLE_KIND, lifecycleStates } from "./lifecycle.js";
 import { basename, parseNote, type FrontmatterValue } from "./note.js";
-import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
+import { SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
 import type { Store } from "./store.js";
 
 export interface Finding {
@@ -53,8 +53,11 @@ export function lint(store: Store, cfg: Config): Finding[] {
   }
   // Every non-note file (attachments, .excalidraw boards, sources), findable
   // by vault path, file name, or file name without its extension.
+  const sidecars = sourceSidecars(store.vault);
+  const originals = new Set(sidecars.map((sidecar) => sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length)));
+  const managed = new Set([...sidecars, ...originals]);
   const files = new Map<string, string>();
-  for (const f of walkFiles(store.vault)) {
+  for (const f of walkFiles(store.vault, originals)) {
     const name = lower(f.split("/").pop()!);
     for (const key of [lower(f), name, name.replace(/\.[^.]+$/, "")]) if (!files.has(key)) files.set(key, f);
   }
@@ -102,7 +105,7 @@ export function lint(store: Store, cfg: Config): Finding[] {
   // orphan: nothing links here. Root-level notes and log entries are entry
   // points by design, not orphans.
   for (const n of notes) {
-    if (!n.path.includes("/") || n.path.startsWith(logPrefix) || n.path.startsWith(`${SOURCES_DIR}/`)) continue;
+    if (!n.path.includes("/") || n.path.startsWith(logPrefix) || managed.has(n.path)) continue;
     if (!inbound.get(n.path)) {
       findings.push({ rule: "orphan", severity: "info", path: n.path, message: "no note links here" });
     }
@@ -163,23 +166,13 @@ export function lint(store: Store, cfg: Config): Finding[] {
     }
   }
 
-  // source-modified: every immutable original has one sidecar whose recorded
-  // digest still matches, and every sidecar still has its original.
-  const sourceRoot = join(store.vault, SOURCES_DIR);
-  const sourceFiles = [...walkAllFiles(sourceRoot)].map((abs) => relative(store.vault, abs).split(sep).join("/"));
-  const sourceSet = new Set(sourceFiles);
-  for (const path of sourceFiles) {
-    if (!inScope(path, scope)) continue;
-    if (path.endsWith(SOURCE_SIDECAR_SUFFIX)) {
-      const original = path.slice(0, -SOURCE_SIDECAR_SUFFIX.length);
-      if (!sourceSet.has(original)) {
-        findings.push({ rule: "source-modified", severity: "warn", path, message: `source file ${original} is missing` });
-      }
-      continue;
-    }
-    const sidecar = path + SOURCE_SIDECAR_SUFFIX;
-    if (!sourceSet.has(sidecar)) {
-      findings.push({ rule: "source-modified", severity: "warn", path, message: "metadata sidecar is missing" });
+  // source-modified: every sidecar still has its original, and the
+  // original's bytes still match the digest the sidecar recorded.
+  for (const sidecar of sidecars) {
+    if (!inScope(sidecar, scope)) continue;
+    const path = sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length);
+    if (!existsSync(join(store.vault, ...path.split("/")))) {
+      findings.push({ rule: "source-modified", severity: "warn", path: sidecar, message: `source file ${path} is missing` });
       continue;
     }
     let expected: unknown;
@@ -197,11 +190,11 @@ export function lint(store: Store, cfg: Config): Finding[] {
   }
 
   // unsourced: selected folders require either an explicit `sources:` entry
-  // or a normal wiki-link that resolves into sources/.
+  // or a normal wiki-link that resolves to an ingested source.
   for (const n of notes) {
-    if (n.path.startsWith(`${SOURCES_DIR}/`) || !cfg.lintUnsourced.some((prefix) => n.path.startsWith(prefix))) continue;
+    if (managed.has(n.path) || !cfg.lintUnsourced.some((prefix) => n.path.startsWith(prefix))) continue;
     const explicit = explicitSources.get(n.path) ?? [];
-    const linked = (linksBySource.get(n.path) ?? []).some((target) => resolve(target)?.startsWith(`${SOURCES_DIR}/`));
+    const linked = (linksBySource.get(n.path) ?? []).some((target) => managed.has(resolve(target) ?? ""));
     if (!explicit.length && !linked) {
       findings.push({ rule: "unsourced", severity: "info", path: n.path, message: "no source citation" });
     }
@@ -234,7 +227,7 @@ function sourceTargets(frontmatter: Record<string, FrontmatterValue>): string[] 
   return targets;
 }
 
-function* walkFiles(root: string, dir = root): Generator<string> {
+function* walkFiles(root: string, originals: Set<string>, dir = root): Generator<string> {
   let entries;
   try {
     entries = readdirSync(dir, { withFileTypes: true });
@@ -244,27 +237,12 @@ function* walkFiles(root: string, dir = root): Generator<string> {
   for (const e of entries) {
     if (e.name.startsWith(".") || e.name === "node_modules") continue;
     const full = join(dir, e.name);
-    if (e.isDirectory()) yield* walkFiles(root, full);
+    if (e.isDirectory()) yield* walkFiles(root, originals, full);
     else if (e.isFile()) {
       const rel = relative(root, full).split(sep).join("/");
-      if (!e.name.toLowerCase().endsWith(".md") || (rel.startsWith(`${SOURCES_DIR}/`) && !rel.endsWith(SOURCE_SIDECAR_SUFFIX))) {
+      if (!e.name.toLowerCase().endsWith(".md") || originals.has(rel)) {
         yield rel;
       }
     }
-  }
-}
-
-function* walkAllFiles(dir: string): Generator<string> {
-  let entries;
-  try {
-    entries = readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (entry.name.startsWith(".")) continue;
-    const full = join(dir, entry.name);
-    if (entry.isDirectory()) yield* walkAllFiles(full);
-    else if (entry.isFile()) yield full;
   }
 }

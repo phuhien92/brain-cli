@@ -112,8 +112,10 @@ test("sync commits only the log and sources, never a note being written", () => 
   const mini = machine("mini");
   mini.run("log", "add", "decision", "Use brain for memory");
   writeFileSync(join(mini.vault, "Draft.md"), "half-written\n");
+  mkdirSync(join(mini.vault, "sources"), { recursive: true });
+  writeFileSync(join(mini.vault, "sources", "reading-list.md"), "half-written\n");
   assert.equal(mini.run("sync").code, 0);
-  assert.equal(git(mini.vault, "status", "--porcelain"), "?? Draft.md");
+  assert.equal(git(mini.vault, "status", "--porcelain", "-uall"), "?? Draft.md\n?? sources/reading-list.md");
   assert.match(git(join(root, "remote.git"), "log", "-1", "--format=%s"), /^brain: 1 log entry from mini$/);
 });
 

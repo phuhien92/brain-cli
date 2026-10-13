@@ -18,6 +18,7 @@ import { join, relative, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
+import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 
 const SCHEMA_VERSION = 1;
 
@@ -413,7 +414,7 @@ function* walk(dir: string, offline: Set<string>, root = dir): Generator<string>
       const rel = toPosix(relative(root, full));
       // Ingested markdown is an immutable original, not a note. Its
       // `<name>.source.md` sidecar carries the searchable metadata.
-      if (rel.startsWith("sources/") && !rel.toLowerCase().endsWith(".source.md")) continue;
+      if (rel.startsWith(`${SOURCES_DIR}/`) && existsSync(full + SOURCE_SIDECAR_SUFFIX)) continue;
       yield full;
     }
   }

@@ -98,6 +98,28 @@ export function ingest(vault: string, cfg: Config, input: IngestInput): IngestRe
   }
 }
 
+// Vault-relative paths of every `.source.md` sidecar under sources/. A file
+// there is an ingested original only when its sidecar exists; anything else
+// was written by hand and stays an ordinary note.
+export function sourceSidecars(vault: string): string[] {
+  const found: string[] = [];
+  const visit = (dir: string, rel: string) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.name.startsWith(".")) continue;
+      if (e.isDirectory()) visit(join(dir, e.name), `${rel}/${e.name}`);
+      else if (e.isFile() && e.name.endsWith(SOURCE_SIDECAR_SUFFIX)) found.push(`${rel}/${e.name}`);
+    }
+  };
+  visit(join(vault, SOURCES_DIR), SOURCES_DIR);
+  return found.sort();
+}
+
 function findExisting(dir: string, id: string): string | null {
   let names: string[];
   try {

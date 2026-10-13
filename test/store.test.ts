@@ -37,9 +37,11 @@ test("first refresh indexes every note and skips dot-folders and node_modules", 
 test("sources index their markdown sidecars, not an original that happens to be markdown", () => {
   write("sources/article.md", "# Raw source\nneedle-only-in-original\n");
   write("sources/article.md.source.md", "---\ntitle: Searchable article\nsha256: deadbeef\n---\n");
+  write("sources/reading-list.md", "# Reading list\nhandwrittenmarker\n");
   const store = Store.open(vault);
   const stats = store.refresh();
-  assert.equal(stats.added, 4);
+  assert.equal(stats.added, 5);
+  assert.equal(store.search("handwrittenmarker")[0]?.path, "sources/reading-list.md");
   assert.equal(store.search("needle-only-in-original").length, 0);
   assert.equal(store.search("searchable article")[0]?.path, "sources/article.md.source.md");
   store.close();

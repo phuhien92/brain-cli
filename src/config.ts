@@ -152,9 +152,7 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
     }
     lintMaxLines[path] = n;
   }
-  const lintUnsourced = stringList(lintCfg.unsourced, "brain.json: lint.unsourced").map((path) =>
-    path === "*" ? "" : folderPrefix(path),
-  );
+  const lintUnsourced = stringList(lintCfg.unsourced, "brain.json: lint.unsourced").map(folderPrefix);
 
   return { logDir, machine, exports, sync, integrations, as, lifecycleWindows, lintMaxLines, lintUnsourced, userConfigPath };
 }

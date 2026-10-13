@@ -1,6 +1,6 @@
 // `brain sync`: commit new log entries and sources, pull, push. Plain git, no service.
 //
-// It commits only what brain owns — the log folder, sources/ and brain.json — so it never
+// It commits only what brain owns — the log folder, ingested source pairs in sources/ and brain.json — so it never
 // sweeps a half-written note into a commit behind the user's back. Pulls rebase
 // with --autostash, so other uncommitted edits survive. Because log entries and
 // source pairs are always new machine-named files, two machines syncing never
@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "./config.js";
+import { SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
 
 export interface SyncResult {
   mode: "git" | "none" | "command";
@@ -71,7 +72,8 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
     throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote, or set "sync": "none" in brain.json`);
   }
 
-  const owned = [cfg.logDir, "sources", "brain.json"].filter((p) => existsSync(join(vault, p)));
+  const sources = sourceSidecars(vault).flatMap((sidecar) => [sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length), sidecar]);
+  const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
   let committed = 0;
   if (owned.length) {
     git("add", "--", ...owned);
