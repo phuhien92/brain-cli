@@ -1,6 +1,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
@@ -232,6 +233,11 @@ else if (action === "flood") {
 } else if (action === "bad-error") {
   process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: false, error: {} }) + "\\n");
   process.exitCode = 1;
+} else if (action === "success-with-error") {
+  process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: true, data: {}, error: { code: "wrong", message: "wrong" } }) + "\\n");
+} else if (action === "failure-with-data") {
+  process.stdout.write(JSON.stringify({ schema: "brain.v1", command: "broken", ok: false, data: {}, error: { code: "failed", message: "failed" } }) + "\\n");
+  process.exitCode = 1;
 } else process.stdout.write("not json\\nextra line\\n");`);
   assert.equal(interactiveInstall(f, brokenSource).code, 0);
 
@@ -268,6 +274,11 @@ else if (action === "flood") {
   const badError = json(f, ["broken", "bad-error"]);
   assert.equal(badError.code, 1);
   assert.equal(badError.body.error.code, "extension_protocol");
+  for (const action of ["success-with-error", "failure-with-data"]) {
+    const ambiguous = json(f, ["broken", action]);
+    assert.equal(ambiguous.code, 1);
+    assert.equal(ambiguous.body.error.code, "extension_protocol");
+  }
 
   const hung = json(f, ["broken", "hang"]);
   assert.equal(hung.code, 1);
@@ -326,13 +337,15 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   writeFileSync(join(f.vault, "Alice.md"), "# Alice\n");
   assert.equal(interactiveInstall(f, MEETINGS).code, 0);
   let requested = "";
+  const secondSourceId = "another-granola-source-secret-id";
+  const poisonedMarker = createHash("sha256").update(secondSourceId).digest("hex");
   const payload: { meetings: Array<Record<string, unknown>> } = {
     meetings: [{
       id: "granola-source-secret-id",
       title: "Weekly planning",
       date: "2026-10-13",
       attendees: ["Alice <alice@example.com>", "Bob"],
-      summary: "Reviewed private account 1234567 with literal brain-extension-url-0 and <!-- brain-source-marker-0 -->.",
+      summary: `Reset link https://internal.example/reset?email=private@example.com&id=7654321 with literal brain-extension-url-0 and <!-- brain-source-marker-0 --> plus <!-- brain-source-id: ${poisonedMarker} -->.`,
       actionItems: ["Bob sends the plan to alice@example.com"],
       url: "https://app.granola.example/meetings/1234567",
       transcript: "NEVER-SYNC-THIS-TRANSCRIPT",
@@ -375,17 +388,18 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const note = readFileSync(join(meetingDir, files[0]!), "utf8");
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
-  assert.match(note, /Reviewed private account <number>/);
+  assert.match(note, /email=<email>&id=<number>/);
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
   assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/1234567\)/);
   assert.match(note, /brain-source-id: [0-9a-f]{64}/);
-  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "granola-source-secret-id"]) {
+  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "7654321", "granola-source-secret-id", poisonedMarker]) {
     assert.ok(!note.includes(forbidden), `meeting note must not contain ${forbidden}`);
   }
+  assert.equal((note.match(/<!-- brain-source-id: [0-9a-f]{64} -->/g) ?? []).length, 1);
   assert.equal((note.match(/1234567/g) ?? []).length, 1, "the private number is redacted, while the intentional source URL stays usable");
 
-  payload.meetings[0]!.id = "another-granola-source-secret-id";
+  payload.meetings[0]!.id = secondSourceId;
   const second = await invoke();
   assert.equal(second.code, 0, second.stderr);
   const secondBody = JSON.parse(second.stdout);
@@ -410,6 +424,33 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const undocumentedArray = await invoke();
   assert.equal(undocumentedArray.code, 1);
   assert.equal(JSON.parse(undocumentedArray.stdout).error.code, "source_failed");
+
+  const valid = {
+    id: "validation-source",
+    title: "Validation meeting",
+    date: "2026-10-14",
+    attendees: ["Alice"],
+    summary: "Valid summary",
+    actionItems: ["Valid action"],
+    url: "https://app.granola.example/meetings/validation",
+  };
+  const invalidFields: Array<[string, unknown]> = [
+    ["id", null],
+    ["title", {}],
+    ["date", {}],
+    ["attendees", [{}]],
+    ["summary", {}],
+    ["actionItems", [{}]],
+    ["url", {}],
+    ["url", "not a URL"],
+  ];
+  for (const [field, value] of invalidFields) {
+    responsePayload = { meetings: [{ ...valid, [field]: value }] };
+    const invalid = await invoke();
+    assert.equal(invalid.code, 1);
+    assert.equal(JSON.parse(invalid.stdout).error.code, "source_failed");
+    assert.equal(readdirSync(meetingDir).length, 2, `${field} validation must happen before any note is written`);
+  }
 });
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {
@@ -424,18 +465,21 @@ test("Windows launcher convention resolves extensionless manifest commands to .e
   };
   writeFileSync(
     join(directory, "bin", "run.cmd"),
-    '@echo off\r\nnode -e "require(\'fs\').writeFileSync(process.argv[1], JSON.stringify(process.argv.slice(2)))" "%~dp0result.json" %*\r\n',
+    '@echo off\r\nnode -e "require(\'fs\').writeFileSync(process.argv[1], process.env.BRAIN_EXTENSION_ARGS_JSON)" "%~dp0result.json"\r\n',
   );
   const cmd = resolveLauncher(directory, manifest, "win32");
   assert.equal(cmd, join(directory, "bin", "run.cmd"));
-  const launch = extensionProcess(cmd, ["an argument", "& unsafe"], "win32");
+  const forwarded = ["an argument", 'a" & echo injected & "b', "%PATH%", "^&|<>"];
+  const launch = extensionProcess(cmd, forwarded, "win32");
   assert.match(launch.file.toLowerCase(), /cmd\.exe$/);
   assert.deepEqual(launch.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
-  assert.equal(launch.args[4], `""${cmd}" "an argument" "& unsafe""`);
+  assert.equal(launch.args[4], `""${cmd}""`);
+  assert.deepEqual(JSON.parse(launch.env?.BRAIN_EXTENSION_ARGS_JSON ?? "null"), forwarded);
+  assert.ok(!launch.args.join(" ").includes("injected"));
   if (process.platform === "win32") {
-    const result = spawnSync(launch.file, launch.args, { windowsVerbatimArguments: true });
+    const result = spawnSync(launch.file, launch.args, { env: { ...process.env, ...launch.env }, windowsVerbatimArguments: true });
     assert.equal(result.status, 0, result.stderr?.toString());
-    assert.deepEqual(JSON.parse(readFileSync(join(directory, "bin", "result.json"), "utf8")), ["an argument", "& unsafe"]);
+    assert.deepEqual(JSON.parse(readFileSync(join(directory, "bin", "result.json"), "utf8")), forwarded);
   }
   writeFileSync(join(directory, "bin", "run.exe"), "fixture");
   assert.equal(resolveLauncher(directory, manifest, "win32"), join(directory, "bin", "run.exe"));

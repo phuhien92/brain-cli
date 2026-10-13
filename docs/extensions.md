@@ -67,7 +67,9 @@ writes, not what arbitrary local code can access.
 The manifest uses one extensionless command path, such as `bin/brain-example`. Unix runs that
 file directly. On Windows, brain looks for `bin/brain-example.exe` first and then
 `bin/brain-example.cmd`. Cross-platform extensions should ship the Unix executable plus one of
-those Windows launchers. This keeps platform suffixes out of the manifest.
+those Windows launchers. A `.cmd` launcher is invoked without command-line arguments; its program
+reads the JSON string list in `BRAIN_EXTENSION_ARGS_JSON`. This keeps untrusted arguments out of
+cmd syntax and platform suffixes out of the manifest.
 
 ## Process contract
 
@@ -81,12 +83,17 @@ arguments. It sets:
 | `BRAIN_AS` | extension name, or the existing integration name when already scoped |
 | `BRAIN_EXT_DIR` | this extension's installed directory |
 | `BRAIN_MACHINE` | current machine name |
+| `BRAIN_EXT_REDACT_TOKEN` | opaque token for marking extension-generated source metadata |
+| `BRAIN_EXTENSION_ARGS_JSON` | Windows `.cmd` launchers only: the command arguments as a JSON string list |
 
 Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
 the manifest scope. If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
 narrow a caller but cannot widen it. Inputs an extension sends through `brain log add` are run
-through core redaction before the new note is created.
+through core redaction before the new note is created. To retain an extension-generated source
+marker or link, encode its UTF-8 bytes as base64url inside
+`<!-- brain-protected:<BRAIN_EXT_REDACT_TOKEN>:<encoded-value> -->`. Never wrap source-provided
+summary, attendee, or action text.
 
 The process must write exactly one JSON line to stdout using the existing envelope:
 

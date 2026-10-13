@@ -186,22 +186,16 @@ export function resolveLauncher(directory: string, manifest: ExtensionManifest, 
 export interface ExtensionProcess {
   file: string;
   args: string[];
+  env?: NodeJS.ProcessEnv;
   windowsVerbatimArguments?: boolean;
 }
 
-// .cmd launchers require cmd.exe. Quote using cmd's two parsing layers rather
-// than `shell: true`, which would interpolate extension arguments.
 export function extensionProcess(launcher: string, args: string[], platform = process.platform): ExtensionProcess {
   if (platform !== "win32" || extname(launcher).toLowerCase() !== ".cmd") return { file: launcher, args };
-  const quote = (value: string) => {
-    let escaped = value.replace(/(?=(\\+?))\1"/g, "$1$1\\\"");
-    escaped = escaped.replace(/(?=(\\+?))\1$/g, "$1$1");
-    return `"${escaped}"`;
-  };
-  const command = `"${[quote(launcher), ...args.map(quote)].join(" ")}"`;
   return {
     file: process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
-    args: ["/d", "/s", "/v:off", "/c", command],
+    args: ["/d", "/s", "/v:off", "/c", `""${launcher}""`],
+    env: { BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
     windowsVerbatimArguments: true,
   };
 }

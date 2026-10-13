@@ -49,6 +49,12 @@ function oneLine(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
+function protectedMetadata(value) {
+  const token = process.env.BRAIN_EXT_REDACT_TOKEN;
+  if (!token || !/^[0-9a-f-]{36}$/.test(token)) throw new Error("brain did not provide a redaction token");
+  return `<!-- brain-protected:${token}:${Buffer.from(value).toString("base64url")} -->`;
+}
+
 function sourceUrl(value) {
   const raw = oneLine(value);
   if (!raw) return "";
@@ -63,13 +69,29 @@ function sourceUrl(value) {
   }
 }
 
+function validateMeeting(value, index) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`meetings[${index}] must be an object`);
+  if (typeof value.id !== "string" || !oneLine(value.id)) throw new Error(`meetings[${index}].id must be a non-empty string`);
+  if (typeof value.title !== "string" || !oneLine(value.title)) throw new Error(`meetings[${index}].title must be a non-empty string`);
+  for (const field of ["date", "summary", "url"]) {
+    if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`meetings[${index}].${field} must be a string`);
+  }
+  for (const field of ["attendees", "actionItems"]) {
+    if (value[field] !== undefined && (!Array.isArray(value[field]) || value[field].some((item) => typeof item !== "string"))) {
+      throw new Error(`meetings[${index}].${field} must be a list of strings`);
+    }
+  }
+  if (oneLine(value.url) && !sourceUrl(value.url)) throw new Error(`meetings[${index}].url must be an HTTP URL`);
+  return value;
+}
+
 function bodyFor(meeting, key) {
   const attendees = Array.isArray(meeting.attendees) ? meeting.attendees.map(oneLine).filter(Boolean) : [];
   const actions = Array.isArray(meeting.actionItems) ? meeting.actionItems.map(oneLine).filter(Boolean) : [];
   const summary = oneLine(meeting.summary);
   const source = sourceUrl(meeting.url);
   const lines = [
-    `<!-- brain-source-id: ${key} -->`,
+    protectedMetadata(`<!-- brain-source-id: ${key} -->`),
     `Date: ${oneLine(meeting.date) || "unknown"}`,
     `Attendees: ${attendees.join(", ") || "not listed"}`,
     "",
@@ -80,13 +102,19 @@ function bodyFor(meeting, key) {
     ...(actions.length ? actions.map((item) => `- ${item}`) : ["- None listed."]),
     "",
     "## Source",
-    source ? `[Open in the meeting source](${source.replace(/[()]/g, (c) => `\\${c}`)})` : "No source link was provided.",
+    source ? `[Open in the meeting source](${protectedMetadata(source.replace(/[()]/g, (c) => `\\${c}`))})` : "No source link was provided.",
   ];
   return lines.join("\n");
 }
 
 async function main() {
-  const args = process.argv.slice(2).filter((arg) => !["--json", "--quiet", "-q"].includes(arg));
+  let deliveredArgs = process.argv.slice(2);
+  if (process.env.BRAIN_EXTENSION_ARGS_JSON !== undefined) {
+    const parsed = JSON.parse(process.env.BRAIN_EXTENSION_ARGS_JSON);
+    if (!Array.isArray(parsed) || parsed.some((arg) => typeof arg !== "string")) throw new Error("BRAIN_EXTENSION_ARGS_JSON must be a list of strings");
+    deliveredArgs = parsed;
+  }
+  const args = deliveredArgs.filter((arg) => !["--json", "--quiet", "-q"].includes(arg));
   if (args[0] !== "import") {
     fail("usage", "usage: brain meetings import [--since <duration>]", 2);
     return;
@@ -106,8 +134,9 @@ async function main() {
   const response = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
   if (!response.ok) throw new Error(`meeting source answered ${response.status}`);
   const payload = await response.json();
-  const meetings = payload?.meetings;
-  if (!Array.isArray(meetings)) throw new Error("meeting source response needs a meetings list");
+  const rawMeetings = payload?.meetings;
+  if (!Array.isArray(rawMeetings)) throw new Error("meeting source response needs a meetings list");
+  const meetings = rawMeetings.map(validateMeeting);
 
   const current = brain(["log", "100000", "--kind", "meeting"]);
   const seen = new Set();
@@ -118,7 +147,6 @@ async function main() {
   const added = [];
   let skipped = 0;
   for (const meeting of meetings) {
-    if (meeting?.id === undefined || !oneLine(meeting.title)) throw new Error("each meeting needs an id and title");
     const key = marker(meeting.id);
     if (seen.has(key)) {
       skipped++;

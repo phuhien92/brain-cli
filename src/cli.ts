@@ -1,4 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -591,16 +592,17 @@ async function run(argv: string[]): Promise<number> {
                 protectedValues.push(value);
                 return `${guard}-${protectedValues.length - 1}-end`;
               };
-              const protectedBody = original
-                .replace(/<!-- brain-source-id: [0-9a-f]{64} -->/g, (marker) => {
-                  return protect(marker);
-                })
-                // A source link is deliberately retained so the redacted note
-                // still leads back to the private system holding the details.
-                .replace(/https?:\/\/[^\s<>)]+/g, (url) => {
-                  return protect(url);
-                });
-              body = redact(protectedBody).replace(
+              const token = process.env.BRAIN_EXT_REDACT_TOKEN;
+              const wrapper = token && /^[0-9a-f-]{36}$/.test(token)
+                ? new RegExp(`<!-- brain-protected:${token}:([A-Za-z0-9_-]+) -->`, "g")
+                : null;
+              const protectedBody = wrapper
+                ? original.replace(wrapper, (all, encoded: string) => {
+                    const value = Buffer.from(encoded, "base64url").toString("utf8");
+                    return Buffer.from(value).toString("base64url") === encoded ? protect(value) : all;
+                  })
+                : original;
+              body = redact(protectedBody.replace(/<!-- brain-source-id: [0-9a-f]{64} -->/g, "<source-id>")).replace(
                 new RegExp(`${guard}-(\\d+)-end`, "g"),
                 (_all, index: string) => protectedValues[Number(index)] ?? "",
               );
@@ -1000,6 +1002,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     BRAIN_MACHINE: cfg.machine,
     BRAIN_EXTENSION_SCOPE: installed.manifest.name,
     BRAIN_EXT_REDACT: "1",
+    BRAIN_EXT_REDACT_TOKEN: randomUUID(),
   };
   if (parentAs) env.BRAIN_EXTENSION_PARENT_AS = parentAs;
   else delete env.BRAIN_EXTENSION_PARENT_AS;
@@ -1013,10 +1016,11 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     policyError?: ExtensionError;
   }>((done) => {
     const launch = extensionProcess(launcher, invocation.args);
+    delete env.BRAIN_EXTENSION_ARGS_JSON;
     const child = spawn(launch.file, launch.args, {
       cwd: installed.directory,
       detached: process.platform !== "win32",
-      env,
+      env: { ...env, ...launch.env },
       stdio: ["inherit", "pipe", "pipe"],
       windowsVerbatimArguments: launch.windowsVerbatimArguments,
     });
@@ -1084,7 +1088,9 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   const valid = envelope?.schema === SCHEMA
     && typeof envelope.command === "string"
     && typeof envelope.ok === "boolean"
-    && (envelope.ok === true ? Object.hasOwn(envelope, "data") : validError);
+    && (envelope.ok === true
+      ? Object.hasOwn(envelope, "data") && !Object.hasOwn(envelope, "error")
+      : !Object.hasOwn(envelope, "data") && Object.hasOwn(envelope, "error") && validError);
   if (!valid) {
     throw new ExtensionError(
       "extension_protocol",

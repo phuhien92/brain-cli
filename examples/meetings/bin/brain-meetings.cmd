@@ -1,2 +1,2 @@
 @echo off
-node "%~dp0brain-meetings" %*
+node "%~dp0brain-meetings"
