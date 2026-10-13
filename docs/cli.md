@@ -5,6 +5,7 @@
 
 | Command | What it does | More |
 | --- | --- | --- |
+| `setup [--yes …]` | first-run walkthrough: vault, machine, sync, agents, telemetry, shell profile | [setup](#setup) |
 | `index [--rebuild\|--verify]` | bring the index up to date (every command does this first) | [indexing.md](indexing.md) |
 | `search <query>` | ranked full-text search; `--limit`, `--path`, `--tag`, `--raw`, `--include-archived` | below |
 | `get <note>` | a note by path, file name, title or alias; `--meta`, `--section`, `--lines` | below |
@@ -14,6 +15,26 @@
 | `lint [--strict]` | vault health, read-only | [lifecycle.md](lifecycle.md#lint) |
 | `integrations`, `doctor` | who is connected; this machine's setup | [integrations.md](integrations.md) |
 | `context`, `agent install <harness>` | session primer; teach a harness about brain | [agents.md](agents.md) |
+
+## Setup
+
+`brain setup` asks six things, each with a recommended default, and writes nothing until you
+confirm the summary:
+
+1. **Vault** — found for you: the folder you are in, Obsidian vaults in iCloud, `~/Documents`,
+   `~/Obsidian`, `~/Dropbox`; or type a path.
+2. **Machine name** — labels the memory entries written here.
+3. **Sync** — how the vault reaches your other machines; recommended from what it detects, with
+   a warning if the vault is a git repository inside a cloud folder.
+4. **Agents** — install the brain skill for Claude Code, Pi, or the shared `~/.agents/skills`
+   (Claude Code's session hook is printed for you to add; brain never edits its settings).
+5. **Telemetry** — the opt-in question ([telemetry.md](telemetry.md)).
+6. **Shell profile** — add `export BRAIN_VAULT=…` to your shell's startup file, only on yes.
+
+It writes this machine's config (`~/.config/brain/config.json`) — never the vault. The chosen
+vault is remembered there, so brain finds it from any folder even without step 6. Without a
+terminal it needs `--yes`, with `--vault`, `--machine`, `--sync auto|git|none`,
+`--agents claude,pi,agents`, `--telemetry yes|no` and `--profile`.
 
 ## Everyday use
 

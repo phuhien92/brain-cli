@@ -231,7 +231,8 @@ export async function flush(): Promise<{ sent: number; error: string | null }> {
 export function shouldAsk(opts: { json: boolean; command: string; userConfigTelemetry: unknown; tty?: boolean }): boolean {
   const tty = opts.tty ?? (process.stdin.isTTY === true && process.stderr.isTTY === true);
   if (!tty || opts.json || process.env.CI) return false;
-  if (["telemetry", "help", "context", "unknown"].includes(opts.command.split(".")[0]!)) return false;
+  // setup asks the same question itself, as one of its steps.
+  if (["telemetry", "help", "context", "setup", "unknown"].includes(opts.command.split(".")[0]!)) return false;
   if (process.env.DO_NOT_TRACK || process.env.BRAIN_TELEMETRY || typeof opts.userConfigTelemetry === "boolean") return false;
   const s = readSettings();
   return !s.asked && s.enabled === null;

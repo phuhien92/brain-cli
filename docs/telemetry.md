@@ -60,6 +60,22 @@ These guarantees are tested: `test/telemetry.test.ts` searches a vault for a pri
 and fails if the query, the note's name or folder, the vault path, the hostname or the
 machine name appears anywhere in the queued events.
 
+## Where it is saved
+
+**On your machine**, in `~/.local/state/brain/` (or `$BRAIN_STATE_DIR`):
+
+| File | Holds |
+| --- | --- |
+| `telemetry.json` | your choice (yes / no / not asked yet), the random install id, when events were last sent |
+| `telemetry-queue.jsonl` | events waiting to be sent, one JSON line each, at most 500 — `brain telemetry show` prints them |
+
+Nothing is written there unless you opted in, apart from your choice itself.
+
+**Remotely: nowhere yet.** No collector is configured in this version, so opted-in events stay
+in the local queue and `brain telemetry flush` reports "no collector configured". When a
+collector exists, its address, owner and retention will be listed here before any version
+sends to it.
+
 ## How it is sent
 
 - Each command **appends one line to a local queue** (`~/.local/state/brain/telemetry-queue.jsonl`)

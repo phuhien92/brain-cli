@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { ConfigError, inScope, loadConfig, readScope, slug, userSettings, type Config } from "./config.js";
+import { ConfigError, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
+import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
 import {
   createDraft,
   diagnostics,
@@ -26,7 +28,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { indexDir, OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.8.1";
+export const VERSION = "0.9.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -36,6 +38,12 @@ USAGE
   brain <command> [args] [flags]
 
 COMMANDS
+  setup                       First-run walkthrough: vault, machine name, sync, agents,
+                              telemetry, shell profile — each a choice; nothing is written
+                              until you confirm. Non-interactive: --yes with --vault,
+                              --machine, --sync auto|git|none, --agents claude,pi,agents,
+                              --telemetry yes|no, --profile
+
   index [--rebuild|--verify]  Bring the index up to date (every command does this first);
                               --verify re-reads and hashes every note instead of trusting
                               modification time and size; --rebuild starts from scratch
@@ -148,7 +156,7 @@ interface Out {
 
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -235,6 +243,11 @@ async function run(argv: string[]): Promise<number> {
         title: { type: "string" },
         "from-last-error": { type: "boolean", default: false },
         post: { type: "boolean", default: false },
+        yes: { type: "boolean", default: false },
+        machine: { type: "string" },
+        agents: { type: "string" },
+        telemetry: { type: "string" },
+        profile: { type: "boolean", default: false },
         "user-approved": { type: "boolean", default: false },
       },
     });
@@ -256,6 +269,14 @@ async function run(argv: string[]): Promise<number> {
     if (out.json) print(out, "help", { usage: HELP }, null, () => "");
     else process.stdout.write(HELP);
     return 0;
+  }
+
+  if (command === "setup") {
+    try {
+      return await setupCommand(flags, out);
+    } catch (err) {
+      return fail(out, "setup", err);
+    }
   }
 
   if (command === "telemetry") {
@@ -655,6 +676,55 @@ async function run(argv: string[]): Promise<number> {
   }
 }
 
+async function setupCommand(flags: Record<string, unknown>, out: Out): Promise<number> {
+  const interactive = process.stdin.isTTY === true && process.stderr.isTTY === true && !flags.yes && !out.json;
+  let choices: SetupChoices | null;
+  if (interactive) {
+    choices = await interactiveSetup();
+    if (!choices) {
+      process.stderr.write("Nothing was written.\n");
+      return 0;
+    }
+  } else {
+    if (!flags.yes) {
+      throw new CliError("usage", "setup asks questions in a terminal; elsewhere pass --yes with the choices as flags (brain help)", 2);
+    }
+    const vaultFlag = flags.vault as string | undefined;
+    const vault = vaultFlag ? resolve(vaultFlag) : findVaultCandidates()[0];
+    if (!vault || !existsSync(vault)) throw new CliError("no_vault", "no vault given or found: pass --vault <dir>", 1);
+    const sync = (flags.sync as string | undefined) ?? recommendSync(vault).mode;
+    if (!["auto", "git", "none"].includes(sync)) throw new CliError("usage", "--sync must be auto, git or none", 2);
+    const agents = flags.agents === undefined ? detectHarnesses() : String(flags.agents).split(",").map((a) => a.trim()).filter(Boolean);
+    for (const a of agents) if (!["claude", "pi", "agents"].includes(a)) throw new CliError("usage", `unknown agent harness '${a}'`, 2);
+    const t = flags.telemetry as string | undefined;
+    if (t !== undefined && !["yes", "no"].includes(t)) throw new CliError("usage", "--telemetry must be yes or no", 2);
+    const machine = slug((flags.machine as string | undefined) ?? String(readUserConfig().machine ?? "")) || slug(hostname().replace(/\.local$/i, ""));
+    choices = {
+      vault,
+      machine,
+      sync: sync as SetupChoices["sync"],
+      agents: agents as Harness[],
+      telemetry: t === undefined ? null : t === "yes",
+      profile: flags.profile === true,
+    };
+  }
+  const result = applySetup(choices);
+  const conflicts = result.installs.flatMap((r) => r.files.filter((f) => f.status === "conflict").map((f) => f.path));
+  print(out, "setup", { ...result, conflicts }, null, () =>
+    [
+      `\nWrote ${result.configPath}`,
+      ...result.installs.flatMap((r) => [`${r.harness}:`, ...r.files.map((f) => `  ${f.status}  ${f.path}`), ...r.warnings.map((w) => `  warning: ${w}`), ...r.next.flatMap((n) => n.split("\n")).map((n) => `  ${n}`)]),
+      ...(conflicts.length ? [`Not replaced (not written by brain; rerun brain agent install <harness> --force): ${conflicts.join(", ")}`] : []),
+      result.profile ? (result.profile.added ? `Added to ${result.profile.file}: ${result.profile.line}` : `${result.profile.file} already sets BRAIN_VAULT`) : "",
+      "",
+      "Next: brain doctor (checks this machine) · brain search \"something you know is in there\"",
+    ]
+      .filter((l) => l !== "")
+      .join("\n"),
+  );
+  return 0;
+}
+
 async function feedbackCommand(
   args: string[],
   flags: Record<string, unknown>,
@@ -879,9 +949,16 @@ function locateVault(flag: string | undefined): string {
     if (parent === dir) break;
     dir = parent;
   }
+  // Last resort: the vault chosen in `brain setup` on this machine.
+  try {
+    const saved = readUserConfig().vault;
+    if (typeof saved === "string" && existsSync(saved) && statSync(saved).isDirectory()) return resolve(saved);
+  } catch {
+    // an unreadable config is reported by the commands that need it
+  }
   throw new CliError(
     "no_vault",
-    "no vault found: pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or brain.json",
+    "no vault found: run brain setup, pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or brain.json",
     1,
   );
 }

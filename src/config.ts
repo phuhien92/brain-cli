@@ -19,9 +19,9 @@
 // Adding a repo is configuration, never code: a block in brain.json, its
 // paths on each machine, and BRAIN_AS=<name> in that repo's agent environment.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 export interface ExportTarget {
   kind: string;
@@ -202,6 +202,25 @@ export function userSettings(): UserSettings {
     telemetry: typeof cfg.telemetry === "boolean" ? cfg.telemetry : null,
     feedbackPost: post === "allow" ? "allow" : "ask",
   };
+}
+
+export function userConfigFile(): string {
+  return process.env.BRAIN_CONFIG || join(homedir(), ".config", "brain", "config.json");
+}
+
+export function readUserConfig(): Record<string, unknown> {
+  return readJson(userConfigFile()) ?? {};
+}
+
+// Merge keys into this machine's config, keeping everything else, atomically.
+export function writeUserConfig(patch: Record<string, unknown>): string {
+  const path = userConfigFile();
+  const next = { ...readUserConfig(), ...patch };
+  mkdirSync(dirname(path), { recursive: true });
+  const tmp = `${path}.${process.pid}.tmp`;
+  writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n");
+  renameSync(tmp, path);
+  return path;
 }
 
 export function slug(s: string): string {

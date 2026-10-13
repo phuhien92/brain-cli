@@ -47,14 +47,16 @@ Requires Node.js **22.13+** (it uses the built-in `node:sqlite`, so nothing comp
 
 ```sh
 npm install -g github:phuhien92/brain-cli
-brain agent install claude     # or: pi, agents — teach your agent harness about brain
+brain setup        # pick your vault, machine name, sync, agents, telemetry — nothing written until you confirm
 ```
+
+Agents and scripts can do the same without questions:
+`brain setup --yes --vault ~/vault --agents claude,pi --telemetry no`.
 
 ## Quick start
 
 ```sh
-cd ~/my-vault                                   # any folder with .obsidian/ or brain.json
-brain search "renewal deadline"                 # ranked search
+brain search "renewal deadline"                 # ranked search, from any folder once set up
 brain get "Projects/blog/runbook" --section Deploy
 brain log add learning "pnpm cache breaks after macOS updates"
 brain lifecycle set "Finance/balances" --category current-state --as-of 2026-09-30
