@@ -112,7 +112,7 @@ sequenceDiagram
 | [`src/source.ts`](../src/source.ts) | SHA-256 source ingest, exclusive creates, metadata sidecars and idempotency |
 | [`src/lifecycle.ts`](../src/lifecycle.ts) | Categories, review windows, lifecycle events, each note's state |
 | [`src/lint.ts`](../src/lint.ts) | Read-only health rules |
-| [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log and sources, pull --rebase, push), none, command |
+| [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log and ingested source pairs, pull --rebase, push), none, command |
 | [`src/agent.ts`](../src/agent.ts) | Session primer (`brain context`) and per-harness install |
 | [`src/telemetry.ts`](../src/telemetry.ts) | Anonymous usage events: fixed fields, local queue, daily background send |
 | [`src/feedback.ts`](../src/feedback.ts) | Feedback drafts, redaction, issue links, permission-gated posting |

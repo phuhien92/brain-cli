@@ -23,7 +23,7 @@ The first file is the unchanged original. The second is a markdown sidecar conta
 original – including when the original itself is markdown. A file in `sources/` counts
 as an ingested original only when its `.source.md` sidecar exists; any other markdown you
 keep there stays an ordinary note that brain indexes, lints and leaves out of sync. The SHA-256 digest is the
-source's stable `id` in JSON output:
+source's stable `id` in the JSON output's `data` object:
 
 ```json
 {"path":"sources/2026-10-13-mac-mini-paper-title.pdf","id":"…","new":true}
@@ -63,8 +63,8 @@ but the full vault-relative path remains clear when names are similar.
 `brain lint` adds three rules:
 
 - `source-missing` (warn) – a wiki-link in `sources:` resolves to no note or file.
-- `source-modified` (warn) – a sidecar is missing its original, or the original's bytes no
-  longer match the recorded SHA-256 digest.
+- `source-modified` (warn) – a sidecar is missing its original, has no valid SHA-256
+  digest, or the original's bytes no longer match that digest.
 - `unsourced` (info) – a note in an opted-in folder has neither a `sources:` entry nor a
   normal wiki-link that resolves to an ingested source.
 
