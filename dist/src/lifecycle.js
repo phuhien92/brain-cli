@@ -9,7 +9,7 @@
 // Events rather than frontmatter edits keep brain's "create, never edit" rule:
 // two machines reviewing notes never edit the same file, and every change
 // leaves an audit trail.
-import { addEntry } from "./log.js";
+import { addEntry, LIFECYCLE_KIND, RETIRE_ACTION } from "./log.js";
 export const CATEGORIES = ["memory", "identity", "preference", "principle", "research", "current-state", "news"];
 // Days until a time-bound note should be re-confirmed. null = enduring.
 export const DEFAULT_WINDOWS = {
@@ -21,7 +21,6 @@ export const DEFAULT_WINDOWS = {
     "current-state": 30,
     news: 14,
 };
-export const LIFECYCLE_KIND = "lifecycle";
 export function today() {
     const fixed = process.env.BRAIN_TODAY; // tests and reproducible reports
     if (fixed && isDate(fixed))
@@ -49,8 +48,11 @@ export function lifecycleStates(store, cfg) {
     for (const r of rows) {
         const fm = JSON.parse(r.frontmatter);
         if (r.path.startsWith(eventDir)) {
-            if (typeof fm.target === "string")
+            // Log-entry retirements share the append-only lifecycle folder but are
+            // handled by log views, not by note freshness state.
+            if (fm.action !== RETIRE_ACTION && typeof fm.target === "string") {
                 events.push({ created: String(fm.created ?? ""), path: r.path, fm });
+            }
             continue;
         }
         const category = fm.category;

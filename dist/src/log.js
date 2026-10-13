@@ -8,6 +8,8 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { slug } from "./config.js";
+export const RETIRE_ACTION = "retire";
+export const LIFECYCLE_KIND = "lifecycle";
 export function addEntry(vault, cfg, input) {
     const kind = slug(input.kind);
     if (!kind)
@@ -26,9 +28,9 @@ export function addEntry(vault, cfg, input) {
     if (tags.length)
         lines.push(`tags: [${tags.join(", ")}]`);
     for (const [key, value] of Object.entries(input.fields ?? {})) {
-        if (!/^[a-z][a-z0-9-]*$/.test(key) || /["\n\r]/.test(value))
+        if (!/^[a-z][a-z0-9-]*$/.test(key))
             throw new Error(`invalid entry field ${key}`);
-        lines.push(`${key}: "${value}"`);
+        lines.push(`${key}: ${JSON.stringify(value)}`);
     }
     lines.push("---", `# ${title}`, "");
     const body = (input.body ?? "").replace(/\r\n/g, "\n").trim();
@@ -53,9 +55,16 @@ export function listEntries(store, cfg, opts = {}) {
         WHERE path LIKE ? ESCAPE '\\'
           AND json_extract(frontmatter, '$.kind') IS NOT NULL
           AND (? IS NULL OR json_extract(frontmatter, '$.kind') = ?)
+          AND (? = 1 OR path NOT IN (
+            SELECT json_extract(events.frontmatter, '$.target')
+              FROM notes AS events
+             WHERE events.path LIKE ? ESCAPE '\\'
+               AND json_extract(events.frontmatter, '$.action') = '${RETIRE_ACTION}'
+               AND json_extract(events.frontmatter, '$.target') IS NOT NULL
+          ))
         ORDER BY json_extract(frontmatter, '$.created') DESC, path DESC
         LIMIT ?`)
-        .all(cfg.logDir.replace(/[\\%_]/g, (c) => `\\${c}`) + "/%", opts.kind ?? null, opts.kind ?? null, opts.limit ?? -1);
+        .all(cfg.logDir.replace(/[\\%_]/g, (c) => `\\${c}`) + "/%", opts.kind ?? null, opts.kind ?? null, opts.includeRetired ? 1 : 0, `${cfg.logDir}/${LIFECYCLE_KIND}`.replace(/[\\%_]/g, (c) => `\\${c}`) + "/%", opts.limit ?? -1);
     return rows.map((r) => {
         const fm = JSON.parse(r.frontmatter);
         const raw = readFileSync(join(store.vault, ...r.path.split("/")), "utf8");
@@ -68,6 +77,21 @@ export function listEntries(store, cfg, opts = {}) {
             tags: JSON.parse(r.tags),
             body: entryBody(raw),
         };
+    });
+}
+// Record a retirement as a separate lifecycle entry. Multiple machines may
+// retire the same target; each event is valid and no existing file is touched.
+export function recordRetirement(vault, cfg, target, opts = {}) {
+    const fields = { target, action: RETIRE_ACTION };
+    if (opts.reason)
+        fields.reason = opts.reason;
+    if (opts.replacement)
+        fields.replacement = opts.replacement;
+    return addEntry(vault, cfg, {
+        kind: LIFECYCLE_KIND,
+        title: `${target}: retired`,
+        body: opts.reason,
+        fields,
     });
 }
 // The body after the frontmatter and the leading "# title" line.
@@ -86,7 +110,7 @@ export function renderView(entries, header) {
     // write a sync could fight over); the view shows the oldest once.
     const seen = new Set();
     const unique = sorted.filter((e) => {
-        const key = norm(e.title) + "\n" + norm(e.body);
+        const key = renderKey(e);
         if (seen.has(key))
             return false;
         seen.add(key);
@@ -132,9 +156,9 @@ export function exportView(store, cfg, target, force = false) {
 // Split an existing memory file into entries: one per top-level list item
 // (with its indented continuation lines), one per free-standing paragraph.
 // Headings become tags. HTML comments — stow's tier markers and file
-// pointers — are dropped from titles. Entries whose title already exists for
-// this kind are skipped, so importing on a second machine does not duplicate
-// what the first already captured.
+// pointers — are dropped from titles. Entries whose title and body already
+// exist for this kind are skipped, so importing on a second machine does not
+// duplicate what the first already captured.
 export function parseImport(markdown) {
     const items = [];
     let section = null;
@@ -183,31 +207,49 @@ export function parseImport(markdown) {
 }
 export function importFile(store, cfg, kind, file) {
     const source = readFileSync(file, "utf8");
-    const existing = new Set(listEntries(store, cfg, { kind: slug(kind) }).map((e) => norm(e.title)));
+    const entryKind = slug(kind);
+    const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
+    const activeEntries = listEntries(store, cfg, { kind: entryKind });
+    // A retired entry remains recorded: importing a stale generated file must
+    // not silently recreate it as a new active entry.
+    const existing = new Set(allEntries.map(importKey));
     const added = [];
     let skipped = 0;
     // A millisecond apart and ending now, so the view (oldest first) keeps the
     // file's original order and nothing imported sorts after a later entry.
     const items = parseImport(source);
+    const imported = new Set(items.map(importKey));
+    const retirementCandidates = activeEntries
+        .filter((entry) => !imported.has(importKey(entry)))
+        .map(({ path, title, body }) => ({ path, title, body }));
     const base = Date.now() - items.length;
     items.forEach((item, i) => {
-        if (existing.has(norm(item.title))) {
+        const key = importKey(item);
+        if (existing.has(key)) {
             skipped++;
             return;
         }
-        existing.add(norm(item.title));
+        existing.add(key);
         added.push(addEntry(store.vault, cfg, { kind, ...item, created: new Date(base + i) }));
     });
     // What was just imported is now captured, so exporting over this file is no
     // longer a loss.
     store.setMeta(`export:${file}`, sha(source));
-    return { added, skipped };
+    return { added, skipped, retirementCandidates };
 }
 function stripComments(s) {
     return s.replace(/<!--[\s\S]*?-->/g, "").replace(/[ \t]+$/gm, "");
 }
 function norm(s) {
     return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+function renderKey(entry) {
+    return `${norm(entry.title)}\n${norm(entry.body)}`;
+}
+function importKey(entry) {
+    const title = entry.title.replace(/\s+/g, " ").trim();
+    const body = entry.body.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
+    return `${title}\n${body}`;
 }
 export function sha(s) {
     return createHash("sha256").update(s).digest("hex");

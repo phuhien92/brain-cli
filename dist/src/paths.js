@@ -20,12 +20,13 @@ export function vaultStateDir(vault, root = stateRoot()) {
     const id = createHash("sha256").update(vault).digest("hex").slice(0, 12);
     return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
 }
-export const PATH_NAMES = ["vault", "log", "config", "user-config", "state", "index", "telemetry-queue"];
+export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "state", "index", "telemetry-queue"];
 export function brainPaths(vault, logDir) {
     const state = vaultStateDir(vault);
     return {
         vault,
         log: join(vault, logDir),
+        sources: join(vault, "sources"),
         config: join(vault, "brain.json"),
         "user-config": userConfigFile(),
         state,
