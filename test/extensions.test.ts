@@ -330,6 +330,25 @@ else if (action === "flood") {
   assert.match(disabled.body.error.message, /disabled/);
 });
 
+test("extension deadline can be extended for long-running commands", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const source = makeExtension(join(f.root, "patient-source"), {
+    name: "patient",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: [], network: [] },
+  }, `setTimeout(() => process.stdout.write(JSON.stringify({schema:"brain.v1",command:"patient",ok:true,data:{finished:true}})+"\\n"), 150);`);
+  assert.equal(interactiveInstall(f, source).code, 0);
+
+  const impatient = json(f, ["patient"], { BRAIN_EXTENSION_TIMEOUT_MS: "25" });
+  assert.equal(impatient.code, 1);
+  assert.equal(impatient.body.error.code, "extension_timeout");
+  assert.match(impatient.body.error.message, /25 ms/);
+
+  const patient = json(f, ["patient"], { BRAIN_EXTENSION_TIMEOUT_MS: "2000" });
+  assert.equal(patient.code, 0, patient.stderr || patient.stdout);
+  assert.equal(patient.body.data.finished, true);
+});
+
 test("extension scope is enforced and intersected with an existing BRAIN_AS scope", { skip: process.platform === "win32" }, (t) => {
   const f = fixture(t);
   mkdirSync(join(f.vault, "Allowed"));

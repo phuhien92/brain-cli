@@ -198,7 +198,8 @@ interface Out {
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
 const BUILT_INS = new Set(COMMANDS);
 const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle", "context"]);
-const EXTENSION_TIMEOUT_MS = 30_000;
+const DEFAULT_EXTENSION_TIMEOUT_MS = 30_000;
+const MAX_EXTENSION_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
@@ -212,6 +213,17 @@ const SUBCOMMANDS: Record<string, string[]> = {
 export function telemetryName(command: string, sub: string | undefined): string {
   if (!COMMANDS.includes(command)) return "unknown";
   return sub && SUBCOMMANDS[command]?.includes(sub) ? `${command}.${sub}` : command;
+}
+
+function extensionTimeoutMs(): number {
+  const raw = process.env.BRAIN_EXTENSION_TIMEOUT_MS;
+  if (raw === undefined) return DEFAULT_EXTENSION_TIMEOUT_MS;
+  if (!/^[1-9]\d*$/.test(raw)) throw new CliError("config", "BRAIN_EXTENSION_TIMEOUT_MS must be a positive integer", 1);
+  const value = Number(raw);
+  if (!Number.isSafeInteger(value) || value > MAX_EXTENSION_TIMEOUT_MS) {
+    throw new CliError("config", `BRAIN_EXTENSION_TIMEOUT_MS must not exceed ${MAX_EXTENSION_TIMEOUT_MS}`, 1);
+  }
+  return value;
 }
 
 const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
@@ -1062,6 +1074,11 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   };
   if (parentAs) env.BRAIN_EXTENSION_PARENT_AS = parentAs;
   else delete env.BRAIN_EXTENSION_PARENT_AS;
+  const timeoutMs = extensionTimeoutMs();
+  const timeoutSeconds = timeoutMs / 1000;
+  const timeoutLabel = timeoutMs % 1000 === 0
+    ? `${timeoutSeconds} second${timeoutSeconds === 1 ? "" : "s"}`
+    : `${timeoutMs} ms`;
 
   const result = await new Promise<{
     code: number | null;
@@ -1105,8 +1122,8 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     child.stderr.on("data", capture(stderr));
     child.on("error", (err) => (spawnError = err));
     const timeout = setTimeout(
-      () => stop(new ExtensionError("extension_timeout", `${name} exceeded the 30 second time limit`)),
-      EXTENSION_TIMEOUT_MS,
+      () => stop(new ExtensionError("extension_timeout", `${name} exceeded the ${timeoutLabel} time limit`)),
+      timeoutMs,
     );
     child.on("close", (code, signal) => {
       clearTimeout(timeout);

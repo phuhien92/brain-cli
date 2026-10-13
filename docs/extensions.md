@@ -115,8 +115,10 @@ The process must write exactly one JSON line to stdout using the existing envelo
 
 On failure it uses `ok: false`, an `error` object, and a non-zero exit. Diagnostics may go to
 stderr. brain validates the envelope and exit code before forwarding it. A command's process tree is killed
-after 30 seconds or after stdout and stderr together exceed 1 MiB. Invalid output, a crash, or
-either limit fails only that extension command; built-ins and `brain context` continue normally.
+after 30 seconds by default or after stdout and stderr together exceed 1 MiB. Set
+`BRAIN_EXTENSION_TIMEOUT_MS` to a positive deadline of at most 86400000 milliseconds when a known
+long-running import needs more time. Invalid output, a crash, or either limit fails only that
+extension command; built-ins and `brain context` continue normally.
 
 ## Reference: meetings
 
@@ -125,6 +127,7 @@ either limit fails only that extension command; built-ins and `brain context` co
 ```sh
 brain ext install ./examples/meetings
 BRAIN_MEETINGS_API_URL=http://127.0.0.1:3000/meetings \
+  BRAIN_EXTENSION_TIMEOUT_MS=300000 \
   brain meetings import --since 7d
 ```
 
