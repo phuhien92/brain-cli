@@ -138,7 +138,7 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
   const extensionName = process.env.BRAIN_EXTENSION_SCOPE ?? "";
   if (extensionName) {
     if (!enabledExtensions.includes(extensionName)) {
-      throw new ConfigError(`extension '${extensionName}' is not enabled in brain.json`);
+      throw new ConfigError(`extension '${extensionName}' is not enabled for this vault`);
     }
     let installed;
     try {

@@ -576,8 +576,7 @@ async function run(argv: string[]): Promise<number> {
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
           let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           if (process.env.BRAIN_EXT_REDACT === "1") {
-            const notes = store.db.prepare("SELECT path, title FROM notes").all() as { path: string; title: string }[];
-            const redact = redactor({ vault, notes });
+            const redact = redactor({ vault });
             title = redact(title);
             if (body !== undefined) {
               const markers: string[] = [];

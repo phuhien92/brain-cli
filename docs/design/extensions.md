@@ -44,7 +44,7 @@ The shipped contract is documented in [`docs/extensions.md`](../extensions.md). 
 an extension adds a subcommand:
 
 ```sh
-brain ext install github:someone/brain-granola     # clones, pins to a commit, shows the manifest
+brain ext install https://github.com/someone/brain-granola.git  # clones and shows the manifest
 brain granola import --since 2026-10-01            # runs the extension's executable
 ```
 
@@ -109,8 +109,8 @@ An extension is code running on your machine with your permissions. So:
   No `$PATH` discovery, no auto-install, no extension installing another.
 - **Pinned to a commit.** `brain ext upgrade` shows the diff of the manifest's
   permissions before moving the pin.
-- **Per-vault enable.** `brain.json` lists which installed extensions a vault uses, so a
-  work vault and a personal vault can differ.
+- **Per-vault enable.** Immutable notes under `<log.dir>/extensions/` record which installed
+  extensions a vault uses, so a work vault and a personal vault can differ without config edits.
 - **Off switch.** `BRAIN_NO_EXTENSIONS=1` runs pure core, for debugging and for agents you
   do not trust with extensions.
 

@@ -65,6 +65,7 @@ export class ExtensionError extends Error {
 
 const MANIFEST = "brain-extension.json";
 const METADATA = ".brain-install.json";
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
 const RESERVED = new Set([
   "setup", "index", "search", "get", "log", "view", "export", "sync", "lifecycle", "lint",
   "integrations", "doctor", "path", "context", "agent", "feedback", "telemetry", "ext", "help",
@@ -117,6 +118,9 @@ export function readManifest(directory: string): ExtensionManifest {
   }
   const p = object(o.permissions, `${path}: permissions`);
   const read = strings(p.read, `${path}: permissions.read`).map((folder) => {
+    if (CONTROL_CHARACTERS.test(folder)) {
+      throw new ExtensionError("invalid_manifest", `${path}: permission read paths cannot contain control characters`, 2);
+    }
     if (folder === "*") return folder;
     const clean = folder.replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
     if (!clean || clean.split("/").includes("..")) {
@@ -139,6 +143,9 @@ export function readManifest(directory: string): ExtensionManifest {
   const brain = o.brain === undefined ? undefined : typeof o.brain === "string" ? o.brain : null;
   const description = o.description === undefined ? undefined : typeof o.description === "string" ? o.description.trim() : null;
   if (brain === null || description === null) throw new ExtensionError("invalid_manifest", `${path}: brain and description must be strings`, 2);
+  if (description && CONTROL_CHARACTERS.test(description)) {
+    throw new ExtensionError("invalid_manifest", `${path}: description cannot contain control characters`, 2);
+  }
 
   const manifest: ExtensionManifest = {
     name,
@@ -228,28 +235,38 @@ function readVaultJson(vault: string): Record<string, unknown> {
 }
 
 export function enabledExtensionNames(vault: string): string[] {
-  const path = join(vault, "brain.json");
-  const raw = readVaultJson(vault).extensions;
-  if (raw === undefined) return [];
-  if (!Array.isArray(raw) || raw.some((name) => typeof name !== "string" || slug(name) !== name)) {
-    throw new ExtensionError("config", `${path}: 'extensions' must be a list of lowercase extension names`);
+  const directory = enablementDirectory(vault);
+  if (!existsSync(directory)) return [];
+  return readdirSync(directory, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name.slice(0, -3))
+    .filter((name) => slug(name) === name)
+    .sort();
+}
+
+function enablementDirectory(vault: string): string {
+  const cfg = readVaultJson(vault);
+  const raw = (cfg.log === undefined ? {} : object(cfg.log, "brain.json: log")).dir ?? "log";
+  const logDir = String(raw).replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
+  if (!logDir || logDir.startsWith(".") || logDir.split("/").includes("..")) {
+    throw new ExtensionError("config", `brain.json: log.dir '${logDir}' must be a plain folder inside the vault`);
   }
-  return [...new Set(raw as string[])];
+  return join(vault, ...logDir.split("/"), "extensions");
 }
 
 function enable(vault: string, name: string): void {
-  const path = join(vault, "brain.json");
-  const cfg = readVaultJson(vault);
-  const current = enabledExtensionNames(vault);
-  if (current.includes(name)) return;
-  const next = { ...cfg, extensions: [...current, name].sort() };
-  const tmp = `${path}.${process.pid}.tmp`;
-  writeFileSync(tmp, JSON.stringify(next, null, 2) + "\n");
-  renameSync(tmp, path);
+  const directory = enablementDirectory(vault);
+  const path = join(directory, `${name}.md`);
+  if (existsSync(path)) return;
+  mkdirSync(directory, { recursive: true });
+  try {
+    writeFileSync(path, `---\nkind: extension\nextension: ${name}\n---\n# ${name}\n`, { flag: "wx" });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+  }
 }
 
 function gitSource(source: string): string | null {
-  if (source.startsWith("github:")) return `https://github.com/${source.slice("github:".length).replace(/^\/+/, "")}`;
   return /^(?:https?|ssh|git|file):\/\//.test(source) || /^[^@\s]+@[^:\s]+:.+/.test(source) ? source : null;
 }
 
@@ -257,7 +274,7 @@ function prepare(source: string, stage: string): InstallMetadata {
   const git = gitSource(source);
   if (git) {
     try {
-      execFileSync("git", ["clone", "--quiet", "--depth", "1", git, stage], { stdio: ["ignore", "pipe", "pipe"] });
+      execFileSync("git", ["clone", "--quiet", "--depth", "1", "--", git, stage], { stdio: ["ignore", "pipe", "pipe"] });
       const commit = execFileSync("git", ["-C", stage, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
       rmSync(join(stage, ".git"), { recursive: true, force: true });
       return { source, commit };

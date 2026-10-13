@@ -115,8 +115,8 @@ test("install needs human permission approval and exposes the declared permissio
 
   const installed = interactiveInstall(f, source);
   assert.equal(installed.code, 0, installed.stdout + installed.stderr);
-  const vaultConfig = JSON.parse(readFileSync(join(f.vault, "brain.json"), "utf8"));
-  assert.deepEqual(vaultConfig.extensions, ["echoer"]);
+  assert.equal(readdirSync(f.vault).includes("brain.json"), false, "enabling an extension does not create mutable vault config");
+  assert.match(readFileSync(join(f.vault, "log", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
 
   const listed = json(f, ["ext", "list"]);
   assert.equal(listed.code, 0);
@@ -137,14 +137,43 @@ test("install needs human permission approval and exposes the declared permissio
 
   const secondVault = join(f.root, "second-vault");
   mkdirSync(join(secondVault, ".obsidian"), { recursive: true });
+  writeFileSync(join(secondVault, "brain.json"), '{\n  "log": { "dir": "memory" }\n}\n');
   const second = { ...f, vault: secondVault };
   const enabledAgain = interactiveInstall(second, source);
   assert.equal(enabledAgain.code, 0, enabledAgain.stdout + enabledAgain.stderr);
-  assert.deepEqual(JSON.parse(readFileSync(join(secondVault, "brain.json"), "utf8")).extensions, ["echoer"]);
+  assert.equal(readFileSync(join(secondVault, "brain.json"), "utf8"), '{\n  "log": { "dir": "memory" }\n}\n');
+  assert.match(readFileSync(join(secondVault, "memory", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
   writeFileSync(join(source, "bin", "command.mjs"), "throw new Error('source changed')\n");
   assert.equal(json(f, ["echoer"]).code, 0, "local installs are copies, not mutable source links");
+});
+
+test("install rejects terminal controls in permission text and unsupported source aliases", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const unsafe: Array<[string, Omit<ExtensionManifest, "version">]> = [
+    ["description", {
+      name: "unsafe-description",
+      command: "bin/command.mjs",
+      description: "looks safe\u001b[2J",
+      permissions: { read: [], write: [], network: [] },
+    }],
+    ["read path", {
+      name: "unsafe-read",
+      command: "bin/command.mjs",
+      permissions: { read: ["Allowed/\u001b[2J"], write: [], network: [] },
+    }],
+  ];
+  for (const [field, manifest] of unsafe) {
+    const source = makeExtension(join(f.root, `unsafe-${field.replace(" ", "-")}`), manifest, "");
+    const result = interactiveInstall(f, source);
+    assert.equal(result.code, 2, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /control characters/);
+  }
+
+  const alias = interactiveInstall(f, "github:example/brain-example");
+  assert.equal(alias.code, 3, alias.stdout + alias.stderr);
+  assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);
 });
 
 test("git installation records its commit, remove is machine-local, and missing installs fail cleanly", { skip: process.platform === "win32" }, (t) => {
@@ -191,9 +220,8 @@ test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extens
   writeFileSync(join(searchDir, "brain-extension.json"), JSON.stringify({ name: "search", version: "1.0.0", command: "run", permissions: { read: [], write: [], network: [] } }));
   writeFileSync(join(searchDir, "run"), "#!/bin/sh\necho shadowed > ran\n");
   chmodSync(join(searchDir, "run"), 0o755);
-  const config = JSON.parse(readFileSync(join(f.vault, "brain.json"), "utf8"));
-  config.extensions.push("search");
-  writeFileSync(join(f.vault, "brain.json"), JSON.stringify(config));
+  mkdirSync(join(f.vault, "log", "extensions"), { recursive: true });
+  writeFileSync(join(f.vault, "log", "extensions", "search.md"), "# search\n");
   const builtIn = json(f, ["search", "needle"]);
   assert.equal(builtIn.code, 0);
   assert.equal(builtIn.body.command, "search");
@@ -253,9 +281,10 @@ if(action==="write-allowed"||action==="write-denied") {
 
 test("meetings imports redacted summaries and links from a fake server, never transcripts, and deduplicates source IDs", { skip: process.platform === "win32" }, async (t) => {
   const f = fixture(t);
+  writeFileSync(join(f.vault, "Alice.md"), "# Alice\n");
   assert.equal(interactiveInstall(f, MEETINGS).code, 0);
   let requested = "";
-  const payload = {
+  const payload: { meetings: Array<Record<string, unknown>> } = {
     meetings: [{
       id: "granola-source-secret-id",
       title: "Weekly planning",
@@ -312,12 +341,26 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   }
   assert.equal((note.match(/1234567/g) ?? []).length, 1, "the private number is redacted, while the intentional source URL stays usable");
 
+  payload.meetings[0]!.id = "another-granola-source-secret-id";
   const second = await invoke();
   assert.equal(second.code, 0, second.stderr);
   const secondBody = JSON.parse(second.stdout);
-  assert.equal(secondBody.data.added.length, 0);
-  assert.equal(secondBody.data.skipped, 1);
-  assert.equal(readdirSync(meetingDir).length, 1);
+  assert.equal(secondBody.data.added.length, 1);
+  assert.equal(secondBody.data.skipped, 0);
+  const notes = readdirSync(meetingDir).map((file) => readFileSync(join(meetingDir, file), "utf8"));
+  assert.equal(notes.length, 2);
+  for (const recurring of notes) {
+    assert.match(recurring, /Weekly planning/);
+    assert.match(recurring, /Alice <<email>>/);
+    assert.ok(!recurring.includes("<note-"), "vault note titles must not be redacted from imported content");
+  }
+
+  const third = await invoke();
+  assert.equal(third.code, 0, third.stderr);
+  const thirdBody = JSON.parse(third.stdout);
+  assert.equal(thirdBody.data.added.length, 0);
+  assert.equal(thirdBody.data.skipped, 1);
+  assert.equal(readdirSync(meetingDir).length, 2);
 });
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {

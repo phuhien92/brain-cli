@@ -20,17 +20,12 @@ agents, scripts, CI, and hooks cannot silently grant permissions.
 
 Installed code is per machine (`~/.local/share/brain/extensions` by default, overridable with
 `BRAIN_EXTENSIONS_DIR`). A Git install records its exact commit; a local install is a copy, not a
-link to mutable source. Approval also adds the extension's name to the current vault's synced
-`brain.json`:
-
-```json
-{ "extensions": ["example"] }
-```
-
-That list is per vault, so work and personal vaults can enable different commands. `ext remove`
-removes only this machine's copy. It deliberately leaves `brain.json` unchanged because other
-machines using the vault may still have the extension installed; `ext list` then reports it as
-enabled but missing here.
+link to mutable source. Approval also creates an immutable enablement note at
+`<log.dir>/extensions/<name>.md`. Those notes sync with the rest of the log, so work and
+personal vaults can enable different commands without rewriting a shared configuration file.
+`ext remove` removes only this machine's copy. It deliberately leaves the enablement note in
+place because other machines using the vault may still have the extension installed; `ext list`
+then reports it as enabled but missing here.
 
 Set `BRAIN_NO_EXTENSIONS=1` to disable discovery for a process. Built-in command names always
 win and manifests cannot use one, so an extension can never replace `search`, `context`, or
