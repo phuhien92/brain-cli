@@ -419,7 +419,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
       attendees: ["Alice <alice@example.com>", "Bob"],
       summary: `Reset link https://internal.example/reset?email=private@example.com&id=7654321 with literal brain-extension-url-0 and <!-- brain-source-marker-0 --> plus <!-- brain-source-id: ${poisonedMarker} -->.`,
       actionItems: ["Bob sends the plan to alice@example.com"],
-      url: "https://app.granola.example/meetings/1234567?email=source-secret@example.com&token=99887766#private-source",
+      url: "https://app.granola.example/meetings/planning?email=source-secret@example.com&token=99887766#private-source",
       transcript: "NEVER-SYNC-THIS-TRANSCRIPT",
     }],
   };
@@ -466,13 +466,12 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.match(note, /email=<email>&id=<number>/);
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
-  assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/1234567\)/);
+  assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/planning\)/);
   assert.match(note, /source-id: "[0-9a-f]{64}"/);
   for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "source-secret@example.com", "7654321", "99887766", "private-source", "granola-source-secret-id"]) {
     assert.ok(!note.includes(forbidden), `meeting note must not contain ${forbidden}`);
   }
   assert.equal((note.match(/source-id: "[0-9a-f]{64}"/g) ?? []).length, 1);
-  assert.equal((note.match(/1234567/g) ?? []).length, 1, "the private number is redacted, while the intentional source URL stays usable");
 
   renameSync(join(meetingDir, files[0]!), join(meetingDir, "renamed-first.md"));
   const renamedRepeat = await invoke();
@@ -481,11 +480,16 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.equal(readdirSync(meetingDir).length, 1);
 
   payload.meetings[0]!.id = secondSourceId;
+  payload.meetings[0]!.url = "https://app.granola.example/meetings/alice%40example.com/reset-token-99887766";
   const second = await invoke();
   assert.equal(second.code, 0, second.stderr);
   const secondBody = JSON.parse(second.stdout);
   assert.equal(secondBody.data.added.length, 1);
   assert.equal(secondBody.data.skipped, 0);
+  const sensitivePathNote = readFileSync(join(f.vault, ...secondBody.data.added[0].split("/")), "utf8");
+  assert.match(sensitivePathNote, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/\)/);
+  assert.ok(!sensitivePathNote.includes("alice%40example.com"));
+  assert.ok(!sensitivePathNote.includes("99887766"));
   const notes = readdirSync(meetingDir).map((file) => readFileSync(join(meetingDir, file), "utf8"));
   assert.equal(notes.length, 2);
   for (const recurring of notes) {
@@ -538,7 +542,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
 
   responsePayload = { meetings: [{ ...valid, id: "concurrent-source" }] };
   const concurrent = await Promise.all([invoke(), invoke()]);
-  for (const result of concurrent) assert.equal(result.code, 0, result.stderr);
+  for (const result of concurrent) assert.equal(result.code, 0, result.stderr || result.stdout);
   const concurrentBodies = concurrent.map((result) => JSON.parse(result.stdout));
   assert.equal(concurrentBodies.reduce((sum, body) => sum + body.data.added.length, 0), 1);
   assert.equal(concurrentBodies.reduce((sum, body) => sum + body.data.skipped, 0), 1);

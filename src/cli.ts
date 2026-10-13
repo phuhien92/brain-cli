@@ -605,9 +605,16 @@ async function run(argv: string[]): Promise<number> {
                     if (Buffer.from(value).toString("base64url") !== encoded) return all;
                     try {
                       const url = new URL(value);
-                      const safe = (url.protocol === "https:" || url.protocol === "http:")
+                      const safeUrl = (url.protocol === "https:" || url.protocol === "http:")
                         && !url.username && !url.password && !url.search && !url.hash && url.toString() === value;
-                      return safe ? protect(value) : all;
+                      if (!safeUrl) return all;
+                      let decodedPath = "";
+                      try {
+                        decodedPath = decodeURIComponent(url.pathname);
+                      } catch {
+                        return `${url.origin}/`;
+                      }
+                      return redact(decodedPath) === decodedPath ? protect(value) : `${url.origin}/`;
                     } catch {
                       return all;
                     }
