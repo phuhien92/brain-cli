@@ -142,7 +142,6 @@ CONFIG
   $BRAIN_STATE_DIR            Where indexes live (default ~/.local/state/brain); never
                               inside the vault, so iCloud/Dropbox never sync a live database
   $BRAIN_EXTENSIONS_DIR       Installed extensions (default ~/.local/share/brain/extensions)
-  $BRAIN_NO_EXTENSIONS=1      Disable extension discovery for this process
 
 EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
@@ -1001,9 +1000,6 @@ function extensionInvocation(args) {
     return { args: forwarded, vault, as };
 }
 async function runExtensionCommand(name, rawArgs, out) {
-    if (process.env.BRAIN_NO_EXTENSIONS === "1") {
-        throw new CliError("usage", `unknown command '${name}' — extensions are disabled by BRAIN_NO_EXTENSIONS`, 2);
-    }
     const invocation = extensionInvocation(rawArgs);
     const vault = findVault(invocation.vault);
     const parentAs = invocation.as ?? process.env.BRAIN_AS ?? "";

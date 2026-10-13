@@ -340,7 +340,7 @@ test("git installation records its commit, remove is machine-local, and missing 
   assert.equal(missing.body.error.code, "not_found");
 });
 
-test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extension is isolated", { skip: process.platform === "win32" }, async (t) => {
+test("built-ins win and a broken extension is isolated", { skip: process.platform === "win32" }, async (t) => {
   const f = fixture(t);
   mkdirSync(join(f.vault, "notes"));
   writeFileSync(join(f.vault, "notes", "answer.md"), "# Answer\nneedle built-in proof\n");
@@ -430,10 +430,6 @@ else if (action === "flood") {
   assert.match(hung.body.error.message, /30 second/);
   assert.equal(json(f, ["index"]).code, 0, "a broken extension cannot break built-ins");
   assert.equal(json(f, ["context"]).code, 0, "context keeps its never-fail contract");
-
-  const disabled = json(f, ["broken"], { BRAIN_NO_EXTENSIONS: "1" });
-  assert.equal(disabled.code, 2);
-  assert.match(disabled.body.error.message, /disabled/);
 });
 
 test("extension scope is enforced and intersected with an existing BRAIN_AS scope", { skip: process.platform === "win32" }, (t) => {

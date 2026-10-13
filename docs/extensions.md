@@ -29,9 +29,8 @@ personal vaults can enable different commands without rewriting a shared configu
 place because other machines using the vault may still have the extension installed; `ext list`
 then reports it as enabled but missing here.
 
-Set `BRAIN_NO_EXTENSIONS=1` to disable discovery for a process. Built-in command names always
-win and manifests cannot use one, so an extension can never replace `search`, `context`, or
-another core command.
+Built-in command names always win and manifests cannot use one, so an extension can never
+replace `search`, `context`, or another core command.
 
 ## Manifest
 
