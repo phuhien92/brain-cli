@@ -95,8 +95,9 @@ The process must write exactly one JSON line to stdout using the existing envelo
 ```
 
 On failure it uses `ok: false`, an `error` object, and a non-zero exit. Diagnostics may go to
-stderr. brain validates the envelope and exit code before forwarding it. Invalid output or a
-crash fails only that extension command; built-ins and `brain context` continue normally.
+stderr. brain validates the envelope and exit code before forwarding it. A command is killed
+after 30 seconds or after stdout and stderr together exceed 1 MiB. Invalid output, a crash, or
+either limit fails only that extension command; built-ins and `brain context` continue normally.
 
 ## Reference: meetings
 

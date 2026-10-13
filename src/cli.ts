@@ -194,6 +194,8 @@ interface Out {
 // a user typed (a query, a note, feedback text) can never become a name.
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
 const BUILT_INS = new Set(COMMANDS);
+const EXTENSION_TIMEOUT_MS = 30_000;
+const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -967,7 +969,14 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   if (parentAs) env.BRAIN_EXTENSION_PARENT_AS = parentAs;
   else delete env.BRAIN_EXTENSION_PARENT_AS;
 
-  const result = await new Promise<{ code: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string; error?: Error }>((done) => {
+  const result = await new Promise<{
+    code: number | null;
+    signal: NodeJS.Signals | null;
+    stdout: string;
+    stderr: string;
+    error?: Error;
+    policyError?: ExtensionError;
+  }>((done) => {
     const launch = extensionProcess(launcher, invocation.args);
     const child = spawn(launch.file, launch.args, {
       cwd: installed.directory,
@@ -975,15 +984,47 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
       stdio: ["inherit", "pipe", "pipe"],
       windowsVerbatimArguments: launch.windowsVerbatimArguments,
     });
-    let stdout = "";
-    let stderr = "";
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let outputBytes = 0;
     let spawnError: Error | undefined;
-    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
-    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    let policyError: ExtensionError | undefined;
+    const stop = (error: ExtensionError) => {
+      if (policyError) return;
+      policyError = error;
+      child.stdout.destroy();
+      child.stderr.destroy();
+      child.kill("SIGKILL");
+    };
+    const capture = (chunks: Buffer[]) => (chunk: Buffer) => {
+      outputBytes += chunk.length;
+      if (outputBytes > EXTENSION_OUTPUT_LIMIT) {
+        stop(new ExtensionError("extension_output_limit", `${name} exceeded the 1 MiB output limit`));
+        return;
+      }
+      chunks.push(chunk);
+    };
+    child.stdout.on("data", capture(stdout));
+    child.stderr.on("data", capture(stderr));
     child.on("error", (err) => (spawnError = err));
-    child.on("close", (code, signal) => done({ code, signal, stdout, stderr, ...(spawnError ? { error: spawnError } : {}) }));
+    const timeout = setTimeout(
+      () => stop(new ExtensionError("extension_timeout", `${name} exceeded the 30 second time limit`)),
+      EXTENSION_TIMEOUT_MS,
+    );
+    child.on("close", (code, signal) => {
+      clearTimeout(timeout);
+      done({
+        code,
+        signal,
+        stdout: Buffer.concat(stdout).toString("utf8"),
+        stderr: Buffer.concat(stderr).toString("utf8"),
+        ...(spawnError ? { error: spawnError } : {}),
+        ...(policyError ? { policyError } : {}),
+      });
+    });
   });
   if (result.stderr) process.stderr.write(result.stderr);
+  if (result.policyError) throw result.policyError;
   if (result.error) throw new ExtensionError("extension_failed", `${name} could not start: ${result.error.message}`);
   if (result.signal) throw new ExtensionError("extension_failed", `${name} was terminated by ${result.signal}`);
 

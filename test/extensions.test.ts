@@ -211,7 +211,13 @@ test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extens
     name: "broken",
     command: "bin/command.mjs",
     permissions: { read: [], write: [], network: [] },
-  }, `process.stdout.write("not json\\nextra line\\n")`);
+  }, `
+const action = process.argv[2];
+if (action === "hang") setInterval(() => {}, 1000);
+else if (action === "flood") {
+  process.stdout.write("x".repeat(2 * 1024 * 1024));
+  setInterval(() => {}, 1000);
+} else process.stdout.write("not json\\nextra line\\n");`);
   assert.equal(interactiveInstall(f, brokenSource).code, 0);
 
   // Even an invalid, manually placed extension named search cannot shadow core.
@@ -231,6 +237,16 @@ test("built-ins win, BRAIN_NO_EXTENSIONS disables discovery, and a broken extens
   assert.equal(broken.code, 1);
   assert.equal(broken.stdout.trim().split("\n").length, 1);
   assert.equal(broken.body.error.code, "extension_protocol");
+
+  const flooded = json(f, ["broken", "flood"]);
+  assert.equal(flooded.code, 1);
+  assert.equal(flooded.body.error.code, "extension_output_limit");
+  assert.match(flooded.body.error.message, /1 MiB/);
+
+  const hung = json(f, ["broken", "hang"]);
+  assert.equal(hung.code, 1);
+  assert.equal(hung.body.error.code, "extension_timeout");
+  assert.match(hung.body.error.message, /30 second/);
   assert.equal(json(f, ["index"]).code, 0, "a broken extension cannot break built-ins");
   assert.equal(json(f, ["context"]).code, 0, "context keeps its never-fail contract");
 
