@@ -97,6 +97,6 @@ A fork can send to its own PostHog project with `BRAIN_POSTHOG_KEY` and `BRAIN_P
   — which matters inside agent sandboxes that have no network at all.
 - At most **once a day**, a detached background process posts the queue to the collector and
   clears it. If that fails, the events stay queued (at most 500; the oldest are dropped).
-- **No collector is configured in this version**, so nothing is sent yet: events stay in the
-  local queue until a collector exists. The collector's URL will be listed here when it does.
+- The collector is PostHog (see [Where it is saved](#where-it-is-saved)). Until a release
+  carries its project key, nothing is sent: events stay in the local queue.
 - The question is written to stderr, never stdout, so `--json` output is never affected.
