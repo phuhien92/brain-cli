@@ -1,0 +1,37 @@
+{
+  "name": "brain-cli",
+  "version": "0.1.0",
+  "description": "Headless, agent-agnostic memory for a markdown vault: incremental index, ranked search, JSON output.",
+  "type": "module",
+  "bin": {
+    "brain": "bin/brain.js"
+  },
+  "files": [
+    "bin",
+    "dist/src"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "prepare": "tsc -p .",
+    "test": "npm run build && node --no-warnings=ExperimentalWarning --test \"dist/test/*.test.js\"",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "keywords": [
+    "obsidian",
+    "vault",
+    "second-brain",
+    "agents",
+    "cli",
+    "memory",
+    "search",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.19.1",
+    "typescript": "^5.9.3"
+  }
+}

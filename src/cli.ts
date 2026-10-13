@@ -1,0 +1,232 @@
+import { existsSync, statSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { parseArgs } from "node:util";
+import { Store, type RefreshStats } from "./store.js";
+
+export const VERSION = "0.1.0";
+// Bumped only on a breaking change to the --json envelope or a command's data shape.
+export const SCHEMA = "brain.v1";
+
+const HELP = `brain — headless memory for a markdown vault
+
+USAGE
+  brain <command> [args] [flags]
+
+COMMANDS
+  index [--rebuild]           Bring the index up to date (every command does this first)
+  search <query>              Ranked full-text search over titles, aliases, headings, tags, body
+      --limit <n>             Max results (default 10, max 100)
+      --path <folder>         Only notes under this folder
+      --tag <tag>             Only notes carrying this tag
+      --raw                   Treat <query> as SQLite FTS5 syntax (AND, NEAR, prefix*)
+  get <note>                  Print a note by path, file name, title or alias
+      --meta                  Frontmatter, tags, headings and links only, no body
+  help                        Show this help
+
+GLOBAL FLAGS
+  --vault <dir>               Vault root (default: $BRAIN_VAULT, else the nearest
+                              parent folder holding .obsidian/ or .brain/)
+  --json                      Emit a versioned machine-readable envelope
+  --quiet, -q                 Suppress successful human-readable output
+  --version                   Print the version
+
+EXIT CODES
+  0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
+`;
+
+class CliError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly exit: number,
+    readonly details?: Record<string, unknown>,
+  ) {
+    super(message);
+  }
+}
+
+interface Out {
+  json: boolean;
+  quiet: boolean;
+}
+
+export async function main(argv: string[]): Promise<number> {
+  let parsed;
+  try {
+    parsed = parseArgs({
+      args: argv,
+      allowPositionals: true,
+      strict: true,
+      options: {
+        vault: { type: "string" },
+        json: { type: "boolean", default: false },
+        quiet: { type: "boolean", short: "q", default: false },
+        version: { type: "boolean", default: false },
+        help: { type: "boolean", short: "h", default: false },
+        rebuild: { type: "boolean", default: false },
+        limit: { type: "string" },
+        path: { type: "string" },
+        tag: { type: "string" },
+        raw: { type: "boolean", default: false },
+        meta: { type: "boolean", default: false },
+      },
+    });
+  } catch (err) {
+    const json = argv.includes("--json");
+    return fail({ json, quiet: false }, "unknown", new CliError("usage", (err as Error).message, 2));
+  }
+
+  const { values: flags, positionals } = parsed;
+  const out: Out = { json: flags.json ?? false, quiet: flags.quiet ?? false };
+  const [command = "help", ...args] = positionals;
+
+  if (flags.version) {
+    print(out, "version", { version: VERSION }, null, () => VERSION);
+    return 0;
+  }
+  if (flags.help || command === "help") {
+    if (out.json) print(out, "help", { usage: HELP }, null, () => "");
+    else process.stdout.write(HELP);
+    return 0;
+  }
+
+  let store: Store | null = null;
+  try {
+    if (!["index", "search", "get"].includes(command)) {
+      throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
+    }
+    const vault = findVault(flags.vault);
+    store = Store.open(vault, { rebuild: command === "index" && flags.rebuild });
+    const index = store.refresh();
+
+    switch (command) {
+      case "index": {
+        const data = { notes: store.count(), ...index };
+        print(out, command, data, { vault, index }, () =>
+          `${vault}\n${data.notes} notes · +${index.added} ~${index.updated} -${index.removed} · ${index.ms}ms`,
+        );
+        return 0;
+      }
+
+      case "search": {
+        const query = args.join(" ").trim();
+        if (!query) throw new CliError("usage", "search needs a query: brain search <query>", 2);
+        const limit = flags.limit === undefined ? 10 : Number(flags.limit);
+        if (!Number.isInteger(limit) || limit < 1) throw new CliError("usage", "--limit must be a positive integer", 2);
+        let hits;
+        try {
+          hits = store.search(query, { limit, path: flags.path, tag: flags.tag, raw: flags.raw });
+        } catch (err) {
+          if (flags.raw) throw new CliError("bad_query", `invalid FTS5 query: ${(err as Error).message}`, 2);
+          throw err;
+        }
+        print(out, command, { query, results: hits }, { vault, index }, () =>
+          hits.length
+            ? hits
+                .map((h, i) => `${i + 1}. ${h.path}  (${h.score})\n   ${h.title !== stem(h.path) ? h.title + " — " : ""}${h.snippet}`)
+                .join("\n")
+            : `no results for '${query}'`,
+        );
+        return 0;
+      }
+
+      case "get": {
+        const ref = args.join(" ").trim();
+        if (!ref) throw new CliError("usage", "get needs a note: brain get <path|name|title>", 2);
+        const matches = store.resolve(ref);
+        if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
+        if (matches.length > 1) {
+          throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, {
+            candidates: matches,
+          });
+        }
+        const note = store.get(matches[0]!)!;
+        const data = flags.meta ? { ...note, content: undefined } : note;
+        print(out, command, data, { vault, index }, () => (flags.meta ? formatMeta(note) : note.content));
+        return 0;
+      }
+    }
+    return 0;
+  } catch (err) {
+    return fail(out, command, err);
+  } finally {
+    store?.close();
+  }
+}
+
+function findVault(flag: string | undefined): string {
+  const explicit = flag ?? process.env.BRAIN_VAULT;
+  if (explicit) {
+    const dir = resolve(explicit);
+    if (!existsSync(dir) || !statSync(dir).isDirectory()) {
+      throw new CliError("no_vault", `vault '${dir}' is not a directory`, 1);
+    }
+    return dir;
+  }
+  let dir = process.cwd();
+  for (;;) {
+    if (existsSync(join(dir, ".obsidian")) || existsSync(join(dir, ".brain"))) return dir;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  throw new CliError(
+    "no_vault",
+    "no vault found: pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or .brain/",
+    1,
+  );
+}
+
+function print(
+  out: Out,
+  command: string,
+  data: unknown,
+  ctx: { vault: string; index: RefreshStats } | null,
+  human: () => string,
+): void {
+  if (out.json) {
+    const envelope = { schema: SCHEMA, command, ok: true, ...(ctx ?? {}), data };
+    process.stdout.write(JSON.stringify(envelope) + "\n");
+  } else if (!out.quiet) {
+    const text = human();
+    if (text) process.stdout.write(text.endsWith("\n") ? text : text + "\n");
+  }
+}
+
+function fail(out: Out, command: string, err: unknown): number {
+  const e =
+    err instanceof CliError ? err : new CliError("internal", err instanceof Error ? err.message : String(err), 1);
+  if (out.json) {
+    const envelope = {
+      schema: SCHEMA,
+      command,
+      ok: false,
+      error: { code: e.code, message: e.message, ...(e.details ?? {}) },
+    };
+    process.stdout.write(JSON.stringify(envelope) + "\n");
+  } else {
+    process.stderr.write(`brain: ${e.message}\n`);
+    const candidates = e.details?.candidates;
+    if (Array.isArray(candidates)) for (const c of candidates) process.stderr.write(`  ${c}\n`);
+  }
+  return e.exit;
+}
+
+function formatMeta(note: NonNullable<ReturnType<Store["get"]>>): string {
+  const lines = [`${note.path}`, `title: ${note.title}`];
+  if (note.aliases.length) lines.push(`aliases: ${note.aliases.join(", ")}`);
+  if (note.tags.length) lines.push(`tags: ${note.tags.join(", ")}`);
+  for (const [k, v] of Object.entries(note.frontmatter)) {
+    if (["title", "tags", "aliases", "alias"].includes(k)) continue;
+    lines.push(`${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`);
+  }
+  if (note.headings.length) lines.push("headings:", ...note.headings.map((h) => `  ${h}`));
+  if (note.links.length) {
+    lines.push("links:", ...note.links.map((l) => `  [[${l.target}${l.heading ? "#" + l.heading : ""}]]`));
+  }
+  return lines.join("\n");
+}
+
+function stem(path: string): string {
+  return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
+}
