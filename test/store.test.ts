@@ -34,6 +34,17 @@ test("first refresh indexes every note and skips dot-folders and node_modules", 
   store.close();
 });
 
+test("sources index their markdown sidecars, not an original that happens to be markdown", () => {
+  write("sources/article.md", "# Raw source\nneedle-only-in-original\n");
+  write("sources/article.md.source.md", "---\ntitle: Searchable article\nsha256: deadbeef\n---\n");
+  const store = Store.open(vault);
+  const stats = store.refresh();
+  assert.equal(stats.added, 4);
+  assert.equal(store.search("needle-only-in-original").length, 0);
+  assert.equal(store.search("searchable article")[0]?.path, "sources/article.md.source.md");
+  store.close();
+});
+
 test("the index lives outside the vault, so a synced vault never carries a live database", () => {
   const store = Store.open(vault);
   store.refresh();

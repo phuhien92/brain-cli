@@ -58,10 +58,11 @@ Agents and scripts can do the same without questions:
 ```sh
 brain search "renewal deadline"                 # ranked search, from any folder once set up
 brain get "Projects/blog/runbook" --section Deploy
+brain ingest ~/Downloads/paper.pdf --title "Paper title" --tag reading
 brain log add learning "pnpm cache breaks after macOS updates"
 brain lifecycle set "Finance/balances" --category current-state --as-of 2026-09-30
 brain doctor                                    # check this machine's setup
-brain path log                                  # where things live: log, index, configs
+brain path sources                              # where things live: sources, log, index, configs
 ```
 
 ## How it fits together
@@ -69,12 +70,12 @@ brain path log                                  # where things live: log, index,
 ```mermaid
 flowchart LR
   A["Agents and tools<br/>Claude Code, Pi, firstmate, cron"] -- "brain ... --json" --> B["brain CLI<br/>checks freshness on every call"]
-  B -- "reads notes; writes only new log files" --> V[("Vault<br/>synced by git, iCloud, anything")]
+  B -- "reads notes; creates log entries and immutable sources" --> V[("Vault<br/>synced by git, iCloud, anything")]
   B -- "keeps current" --> I[("Index<br/>per machine, never synced")]
 ```
 
-The vault holds only markdown and stays the source of truth; the index is a per-machine
-cache; brain never edits a note. Full design, with the per-command flow and where every
+The vault's notes and ingested source files stay the source of truth; the index is a
+per-machine cache; brain never edits a note or source. Full design, with the per-command flow and where every
 file lives: **[docs/architecture.md](docs/architecture.md)**.
 
 ## Documentation
@@ -84,6 +85,7 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [Architecture](docs/architecture.md) | design, diagrams, guarantees, code map |
 | [Indexing](docs/indexing.md) | how the index stays up to date, measured costs, limits |
 | [Commands](docs/cli.md) | every command, the JSON contract, exit codes |
+| [Sources and provenance](docs/sources.md) | immutable originals, citations and source lint rules |
 | [Agents](docs/agents.md) | skills and session primers for Claude Code, Pi and others |
 | [Memory across machines](docs/memory.md) | one file per entry, views, export, sync |
 | [Keeping the vault true](docs/lifecycle.md) | lifecycle categories, review windows, lint |

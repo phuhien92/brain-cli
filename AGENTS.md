@@ -11,10 +11,12 @@ holds the rules an agent changing the code must not break.
    what was last exported to each path, whose loss only makes `export` refuse until
    `--force`, never overwrite.
 2. **Create, never edit.** The only writes into the vault are new files under the log
-   folder (`log add`, `log import`, `lifecycle …`), opened with the `wx` flag so an existing file can
-   never be replaced. No command edits, moves or deletes a note. This is what keeps two
-   machines conflict-free; an "edit an entry" feature would break it.
-3. **`sync` commits only what brain owns**: the log folder and `brain.json`. A conflict
+   folder (`log add`, `log import`, `lifecycle …`) and immutable originals plus metadata
+   sidecars under `sources/` (`ingest`), opened with the `wx` flag so an existing file can
+   never be replaced. No command edits, moves or deletes a note or source. The writable set
+   includes `sources/` so provenance can travel with the vault without weakening the
+   create-only rule that keeps two machines conflict-free.
+3. **`sync` commits only what brain owns**: the log folder, `sources/` and `brain.json`. A conflict
    aborts the rebase and exits 5 naming the files; it never resolves one.
 4. **Exports never lose an edit.** A file outside the vault is overwritten only if it is
    byte-identical to what brain last wrote there (or `--force`). Exports are regular files,
@@ -50,7 +52,7 @@ holds the rules an agent changing the code must not break.
 
 - `src/note.ts` — parse one note: frontmatter, title, headings, tags, aliases, wiki-links.
 - `src/store.ts` — the SQLite index: schema, incremental refresh, search, resolve, get.
-- `src/paths.ts` — where brain keeps things (state, index, configs, log). The one resolver
+- `src/paths.ts` — where brain keeps things (state, index, configs, log, sources). The one resolver
   behind `brain path`, `doctor`, the index and telemetry; it never creates anything.
 - `src/config.ts` — `brain.json` (synced) and the machine-local user config: sync mode,
   integrations, `BRAIN_AS`, read scope.

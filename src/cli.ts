@@ -28,6 +28,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
+import { ingest } from "./source.js";
 
 export const VERSION = "0.10.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
@@ -62,6 +63,10 @@ COMMANDS
       --lines <n>             Only the first n lines of each section (or of the note) —
                               enough for a newest-first log
 
+  ingest <file>               Copy an immutable source into sources/ with searchable metadata
+      --title <title>          Source title (default: the input file name)
+      --tag <tag>             Tag the source (repeatable)
+
   log add <kind> <title>      Record an entry as a new file: <log>/<kind>/<date>-<machine>-<slug>.md
       --body <text|->         Entry body (- reads stdin)
       --tag <tag>             Tag the entry (repeatable)
@@ -72,7 +77,7 @@ COMMANDS
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
   sync [--no-push]            Bring other machines' changes in and send ours out, by the
-                              vault's sync mode (brain.json "sync"): git commits the log,
+                              vault's sync mode (brain.json "sync"): git commits the log and sources,
                               pulls and pushes; none leaves it to iCloud/Dropbox/etc.;
                               { "command": … } runs yours. Then refreshes and exports
 
@@ -86,8 +91,9 @@ COMMANDS
                               Hide an obsolete or misplaced note from search and recall
   lifecycle restore <note>    Undo an archive
   lifecycle status [--due]    Every note with lifecycle data; --due: only overdue ones
-  lint [--strict]             Report broken links, orphans, sync conflict copies, overdue
-                              reviews, lifecycle problems and line limits (--strict: exit 7
+  lint [--strict]             Report broken links, source integrity/provenance, orphans,
+                              sync conflict copies, overdue reviews, lifecycle problems and
+                              line limits (--strict: exit 7
                               if anything is reported at warn level)
 
   integrations                List the repos/tools connected to this vault, what each may
@@ -160,7 +166,7 @@ interface Out {
 
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "help"];
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -404,7 +410,7 @@ async function run(argv: string[]): Promise<number> {
 
   let store: Store | null = null;
   try {
-    if (!["index", "search", "get", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
+    if (!["index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
       throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
     }
     const vault = findVault(flags.vault);
@@ -423,6 +429,17 @@ async function run(argv: string[]): Promise<number> {
     };
 
     switch (command) {
+      case "ingest": {
+        if (args.length !== 1) throw new CliError("usage", "usage: brain ingest <file> [--title <title>] [--tag <tag>]", 2);
+        if (cfg.as) permit(false, "ingest sources");
+        const file = resolve(args[0]!);
+        if (!existsSync(file)) throw new CliError("not_found", `no file at ${file}`, 3);
+        const result = ingest(vault, cfg, { file, title: flags.title, tags: flags.tag });
+        index = store.refresh();
+        print(out, command, result, { vault, index }, () => result.new ? result.path : `${result.path} (already ingested)`);
+        return 0;
+      }
+
       case "index": {
         const data = { notes: store.count(), ...index };
         print(out, command, data, { vault, index }, () =>

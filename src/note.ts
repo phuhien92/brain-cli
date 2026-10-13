@@ -170,7 +170,14 @@ function splitInline(s: string): string[] {
 
 function scalar(raw: string): string | number | boolean | null {
   let s = raw.trim();
-  if (/^(['"]).*\1$/.test(s)) return s.slice(1, -1);
+  if (/^".*"$/.test(s)) {
+    try {
+      return JSON.parse(s) as string;
+    } catch {
+      return s.slice(1, -1);
+    }
+  }
+  if (/^'.*'$/.test(s)) return s.slice(1, -1);
   s = s.replace(/\s+#.*$/, ""); // trailing comment on an unquoted value
   if (s === "" || s === "~" || s === "null") return null;
   if (s === "true") return true;

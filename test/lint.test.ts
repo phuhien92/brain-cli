@@ -1,5 +1,6 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -35,7 +36,16 @@ before(() => {
   write("assets/diagram.png", "png");
   write("boards/sketch.excalidraw", "{}");
   write("assets/chart.svg", "<svg/>");
-  write("brain.json", JSON.stringify({ lint: { maxLines: { "MEMORY.md": 5 } } }));
+  const evidence = "immutable evidence\n";
+  const evidenceHash = createHash("sha256").update(evidence).digest("hex");
+  write("sources/evidence.pdf", evidence);
+  write("sources/evidence.pdf.source.md", `---\ntitle: Evidence\ningested: 2026-10-13T00:00:00.000Z\nmachine: mini\norigin: /tmp/evidence.pdf\nsha256: ${evidenceHash}\ntags: []\n---\n`);
+  write("Claims/frontmatter.md", "---\nsources: [[sources/evidence.pdf]]\n---\n# Cited in frontmatter\n");
+  write("Claims/wiki.md", "# Cited with a link\n[[sources/evidence.pdf]]\n");
+  write("Claims/missing.md", "---\nsources: [[sources/gone.pdf]]\n---\n# Missing source\n");
+  write("Claims/none.md", "# No citation\n");
+  write("Other/no-source-needed.md", "# No citation needed\n");
+  write("brain.json", JSON.stringify({ lint: { maxLines: { "MEMORY.md": 5 }, unsourced: ["Claims/"] } }));
   write("Finance/old.md", "---\ncategory: news\nas-of: 2026-01-01\n---\n# Old news\n");
   write("Finance/undated.md", "---\ncategory: research\n---\n# Undated\n");
 });
@@ -55,11 +65,21 @@ test("lint finds broken links, conflict copies, overdue and undated reviews, lin
   assert.deepEqual(by("review-overdue").map((x) => x.split(":")[0]), ["Finance/old.md"]);
   assert.ok(by("lifecycle").some((x) => x.startsWith("Finance/undated.md") && /no as-of/.test(x)));
   assert.deepEqual(by("max-lines"), ["MEMORY.md: 12 lines, over this vault's limit of 5"]);
+  assert.deepEqual(by("source-missing"), ["Claims/missing.md: source [[sources/gone.pdf]] does not resolve to any note or file"]);
+  assert.deepEqual(by("unsourced"), ["Claims/none.md: no source citation"]);
+  assert.deepEqual(by("source-modified"), []);
   const orphans = by("orphan").map((x) => x.split(":")[0]);
   assert.ok(orphans.includes("Career/lonely.md"));
   assert.ok(!orphans.includes("Career/plan.md"), "linked notes are not orphans");
   assert.ok(!orphans.includes("MEMORY.md"), "root notes are entry points");
   assert.equal(f[0]!.severity, "warn", "warnings sort before info");
+});
+
+test("lint reports an immutable source whose bytes changed", () => {
+  write("sources/evidence.pdf", "edited evidence\n");
+  const findings = brain(["lint"]).body.data.findings as { rule: string; path: string }[];
+  assert.deepEqual(findings.filter((f) => f.rule === "source-modified").map((f) => f.path), ["sources/evidence.pdf"]);
+  write("sources/evidence.pdf", "immutable evidence\n");
 });
 
 test("lint --strict exits 7 when there are warnings", () => {

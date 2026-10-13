@@ -20,6 +20,7 @@ const cfg = (machine = "mini", exports: Config["exports"] = []): Config => ({
   as: null,
   lifecycleWindows: {},
   lintMaxLines: {},
+  lintUnsourced: [],
 });
 
 beforeEach(() => {

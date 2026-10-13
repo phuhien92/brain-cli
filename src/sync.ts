@@ -1,10 +1,10 @@
-// `brain sync`: commit new log entries, pull, push. Plain git, no service.
+// `brain sync`: commit new log entries and sources, pull, push. Plain git, no service.
 //
-// It commits only what brain owns — the log folder and brain.json — so it never
+// It commits only what brain owns — the log folder, sources/ and brain.json — so it never
 // sweeps a half-written note into a commit behind the user's back. Pulls rebase
-// with --autostash, so other uncommitted edits survive. Because log entries are
-// always new files, two machines syncing never conflict on them; a conflict can
-// only come from notes a person edited on both machines, and then sync stops
+// with --autostash, so other uncommitted edits survive. Because log entries and
+// source pairs are always new machine-named files, two machines syncing never
+// conflict on them; a conflict can only come from notes a person edited on both machines, and then sync stops
 // and says which files, rather than guessing.
 
 import { execFileSync } from "node:child_process";
@@ -71,7 +71,7 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
     throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote, or set "sync": "none" in brain.json`);
   }
 
-  const owned = [cfg.logDir, "brain.json"].filter((p) => existsSync(join(vault, p)));
+  const owned = [cfg.logDir, "sources", "brain.json"].filter((p) => existsSync(join(vault, p)));
   let committed = 0;
   if (owned.length) {
     git("add", "--", ...owned);
@@ -79,7 +79,11 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
       .split("\n")
       .filter(Boolean);
     if (staged.length) {
-      git("commit", "--quiet", "-m", `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`, "--", ...owned);
+      const onlyLog = staged.every((path) => path.startsWith(`${cfg.logDir}/`));
+      const message = onlyLog
+        ? `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`
+        : `brain: ${staged.length} owned ${staged.length === 1 ? "file" : "files"} from ${cfg.machine}`;
+      git("commit", "--quiet", "-m", message, "--", ...owned);
       committed = staged.length;
     }
   }

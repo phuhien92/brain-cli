@@ -80,7 +80,35 @@ test("two machines log concurrently, sync, and end with identical memory and no 
   assert.equal(git(mini.vault, "status", "--porcelain"), "");
 });
 
-test("sync commits only the log, never a note being written", () => {
+test("two machines ingest sources concurrently and sync both immutable pairs without conflict", () => {
+  const mini = machine("mini");
+  const laptop = machine("laptop");
+  const miniInput = join(root, "mini-paper.pdf");
+  const laptopInput = join(root, "laptop-notes.pdf");
+  writeFileSync(miniInput, "paper bytes\n");
+  writeFileSync(laptopInput, "meeting notes\n");
+
+  const a = mini.run("ingest", miniInput, "--title", "Concurrent source");
+  const b = laptop.run("ingest", laptopInput, "--title", "Concurrent source");
+  assert.equal(a.code, 0);
+  assert.equal(b.code, 0);
+  assert.match(a.body.data.path, /-mini-/);
+  assert.match(b.body.data.path, /-laptop-/);
+
+  assert.equal(mini.run("sync").code, 0);
+  const second = laptop.run("sync");
+  assert.equal(second.code, 0, JSON.stringify(second.body));
+  assert.equal(second.body.data.pulled, 1);
+  assert.equal(second.body.data.pushed, true);
+  assert.equal(mini.run("sync").body.data.pulled, 1);
+
+  for (const path of [a.body.data.path, a.body.data.path + ".source.md", b.body.data.path, b.body.data.path + ".source.md"]) {
+    assert.equal(readFileSync(join(mini.vault, path), "utf8"), readFileSync(join(laptop.vault, path), "utf8"));
+  }
+  assert.equal(git(mini.vault, "status", "--porcelain"), "");
+});
+
+test("sync commits only the log and sources, never a note being written", () => {
   const mini = machine("mini");
   mini.run("log", "add", "decision", "Use brain for memory");
   writeFileSync(join(mini.vault, "Draft.md"), "half-written\n");

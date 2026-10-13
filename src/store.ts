@@ -410,6 +410,10 @@ function* walk(dir: string, offline: Set<string>, root = dir): Generator<string>
     if (e.isDirectory()) {
       if (!SKIP_DIRS.has(e.name)) yield* walk(full, offline, root);
     } else if (e.isFile() && e.name.toLowerCase().endsWith(".md")) {
+      const rel = toPosix(relative(root, full));
+      // Ingested markdown is an immutable original, not a note. Its
+      // `<name>.source.md` sidecar carries the searchable metadata.
+      if (rel.startsWith("sources/") && !rel.toLowerCase().endsWith(".source.md")) continue;
       yield full;
     }
   }

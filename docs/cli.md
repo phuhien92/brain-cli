@@ -9,6 +9,7 @@
 | `index [--rebuild\|--verify]` | bring the index up to date (every command does this first) | [indexing.md](indexing.md) |
 | `search <query>` | ranked full-text search; `--limit`, `--path`, `--tag`, `--raw`, `--include-archived` | below |
 | `get <note>` | a note by path, file name, title or alias; `--meta`, `--section`, `--lines` | below |
+| `ingest <file>` | immutably copy a local source; `--title`, repeatable `--tag` | [sources.md](sources.md) |
 | `log add <kind> <title>` | record memory as a new file | [memory.md](memory.md) |
 | `log [n]`, `log import`, `view`, `export`, `sync` | read, import, render, export and sync memory | [memory.md](memory.md) |
 | `lifecycle set\|review\|archive\|restore\|status` | how long a note stays true | [lifecycle.md](lifecycle.md) |
@@ -47,6 +48,7 @@ brain search 'lease AND renewal' --raw   # SQLite FTS5 syntax: AND, NEAR, prefix
 brain get "Projects/blog/runbook" # print a note by path, file name, title or alias
 brain get "Blog runbook" --meta  # frontmatter, tags, headings and links only
 brain get "Blog runbook" --section Deploy   # just that section — for long notes
+brain ingest paper.pdf --title "Paper title" --tag reading
 brain log add learning "..."     # record memory (see below)
 brain sync                       # share it with your other machines
 ```
@@ -66,6 +68,7 @@ overridden.
 | --- | --- |
 | `vault` | the vault in use |
 | `log` | the log folder: one file per memory entry |
+| `sources` | immutable originals and their metadata sidecars |
 | `config` | the vault's `brain.json`, synced with it |
 | `user-config` | this machine's config |
 | `state` | this vault's state directory, outside the vault and never synced |
