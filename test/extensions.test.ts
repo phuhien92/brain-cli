@@ -365,6 +365,30 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
   assert.ok(!redactedNote.includes("private@example.com"), "extensions cannot protect arbitrary values from redaction");
 });
 
+test("source IDs converge across machines and reject unrelated path collisions", (t) => {
+  const first = fixture(t);
+  const second = fixture(t);
+  const sourceId = createHash("sha256").update("shared-source").digest("hex");
+  const args = ["log", "add", "meeting", "Shared meeting", "--source-id", sourceId, "--body", "Same source body"];
+  const a = json(first, args, { BRAIN_MACHINE: "machine-a" });
+  const b = json(second, args, { BRAIN_MACHINE: "machine-b" });
+  assert.equal(a.code, 0, a.stderr);
+  assert.equal(b.code, 0, b.stderr);
+  assert.equal(a.body.data.path, b.body.data.path);
+  const aNote = readFileSync(join(first.vault, ...a.body.data.path.split("/")), "utf8");
+  const bNote = readFileSync(join(second.vault, ...b.body.data.path.split("/")), "utf8");
+  assert.equal(aNote, bNote, "the same source produces merge-identical records on every machine");
+
+  const collision = fixture(t);
+  const collisionPath = join(collision.vault, ...a.body.data.path.split("/"));
+  mkdirSync(dirname(collisionPath), { recursive: true });
+  writeFileSync(collisionPath, "# Unrelated\n");
+  const rejected = json(collision, args, { BRAIN_MACHINE: "machine-c" });
+  assert.equal(rejected.code, 1);
+  assert.match(rejected.body.error.message, /occupied by a different entry/);
+  assert.equal(readFileSync(collisionPath, "utf8"), "# Unrelated\n");
+});
+
 test("meetings imports redacted summaries and links from a fake server, never transcripts, and deduplicates source IDs", { skip: process.platform === "win32" }, async (t) => {
   const f = fixture(t);
   writeFileSync(join(f.vault, "Alice.md"), "# Alice\n");

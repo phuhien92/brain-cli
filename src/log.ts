@@ -6,9 +6,10 @@
 // this module creates a file that did not exist — none edits one.
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { slug, type Config, type ExportTarget } from "./config.js";
+import { parseNote } from "./note.js";
 import type { Store } from "./store.js";
 
 export interface Entry {
@@ -68,35 +69,38 @@ export function addEntryOnce(store: Store, cfg: Config, input: NewEntry, sourceI
   ).get(prefix, kind, sourceId) as { path: string } | undefined;
   if (indexed) return { path: indexed.path, added: false };
   const withSource = { ...input, fields: { ...input.fields, "source-id": sourceId } };
-  const { dir, content } = prepareEntry(store.vault, cfg, withSource);
-  const suffix = `-${sourceId}.md`;
-  const existing = readdirSync(dir, { withFileTypes: true }).find((entry) => entry.isFile() && entry.name.endsWith(suffix));
-  if (existing) return { path: `${cfg.logDir}/${kind}/${existing.name}`, added: false };
-  const file = join(dir, `${cfg.machine}-${sourceId}.md`);
+  const { dir, content } = prepareEntry(store.vault, cfg, withSource, true);
+  const relativePath = `${cfg.logDir}/${kind}/source-${sourceId}.md`;
+  const file = join(dir, `source-${sourceId}.md`);
   try {
     writeFileSync(file, content, { flag: "wx" });
-    return { path: `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`, added: true };
+    return { path: relativePath, added: true };
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-    return { path: `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`, added: false };
+    const existing = parseNote(relativePath, readFileSync(file, "utf8"));
+    if (existing.frontmatter.kind !== kind || existing.frontmatter["source-id"] !== sourceId) {
+      throw new Error(`source ID path '${relativePath}' is occupied by a different entry`);
+    }
+    return { path: relativePath, added: false };
   }
 }
 
-function prepareEntry(vault: string, cfg: Config, input: NewEntry): { dir: string; name: string; content: string } {
+function prepareEntry(vault: string, cfg: Config, input: NewEntry, stableSource = false): { dir: string; name: string; content: string } {
   const kind = slug(input.kind);
   if (!kind) throw new Error("an entry needs a kind, e.g. 'learning'");
   const title = input.title.replace(/\s+/g, " ").trim();
   if (!title) throw new Error("an entry needs a title");
 
-  const created = input.created ?? new Date();
+  const created = stableSource ? new Date(0) : input.created ?? new Date();
   const iso = created.toISOString(); // millisecond precision: the view's order is creation order
   const day = iso.slice(0, 10);
-  const name = `${day}-${cfg.machine}-${slug(title) || "entry"}`;
+  const machine = stableSource ? "source" : cfg.machine;
+  const name = `${day}-${machine}-${slug(title) || "entry"}`;
   const dir = join(vault, ...cfg.logDir.split("/"), kind);
   mkdirSync(dir, { recursive: true });
 
   const tags = [...new Set((input.tags ?? []).map((t) => t.replace(/^#/, "").trim().toLowerCase()).filter(Boolean))];
-  const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${cfg.machine}`];
+  const lines = ["---", `kind: ${kind}`, `created: ${iso}`, `machine: ${machine}`];
   if (tags.length) lines.push(`tags: [${tags.join(", ")}]`);
   for (const [key, value] of Object.entries(input.fields ?? {})) {
     if (!/^[a-z][a-z0-9-]*$/.test(key)) throw new Error(`invalid entry field ${key}`);

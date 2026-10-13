@@ -94,6 +94,9 @@ through core redaction before the new note is created. To retain a sanitized HTT
 remove credentials, query, and fragment, encode its canonical UTF-8 bytes as base64url, and place it inside
 `<!-- brain-protected-url:<BRAIN_EXT_REDACT_TOKEN>:<encoded-url> -->`. Core rejects other protected values.
 Use `brain log add … --source-id <sha256>` for exact create-only source deduplication.
+The hash selects one machine-independent path with stable metadata: identical imports on separate
+machines merge as the same file, while different content for one source ID produces a sync conflict
+instead of a second source record.
 
 The process must write exactly one JSON line to stdout using the existing envelope:
 
