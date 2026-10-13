@@ -331,6 +331,11 @@ async function run(argv: string[]): Promise<number> {
   const [command = "help", ...args] = positionals;
   tCommand = telemetryName(command, args[0]);
 
+  const extensionCaller = process.env.BRAIN_EXTENSION_SCOPE;
+  if (extensionCaller && !flags.version && !flags.help && !EXTENSION_CHILD_COMMANDS.has(command)) {
+    return fail(out, command, new CliError("not_permitted", `extension '${extensionCaller}' may not run '${command}'`, 6));
+  }
+
   if (flags.version) {
     print(out, "version", { version: VERSION }, null, () => VERSION);
     return 0;
@@ -589,12 +594,14 @@ async function run(argv: string[]): Promise<number> {
         if (sub === "add") {
           const [kind = "", ...titleWords] = rest;
           let title = titleWords.join(" ").trim();
+          let tags = flags.tag;
           if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t] [--source-id <sha256> --source-created <ISO time>]', 2);
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
           let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           if (process.env.BRAIN_EXT_REDACT === "1") {
             const redact = redactor({ vault });
             title = redact(title);
+            tags = tags?.map((tag) => redact(tag));
             if (body !== undefined) {
               const original = String(body);
               const protectedValues: string[] = [];
@@ -623,7 +630,7 @@ async function run(argv: string[]): Promise<number> {
                       } catch {
                         return `${url.origin}/`;
                       }
-                      return redact(decodedPath) === decodedPath ? protect(value) : `${url.origin}/`;
+                      return !decodedPath.includes("%") && redact(decodedPath) === decodedPath ? protect(value) : `${url.origin}/`;
                     } catch {
                       return all;
                     }
@@ -635,7 +642,7 @@ async function run(argv: string[]): Promise<number> {
               );
             }
           }
-          const input = { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag };
+          const input = { kind, title, body: body === undefined ? undefined : String(body), tags };
           const sourceId = flags["source-id"];
           const sourceCreated = flags["source-created"];
           if (sourceId !== undefined && !/^[0-9a-f]{64}$/.test(sourceId)) {

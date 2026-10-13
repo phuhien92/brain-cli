@@ -73,11 +73,13 @@ function sourceUrl(value) {
 
 function sourceCreated(value) {
   const raw = oneLine(value);
-  if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z)?$/.test(raw)) return "";
-  const date = new Date(raw);
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(raw);
+  const instant = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(raw);
+  if (!dateOnly && !instant) return "";
+  const date = new Date(dateOnly ? `${raw}T00:00:00.000Z` : raw);
   if (Number.isNaN(date.getTime())) return "";
   const canonical = date.toISOString();
-  if (raw.length === 10 && canonical.slice(0, 10) !== raw) return "";
+  if (dateOnly && canonical.slice(0, 10) !== raw) return "";
   return canonical;
 }
 

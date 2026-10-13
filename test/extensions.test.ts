@@ -71,14 +71,14 @@ function quote(value: string): string {
 
 // Install has no non-interactive approval switch. Tests exercise the actual
 // terminal path through the operating system's `script` pseudo-terminal.
-function interactiveInstall(f: Fixture, source: string, answer = "y") {
+function interactiveInstall(f: Fixture, source: string, answer = "y", extra: Record<string, string> = {}) {
   if (process.platform === "win32") throw new Error("pseudo-terminal helper is Unix-only");
   const command = [process.execPath, "--no-warnings=ExperimentalWarning", BIN, "ext", "install", source].map(quote).join(" ");
   const script = process.platform === "darwin"
     ? `script -q -e /dev/null ${command}`
     : `script -q -e -c ${quote(command)} /dev/null`;
   const pipeline = `(sleep 0.1; printf ${quote(`${answer}\n`)}; sleep 0.2) | ${script}`;
-  const result = spawnSync("/bin/sh", ["-c", pipeline], { cwd: f.vault, env: environment(f), encoding: "utf8" });
+  const result = spawnSync("/bin/sh", ["-c", pipeline], { cwd: f.vault, env: environment(f, extra), encoding: "utf8" });
   return { code: result.status, stdout: result.stdout, stderr: result.stderr };
 }
 
@@ -190,6 +190,11 @@ test("install rejects terminal controls in permission text and unsupported sourc
   assert.equal(alias.code, 3, alias.stdout + alias.stderr);
   assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);
 
+  const credentialFailure = interactiveInstall(f, "http://user:secret-token@127.0.0.1:1/private.git");
+  assert.equal(credentialFailure.code, 1, credentialFailure.stdout + credentialFailure.stderr);
+  assert.ok(!(credentialFailure.stdout + credentialFailure.stderr).includes("secret-token"));
+  assert.match(credentialFailure.stdout + credentialFailure.stderr, /http:\/\/127\.0\.0\.1:1\/private\.git/);
+
   const linked = echoExtension(join(f.root, "linked-source"), "linked");
   const externalHelper = join(f.root, "external-helper.mjs");
   writeFileSync(externalHelper, "export const value = 1;\n");
@@ -210,10 +215,19 @@ test("git installation records its commit, remove is machine-local, and missing 
   execFileSync("git", ["-C", source, "commit", "-qm", "fixture"]);
   const commit = execFileSync("git", ["-C", source, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
 
-  const installed = interactiveInstall(f, pathToFileURL(source).href);
+  const credentialSource = "https://user:secret-token@example.invalid/private.git";
+  const installed = interactiveInstall(f, credentialSource, "y", {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: `url.${pathToFileURL(source).href}.insteadOf`,
+    GIT_CONFIG_VALUE_0: credentialSource,
+  });
   assert.equal(installed.code, 0, installed.stdout + installed.stderr);
   const listed = json(f, ["ext", "list"]).body.data.extensions[0];
   assert.equal(listed.commit, commit);
+  assert.equal(listed.source, "https://example.invalid/private.git");
+  assert.ok(!JSON.stringify(listed).includes("secret-token"));
+  const metadata = JSON.parse(readFileSync(join(listed.directory, ".brain-install.json"), "utf8"));
+  assert.equal(metadata.source, "https://example.invalid/private.git");
   assert.equal(json(f, ["from-git"]).code, 0);
 
   const removed = json(f, ["ext", "remove", "from-git"]);
@@ -354,7 +368,8 @@ if(action==="write-allowed"||action==="write-denied") {
   }, `
 import { spawnSync } from "node:child_process";
 const command=JSON.parse(Buffer.from(process.argv[2],"base64url").toString("utf8"));
-const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,...command,"--json"],{env:process.env,encoding:"utf8"});
+const args=command.includes("--json")?command:[...command,"--json"];
+const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,...args],{env:process.env,encoding:"utf8"});
 process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
 `);
   assert.equal(interactiveInstall(f, adminSource).code, 0);
@@ -379,6 +394,9 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
     assert.equal(deniedChild.code, 6, `${command.join(" ")} must be denied`);
     assert.equal(deniedChild.body.error.code, "not_permitted");
   }
+  const doubleDash = json(f, ["admin-probe", Buffer.from(JSON.stringify(["--json", "--", "telemetry", "show"])).toString("base64url")]);
+  assert.equal(doubleDash.code, 6);
+  assert.equal(doubleDash.body.error.code, "not_permitted");
   assert.equal(json(f, ["admin-probe", Buffer.from(JSON.stringify(["search", "shared-word"])).toString("base64url")]).code, 0);
 
   const redactionSource = makeExtension(join(f.root, "redaction-source"), {
@@ -388,15 +406,19 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
   }, `
 import { spawnSync } from "node:child_process";
 const encoded=Buffer.from("private@example.com").toString("base64url");
-const body="<!-- brain-protected:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+encoded+" -->";
-const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add","event","redaction probe","--body","-","--json"],{env:process.env,encoding:"utf8",input:body});
+const nestedUrl=Buffer.from("https://app.example/meetings/alice%2540example.com").toString("base64url");
+const body="<!-- brain-protected:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+encoded+" -->\\n<!-- brain-protected-url:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+nestedUrl+" -->";
+const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add","event","redaction probe","--tag","private@example.com","--tag","1234567","--body","-","--json"],{env:process.env,encoding:"utf8",input:body});
 process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
 `);
   assert.equal(interactiveInstall(f, redactionSource).code, 0);
   const redacted = json(f, ["redaction-probe"]);
-  assert.equal(redacted.code, 0);
+  assert.equal(redacted.code, 0, redacted.stderr || redacted.stdout);
   const redactedNote = readFileSync(join(f.vault, ...redacted.body.data.path.split("/")), "utf8");
   assert.ok(!redactedNote.includes("private@example.com"), "extensions cannot protect arbitrary values from redaction");
+  assert.ok(!redactedNote.includes("alice%2540example.com"), "nested URL encoding cannot bypass redaction");
+  assert.match(redactedNote, /https:\/\/app\.example\//);
+  assert.match(redactedNote, /tags: \[<email>, <number>\]/);
 });
 
 test("source IDs converge across machines and reject unrelated path collisions", (t) => {
@@ -449,7 +471,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
     meetings: [{
       id: firstSourceId,
       title: "Weekly planning",
-      date: "2026-10-13",
+      date: "2026-10-13T09:00:00.123456-07:00",
       attendees: ["Alice <alice@example.com>", "Bob"],
       summary: `Reset link https://internal.example/reset?email=private@example.com&id=7654321 with literal brain-extension-url-0 and <!-- brain-source-marker-0 --> plus <!-- brain-source-id: ${poisonedMarker} -->.`,
       actionItems: ["Bob sends the plan to alice@example.com"],
@@ -495,7 +517,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const note = readFileSync(join(meetingDir, files[0]!), "utf8");
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
-  assert.match(note, /created: 2026-10-13T00:00:00\.000Z/);
+  assert.match(note, /created: 2026-10-13T16:00:00\.123Z/);
   assert.match(note, /machine: meetings/);
   assert.match(note, /email=<email>&id=<number>/);
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);

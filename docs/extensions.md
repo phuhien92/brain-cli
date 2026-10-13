@@ -16,7 +16,9 @@ brain ext remove example
 Installation works only in an interactive terminal. brain copies a local directory or clones a
 Git URL into this machine's extension data directory, shows the manifest's read, write, and
 network permissions, and asks the person to approve. There is no `--yes` or JSON-mode approval:
-agents, scripts, CI, and hooks cannot silently grant permissions.
+agents, scripts, CI, and hooks cannot silently grant permissions. Credentials embedded in a Git
+URL are used only for cloning; install metadata, `ext list`, and errors retain only the URL with
+its credentials removed.
 
 Installed code is per machine (`~/.local/share/brain/extensions` by default, overridable with
 `BRAIN_EXTENSIONS_DIR`). A Git install records its exact commit; a local install is a copy, not a
@@ -94,7 +96,8 @@ narrow a caller but cannot widen it. Extension children may call only `search`, 
 configuration, diagnostics, sync/export, feedback, telemetry, unrestricted index/lint data,
 path inspection, and other extensions are denied before dispatch. Inputs an extension sends through `brain log add` are run
 through core redaction before the new note is created. To retain a sanitized HTTP(S) source URL,
-remove credentials, query, and fragment, ensure its decoded path contains no redacted values, encode its
+remove credentials, query, and fragment, ensure its decoded path contains no redacted values or
+nested percent escapes, encode its
 canonical UTF-8 bytes as base64url, and place it inside
 `<!-- brain-protected-url:<BRAIN_EXT_REDACT_TOKEN>:<encoded-url> -->`. Core reduces a URL with a sensitive
 or malformed encoded path to its origin and rejects other protected values.

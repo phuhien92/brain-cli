@@ -263,17 +263,34 @@ function gitSource(source: string): string | null {
   return /^(?:https?|ssh|git|file):\/\//.test(source) || /^[^@\s]+@[^:\s]+:.+/.test(source) ? source : null;
 }
 
+function publicGitSource(source: string): string {
+  try {
+    const url = new URL(source);
+    url.username = "";
+    url.password = "";
+    return url.toString();
+  } catch {
+    return source;
+  }
+}
+
+function publicGitError(detail: string): string {
+  return detail.replace(/((?:https?|ssh|git|file):\/\/)[^/\s]*@/gi, "$1");
+}
+
 function prepare(source: string, stage: string): InstallMetadata {
   const git = gitSource(source);
   if (git) {
+    const publicSource = publicGitSource(source);
     try {
       execFileSync("git", ["clone", "--quiet", "--depth", "1", "--", git, stage], { stdio: ["ignore", "pipe", "pipe"] });
       const commit = execFileSync("git", ["-C", stage, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
       rmSync(join(stage, ".git"), { recursive: true, force: true });
-      return { source, commit };
+      return { source: publicSource, commit };
     } catch (err) {
-      const detail = (err as { stderr?: Buffer | string }).stderr?.toString().trim().split("\n").at(-1);
-      throw new ExtensionError("install_failed", `could not clone ${source}${detail ? `: ${detail}` : ""}`);
+      const rawDetail = (err as { stderr?: Buffer | string }).stderr?.toString().trim().split("\n").at(-1);
+      const detail = rawDetail ? publicGitError(rawDetail) : undefined;
+      throw new ExtensionError("install_failed", `could not clone ${publicSource}${detail ? `: ${detail}` : ""}`);
     }
   }
   const local = resolve(source);
@@ -382,7 +399,7 @@ export function listExtensions(vault: string): ExtensionRecord[] {
         enabled: enabled.includes(name),
         directory,
         manifest,
-        source: typeof metadata.source === "string" ? metadata.source : null,
+        source: typeof metadata.source === "string" ? publicGitSource(metadata.source) : null,
         commit: typeof metadata.commit === "string" ? metadata.commit : null,
         error: manifest.name === name ? null : `manifest name is '${manifest.name}'`,
       };
