@@ -3,14 +3,16 @@
 // loaded into brain's process.
 
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   accessSync,
   constants,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   realpathSync,
   renameSync,
@@ -286,6 +288,28 @@ function prepare(source: string, stage: string): InstallMetadata {
   return { source: realpathSync(local), commit: null };
 }
 
+function installationHash(directory: string): string {
+  const hash = createHash("sha256");
+  const visit = (parent: string, prefix: string) => {
+    const entries = readdirSync(parent, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    for (const entry of entries) {
+      if (!prefix && entry.name === METADATA) continue;
+      const path = join(parent, entry.name);
+      const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
+      const info = lstatSync(path);
+      const type = entry.isDirectory() ? "directory" : entry.isSymbolicLink() ? "symlink" : entry.isFile() ? "file" : "other";
+      hash.update(`${type}\0${relativePath}\0${info.mode & 0o111}\0`);
+      if (entry.isDirectory()) visit(path, relativePath);
+      else if (entry.isSymbolicLink()) hash.update(readlinkSync(path));
+      else if (entry.isFile()) hash.update(readFileSync(path));
+      else throw new ExtensionError("invalid_manifest", `unsupported extension entry '${relativePath}'`, 2);
+      hash.update("\0");
+    }
+  };
+  visit(directory, "");
+  return hash.digest("hex");
+}
+
 export async function installExtension(
   source: string,
   vault: string,
@@ -303,16 +327,16 @@ export async function installExtension(
     destination = extensionDirectory(manifest.name);
     if (existsSync(destination)) {
       const current = installedManifest(manifest.name)!;
-      if (JSON.stringify(current.manifest) !== JSON.stringify(manifest)) {
+      if (installationHash(current.directory) !== installationHash(stage)) {
         throw new ExtensionError(
           "install_conflict",
-          `extension '${manifest.name}' is already installed with a different manifest; remove it before reinstalling`,
+          `extension '${manifest.name}' is already installed with different code or manifest; remove it before reinstalling`,
           5,
         );
       }
-      if (!(await confirm(current.manifest))) return { installed: false, enabled: false, directory: null, manifest: current.manifest };
+      if (!(await confirm(manifest))) return { installed: false, enabled: false, directory: null, manifest };
       enable(vault, manifest.name);
-      return { installed: true, enabled: true, directory: current.directory, manifest: current.manifest };
+      return { installed: true, enabled: true, directory: current.directory, manifest };
     }
     if (!(await confirm(manifest))) return { installed: false, enabled: false, directory: null, manifest };
     writeFileSync(join(stage, METADATA), JSON.stringify(metadata, null, 2) + "\n", { flag: "wx" });

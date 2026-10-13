@@ -154,6 +154,9 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
   writeFileSync(join(source, "bin", "command.mjs"), "throw new Error('source changed')\n");
+  const changed = interactiveInstall(f, source);
+  assert.equal(changed.code, 5, changed.stdout + changed.stderr);
+  assert.match(changed.stdout + changed.stderr, /different code or manifest/);
   assert.equal(json(f, ["echoer"]).code, 0, "local installs are copies, not mutable source links");
 });
 
@@ -451,6 +454,34 @@ test("meetings imports redacted summaries and links from a fake server, never tr
     assert.equal(JSON.parse(invalid.stdout).error.code, "source_failed");
     assert.equal(readdirSync(meetingDir).length, 2, `${field} validation must happen before any note is written`);
   }
+
+  const oldSourceId = "meeting-recorded-before-the-newest-100000";
+  const oldMarker = createHash("sha256").update(oldSourceId).digest("hex");
+  const fakeBrain = join(f.root, "fake-brain.mjs");
+  writeFileSync(fakeBrain, `
+const args = process.argv.slice(2).filter((arg) => arg !== "--json");
+if (args[0] !== "view" || args[1] !== "meeting") process.exit(9);
+process.stdout.write(JSON.stringify({schema:"brain.v1",command:"view",ok:true,data:{kind:"meeting",entries:100001,markdown:${JSON.stringify(`<!-- brain-source-id: ${oldMarker} -->\n`)}}})+"\\n");
+`);
+  responsePayload = { meetings: [{ ...valid, id: oldSourceId }] };
+  const completeHistory = await new Promise<{ code: number | null; stdout: string; stderr: string }>((done) => {
+    const child = spawn(process.execPath, [join(MEETINGS, "bin", "brain-meetings"), "import", "--json"], {
+      env: environment(f, {
+        BRAIN_BIN: fakeBrain,
+        BRAIN_EXT_REDACT_TOKEN: "00000000-0000-0000-0000-000000000000",
+        BRAIN_MEETINGS_API_URL: `http://127.0.0.1:${port}/meetings`,
+      }),
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
+    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
+    child.on("close", (code) => done({ code, stdout, stderr }));
+  });
+  assert.equal(completeHistory.code, 0, completeHistory.stderr);
+  const completeBody = JSON.parse(completeHistory.stdout);
+  assert.equal(completeBody.data.added.length, 0);
+  assert.equal(completeBody.data.skipped, 1, "source IDs remain idempotent beyond the newest 100,000 entries");
 });
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {

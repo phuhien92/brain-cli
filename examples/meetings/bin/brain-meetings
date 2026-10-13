@@ -138,11 +138,9 @@ async function main() {
   if (!Array.isArray(rawMeetings)) throw new Error("meeting source response needs a meetings list");
   const meetings = rawMeetings.map(validateMeeting);
 
-  const current = brain(["log", "100000", "--kind", "meeting"]);
+  const current = brain(["view", "meeting"]);
   const seen = new Set();
-  for (const entry of current.entries ?? []) {
-    for (const match of String(entry.body ?? "").matchAll(/<!-- brain-source-id: ([0-9a-f]{64}) -->/g)) seen.add(match[1]);
-  }
+  for (const match of String(current.markdown ?? "").matchAll(/<!-- brain-source-id: ([0-9a-f]{64}) -->/g)) seen.add(match[1]);
 
   const added = [];
   let skipped = 0;
