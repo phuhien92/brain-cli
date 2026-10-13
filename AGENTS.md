@@ -29,7 +29,10 @@ holds the rules an agent changing the code must not break.
 8. **Zero runtime dependencies.** `node:sqlite`, `node:util` `parseArgs` and a small
    frontmatter parser in `src/note.ts`. A dependency has to justify itself against
    `npx brain-cli` staying instant and native-build-free.
-9. **Nothing leaves the machine** except what `brain sync` pushes to the vault's own git
+9. **`brain context` never fails.** It runs inside other tools' startup hooks: on any
+   error it prints nothing and exits 0. The installer never edits a harness's settings
+   file; it prints the snippet.
+10. **Nothing leaves the machine** except what `brain sync` pushes to the vault's own git
    remote. No other network calls, no telemetry, no embeddings API.
 
 ## Layout
@@ -39,7 +42,12 @@ holds the rules an agent changing the code must not break.
 - `src/config.ts` — `brain.json` (synced) and the machine-local user config.
 - `src/log.ts` — log entries: add, list, import, render a view, export with drift check.
 - `src/sync.ts` — commit the log, pull --rebase, push.
+- `src/agent.ts` — `brain context` (the session primer) and `brain agent install` per harness.
 - `src/cli.ts` — argument parsing, vault discovery, output and exit codes.
+- `skills/brain/SKILL.md` — the skill every harness installs; its `description` decides
+  when an agent reaches for brain, so change it deliberately.
+- `agents/pi/brain-memory.ts` — the Pi extension (not compiled here; Pi loads it).
+- `scripts/verify-pi.sh` — real Pi, fake model: the skill is listed, one primer per session.
 - `bin/brain.js` — the executable; imports the compiled `dist/src/cli.js`.
 - `test/` — `node:test`. `cli.test.ts` and `sync.test.ts` run the real binary;
   `sync.test.ts` simulates two machines sharing one bare remote.

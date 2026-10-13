@@ -2,11 +2,12 @@ import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { ConfigError, loadConfig, slug, type Config } from "./config.js";
+import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { addEntry, exportView, importFile, listEntries, renderView, type ExportResult } from "./log.js";
 import { Store, type RefreshStats } from "./store.js";
 import { sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -35,6 +36,13 @@ COMMANDS
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
   sync [--no-push]            Commit new entries, pull --rebase, push, then export
+
+  context [--limit n]         Print a short primer for an agent: what brain is, plus the n most
+                              recent memory titles. Prints nothing (exit 0) without a vault,
+                              so it is safe in a session-start hook
+  agent install <harness>     Teach an agent harness about brain: claude | pi | agents
+      --dry-run               Show what would be written
+      --force                 Replace an existing file brain did not write
 
   help                        Show this help
 
@@ -96,6 +104,7 @@ export async function main(argv: string[]): Promise<number> {
         kind: { type: "string" },
         force: { type: "boolean", default: false },
         "no-push": { type: "boolean", default: false },
+        "dry-run": { type: "boolean", default: false },
       },
     });
   } catch (err) {
@@ -114,6 +123,55 @@ export async function main(argv: string[]): Promise<number> {
   if (flags.help || command === "help") {
     if (out.json) print(out, "help", { usage: HELP }, null, () => "");
     else process.stdout.write(HELP);
+    return 0;
+  }
+
+  if (command === "agent") {
+    try {
+      const [sub, harness = ""] = args;
+      if (sub !== "install" || !(HARNESSES as readonly string[]).includes(harness)) {
+        throw new CliError("usage", `usage: brain agent install <${HARNESSES.join("|")}> [--dry-run] [--force]`, 2);
+      }
+      const result = install(harness as Harness, { force: flags.force, dryRun: flags["dry-run"] });
+      const conflicts = result.files.filter((f) => f.status === "conflict");
+      if (conflicts.length) {
+        throw new CliError(
+          "install_conflict",
+          `${conflicts.map((f) => f.path).join(", ")} exists and was not written by brain; rerun with --force to replace it`,
+          5,
+          { files: conflicts.map((f) => f.path) },
+        );
+      }
+      print(out, "agent.install", { ...result, dryRun: flags["dry-run"] }, null, () =>
+        [
+          ...result.files.map((f) => `${flags["dry-run"] && f.status === "written" ? "would write" : f.status}  ${f.path}`),
+          ...result.warnings.map((w) => `warning: ${w}`),
+          ...(result.next.length ? ["", ...result.next] : []),
+        ].join("\n"),
+      );
+      return 0;
+    } catch (err) {
+      return fail(out, "agent.install", err);
+    }
+  }
+
+  if (command === "context") {
+    // Runs inside other tools' session-start hooks: any failure prints nothing
+    // and exits 0, so a missing vault never breaks the agent that called it.
+    let ctxStore: Store | null = null;
+    try {
+      const limit = flags.limit === undefined ? 5 : Math.max(0, Math.min(Number(flags.limit) || 0, 50));
+      const vault = findVault(flags.vault);
+      const cfg = loadConfig(vault);
+      ctxStore = Store.open(vault);
+      const index = ctxStore.refresh();
+      const text = context(ctxStore, cfg, limit);
+      print(out, "context", { context: text }, { vault, index }, () => text);
+    } catch {
+      if (out.json) print(out, "context", { context: "" }, null, () => "");
+    } finally {
+      ctxStore?.close();
+    }
     return 0;
   }
 
