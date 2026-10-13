@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/phuhien92/brain-cli/actions/workflows/ci.yml"><img src="https://github.com/phuhien92/brain-cli/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/node-%E2%89%A522.13-3C873A" alt="Node 22.13+">
-  <img src="https://img.shields.io/badge/runtime%20deps-0-4338CA" alt="zero runtime dependencies">
+  <img src="https://img.shields.io/badge/runtime%20deps-0-075E46" alt="zero runtime dependencies">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT">
 </p>
 
@@ -85,6 +85,7 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | | |
 | --- | --- |
 | [Architecture](docs/architecture.md) | design, diagrams, guarantees, code map |
+| [Design system](design/README.md) | canonical Pen source, semantic tokens and brand usage |
 | [Indexing](docs/indexing.md) | how the index stays up to date, measured costs, limits |
 | [Commands](docs/cli.md) | every command, the JSON contract, exit codes |
 | [Sources and provenance](docs/sources.md) | immutable originals, citations and source lint rules |

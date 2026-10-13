@@ -1,31 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="brain-cli logo">
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1E1B4B"/>
-      <stop offset="1" stop-color="#4338CA"/>
-    </linearGradient>
-  </defs>
-  <rect width="128" height="128" rx="28" fill="url(#bg)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="brain-logo-title brain-logo-description">
+  <title id="brain-logo-title">brain-cli logo</title>
+  <desc id="brain-logo-description">A linked graph of notes held inside double wiki-link brackets.</desc>
+  <!-- Bright local-first tokens: actionText field, brandSoft brackets, action signal. -->
+  <rect width="128" height="128" rx="28" fill="#052F3E"/>
   <!-- [[ and ]]: a wiki-link holding the vault -->
-  <g fill="none" stroke="#C7D2FE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M30 30 H22 V98 H30"/>
-    <path d="M40 30 H32 V98 H40" opacity="0.55"/>
-    <path d="M98 30 H106 V98 H98"/>
-    <path d="M88 30 H96 V98 H88" opacity="0.55"/>
-  </g>
-  <!-- linked notes -->
-  <g stroke="#A5B4FC" stroke-width="3.5" stroke-linecap="round">
-    <line x1="52" y1="48" x2="76" y2="44"/>
-    <line x1="52" y1="48" x2="58" y2="76"/>
-    <line x1="76" y1="44" x2="80" y2="70"/>
-    <line x1="58" y1="76" x2="80" y2="70"/>
-    <line x1="58" y1="76" x2="66" y2="90"/>
-  </g>
+  <path d="M31 30H22V98H31 M41 30H32V98H41 M97 30H106V98H97 M87 30H96V98H87"
+        fill="none" stroke="#DDF8EE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Linked notes; mint identifies the active connection without a separate status hue. -->
+  <path d="M50 48L76 43L81 70L58 77L50 48 M58 77L66 90"
+        fill="none" stroke="#21C995" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
   <g fill="#FFFFFF">
-    <circle cx="52" cy="48" r="7"/>
-    <circle cx="76" cy="44" r="5.5"/>
-    <circle cx="58" cy="76" r="6"/>
-    <circle cx="80" cy="70" r="7.5" fill="#FBBF24"/>
-    <circle cx="66" cy="90" r="4.5"/>
+    <circle cx="50" cy="48" r="7"/>
+    <circle cx="76" cy="43" r="6"/>
+    <circle cx="57.5" cy="76.5" r="6.5"/>
+    <circle cx="81" cy="70" r="8" fill="#21C995"/>
+    <circle cx="66" cy="90" r="5"/>
   </g>
 </svg>

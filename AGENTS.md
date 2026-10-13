@@ -53,6 +53,9 @@ holds the rules an agent changing the code must not break.
 
 ## Layout
 
+- `design/brain-ui.pen`, `design/tokens.json`, `design/README.md` — canonical editable design,
+  machine-readable semantic tokens and handoff. Start visual changes in Pen and keep all
+  three aligned; `CLAUDE.md` links to this contract, so the same rule applies there.
 - `src/note.ts` — parse one note: frontmatter, title, headings, tags, aliases, wiki-links.
 - `src/store.ts` — the SQLite index: schema, incremental refresh, search, resolve, get.
 - `src/paths.ts` — where brain keeps things (state, index, configs, log, sources). The one resolver

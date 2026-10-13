@@ -1,56 +1,53 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-label="brain-cli — headless memory for your markdown vault, for any agent, on any machine">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" width="1280" height="320" role="img" aria-labelledby="brain-banner-title brain-banner-description">
+  <title id="brain-banner-title">brain-cli</title>
+  <desc id="brain-banner-description">Headless memory for your markdown vault, for any agent, on any machine.</desc>
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#0F0D2E"/>
-      <stop offset="0.6" stop-color="#1E1B4B"/>
-      <stop offset="1" stop-color="#3730A3"/>
-    </linearGradient>
-    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#1E1B4B"/>
-      <stop offset="1" stop-color="#4338CA"/>
-    </linearGradient>
+    <clipPath id="banner-corners">
+      <rect width="1280" height="320" rx="24"/>
+    </clipPath>
   </defs>
-  <rect width="1280" height="320" fill="url(#bg)"/>
-  <!-- faint graph of notes in the background -->
-  <g stroke="#6366F1" stroke-opacity="0.25" stroke-width="1.5">
-    <line x1="900" y1="40" x2="1010" y2="90"/><line x1="1010" y1="90" x2="1120" y2="60"/>
-    <line x1="1010" y1="90" x2="1060" y2="200"/><line x1="1120" y1="60" x2="1200" y2="150"/>
-    <line x1="1060" y1="200" x2="1200" y2="150"/><line x1="1060" y1="200" x2="980" y2="270"/>
-    <line x1="1200" y1="150" x2="1240" y2="270"/><line x1="900" y1="40" x2="860" y2="150"/>
-    <line x1="860" y1="150" x2="980" y2="270"/>
-  </g>
-  <g fill="#818CF8" fill-opacity="0.35">
-    <circle cx="900" cy="40" r="6"/><circle cx="1010" cy="90" r="8"/><circle cx="1120" cy="60" r="5"/>
-    <circle cx="1060" cy="200" r="9"/><circle cx="1200" cy="150" r="6"/><circle cx="980" cy="270" r="5"/>
-    <circle cx="1240" cy="270" r="4"/><circle cx="860" cy="150" r="5"/>
-  </g>
-  <!-- logo -->
-  <g transform="translate(80 72) scale(1.375)">
-    <rect width="128" height="128" rx="28" fill="url(#tile)" stroke="#6366F1" stroke-opacity="0.5"/>
-    <g fill="none" stroke="#C7D2FE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M30 30 H22 V98 H30"/><path d="M40 30 H32 V98 H40" opacity="0.55"/>
-      <path d="M98 30 H106 V98 H98"/><path d="M88 30 H96 V98 H88" opacity="0.55"/>
+
+  <g clip-path="url(#banner-corners)">
+    <rect width="1280" height="320" fill="#FFFFFF"/>
+    <rect width="12" height="320" fill="#21C995"/>
+
+    <!-- Linked Vault mark: the vault's wiki-link boundary and linked notes. -->
+    <g transform="translate(64 80)">
+      <rect width="128" height="128" rx="28" fill="#052F3E"/>
+      <path d="M31 30H22V98H31 M41 30H32V98H41 M97 30H106V98H97 M87 30H96V98H87"
+            fill="none" stroke="#DDF8EE" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M50 48L76 43L81 70L58 77L50 48 M58 77L66 90"
+            fill="none" stroke="#21C995" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <g fill="#FFFFFF">
+        <circle cx="50" cy="48" r="7"/>
+        <circle cx="76" cy="43" r="6"/>
+        <circle cx="57.5" cy="76.5" r="6.5"/>
+        <circle cx="81" cy="70" r="8" fill="#21C995"/>
+        <circle cx="66" cy="90" r="5"/>
+      </g>
     </g>
-    <g stroke="#A5B4FC" stroke-width="3.5" stroke-linecap="round">
-      <line x1="52" y1="48" x2="76" y2="44"/><line x1="52" y1="48" x2="58" y2="76"/>
-      <line x1="76" y1="44" x2="80" y2="70"/><line x1="58" y1="76" x2="80" y2="70"/>
-      <line x1="58" y1="76" x2="66" y2="90"/>
+
+    <!-- Product name and durable positioning. -->
+    <g font-family="ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+      <text x="220" y="118" font-size="64" font-weight="750" fill="#14211D" letter-spacing="-2">brain<tspan font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="54" font-weight="650" fill="#075E46" letter-spacing="-1">-cli</tspan></text>
+      <text x="220" y="166" font-size="27" font-weight="650" fill="#14211D">Headless memory for your markdown vault.</text>
+      <text x="220" y="202" font-size="19" fill="#4D6259">For any agent, on any machine.</text>
+      <text x="220" y="252" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" font-weight="700" fill="#075E46" letter-spacing="0.4">LOCAL-FIRST  ·  RANKED SEARCH  ·  ZERO RUNTIME DEPS</text>
     </g>
-    <g fill="#FFFFFF">
-      <circle cx="52" cy="48" r="7"/><circle cx="76" cy="44" r="5.5"/><circle cx="58" cy="76" r="6"/>
-      <circle cx="80" cy="70" r="7.5" fill="#FBBF24"/><circle cx="66" cy="90" r="4.5"/>
+
+    <!-- Real product proof replaces the legacy decorative graph and feature pills. -->
+    <g transform="translate(820 52)">
+      <rect width="396" height="216" rx="18" fill="#052F3E"/>
+      <circle cx="22" cy="22" r="5" fill="#21C995"/>
+      <circle cx="40" cy="22" r="5" fill="#DDF8EE"/>
+      <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+        <text x="24" y="70" font-size="15" font-weight="600" fill="#FFFFFF">$ brain search &quot;deploy gotchas&quot;</text>
+        <text x="24" y="112" font-size="13" fill="#DDF8EE">1  Projects/blog/runbook.md</text>
+        <text x="24" y="143" font-size="13" fill="#DDF8EE">2  firstmate/learnings/…</text>
+        <text x="24" y="184" font-size="12" font-weight="650" fill="#21C995">3 notes · fresh on read · local</text>
+      </g>
     </g>
   </g>
-  <!-- wordmark -->
-  <g font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-    <text x="300" y="150" font-size="84" font-weight="800" fill="#FFFFFF" letter-spacing="-2">brain<tspan fill="#A5B4FC" font-weight="600">-cli</tspan></text>
-    <text x="304" y="196" font-size="26" fill="#C7D2FE">Headless memory for your markdown vault.</text>
-    <text x="304" y="230" font-size="26" fill="#C7D2FE">For any agent, on any machine.</text>
-  </g>
-  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="17" fill="#E0E7FF">
-    <rect x="304" y="252" width="170" height="32" rx="16" fill="#312E81"/><text x="322" y="274">ranked search</text>
-    <rect x="486" y="252" width="211" height="32" rx="16" fill="#312E81"/><text x="504" y="274">memory that syncs</text>
-    <rect x="709" y="252" width="129" height="32" rx="16" fill="#312E81"/><text x="727" y="274">lifecycle</text>
-    <rect x="850" y="252" width="129" height="32" rx="16" fill="#312E81"/><text x="868" y="274">zero deps</text>
-  </g>
+
+  <rect x="0.5" y="0.5" width="1279" height="319" rx="23.5" fill="none" stroke="#D7E5DE"/>
 </svg>
