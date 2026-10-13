@@ -215,6 +215,13 @@ export function telemetryName(command: string, sub: string | undefined): string 
   return sub && SUBCOMMANDS[command]?.includes(sub) ? `${command}.${sub}` : command;
 }
 
+function extensionChildCommandAllowed(command: string, sub: string | undefined): boolean {
+  if (!EXTENSION_CHILD_COMMANDS.has(command)) return false;
+  if (command === "log") return sub !== "import";
+  if (command === "lifecycle") return !["set", "review", "archive", "restore"].includes(sub ?? "");
+  return true;
+}
+
 function extensionTimeoutMs(): number {
   const raw = process.env.BRAIN_EXTENSION_TIMEOUT_MS;
   if (raw === undefined) return DEFAULT_EXTENSION_TIMEOUT_MS;
@@ -243,7 +250,7 @@ export async function main(argv: string[]): Promise<number> {
   const first = position === -1 ? undefined : argv[position];
   const after = position === -1 ? undefined : argv[position + 1];
   const extensionCaller = process.env.BRAIN_EXTENSION_SCOPE;
-  if (extensionCaller && first && !EXTENSION_CHILD_COMMANDS.has(first)) {
+  if (extensionCaller && first && !extensionChildCommandAllowed(first, after)) {
     return fail(
       { json, quiet: argv.includes("--quiet") || argv.includes("-q") },
       first,
@@ -345,8 +352,9 @@ async function run(argv: string[]): Promise<number> {
   tCommand = telemetryName(command, args[0]);
 
   const extensionCaller = process.env.BRAIN_EXTENSION_SCOPE;
-  if (extensionCaller && !flags.version && !flags.help && !EXTENSION_CHILD_COMMANDS.has(command)) {
-    return fail(out, command, new CliError("not_permitted", `extension '${extensionCaller}' may not run '${command}'`, 6));
+  if (extensionCaller && !flags.version && !flags.help && !extensionChildCommandAllowed(command, args[0])) {
+    const attempted = [command, args[0]].filter(Boolean).join(" ");
+    return fail(out, command, new CliError("not_permitted", `extension '${extensionCaller}' may not run '${attempted}'`, 6));
   }
 
   if (flags.version) {

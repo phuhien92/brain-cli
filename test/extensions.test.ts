@@ -157,6 +157,19 @@ test("install needs human permission approval and exposes the declared permissio
   assert.match(readFileSync(join(secondVault, "memory", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
   assert.equal(json(second, ["echoer"]).code, 0, "one machine installation can be enabled independently in another vault");
 
+  const collisionVault = join(f.root, "collision-vault");
+  mkdirSync(join(collisionVault, ".obsidian"), { recursive: true });
+  mkdirSync(join(collisionVault, "log", "extensions"), { recursive: true });
+  const collisionPath = join(collisionVault, "log", "extensions", "echoer.md");
+  const collisionContent = "---\nkind: observation\n---\n# Echoer notes\n";
+  writeFileSync(collisionPath, collisionContent);
+  const collision = { ...f, vault: collisionVault };
+  assert.equal(json(collision, ["echoer"]).code, 3, "an unrelated slug-named note cannot enable an extension");
+  const conflicted = interactiveInstall(collision, source);
+  assert.equal(conflicted.code, 5, conflicted.stdout + conflicted.stderr);
+  assert.match(conflicted.stdout + conflicted.stderr, /not its enablement marker/);
+  assert.equal(readFileSync(collisionPath, "utf8"), collisionContent);
+
   writeFileSync(join(source, "bin", "command.mjs"), "throw new Error('source changed')\n");
   const changed = interactiveInstall(f, source);
   assert.equal(changed.code, 5, changed.stdout + changed.stderr);
@@ -436,6 +449,11 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
     ["lint"],
     ["path"],
     ["probe"],
+    ["log", "import", "event", "secrets.md"],
+    ["lifecycle", "set", "Allowed/visible.md"],
+    ["lifecycle", "review", "Allowed/visible.md"],
+    ["lifecycle", "archive", "Allowed/visible.md"],
+    ["lifecycle", "restore", "Allowed/visible.md"],
   ];
   for (const command of deniedCommands) {
     const encoded = Buffer.from(JSON.stringify(command)).toString("base64url");
@@ -447,6 +465,7 @@ process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode
   assert.equal(doubleDash.code, 6);
   assert.equal(doubleDash.body.error.code, "not_permitted");
   assert.equal(json(f, ["admin-probe", Buffer.from(JSON.stringify(["search", "shared-word"])).toString("base64url")]).code, 0);
+  assert.equal(json(f, ["admin-probe", Buffer.from(JSON.stringify(["lifecycle", "status"])).toString("base64url")]).code, 0);
 
   const redactionSource = makeExtension(join(f.root, "redaction-source"), {
     name: "redaction-probe",

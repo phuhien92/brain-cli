@@ -20,6 +20,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { parseNote } from "./note.js";
 import { extensionsRoot } from "./paths.js";
 
 export interface ExtensionPermissions {
@@ -234,8 +235,17 @@ export function enabledExtensionNames(vault: string): string[] {
   return readdirSync(directory, { withFileTypes: true })
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => entry.name.slice(0, -3))
-    .filter((name) => slug(name) === name)
+    .filter((name) => slug(name) === name && isEnablementMarker(join(directory, `${name}.md`), name))
     .sort();
+}
+
+function isEnablementMarker(path: string, name: string): boolean {
+  try {
+    const frontmatter = parseNote(`${name}.md`, readFileSync(path, "utf8")).frontmatter;
+    return frontmatter.kind === "extension" && frontmatter.extension === name;
+  } catch {
+    return false;
+  }
 }
 
 function enablementDirectory(vault: string): string {
@@ -251,12 +261,17 @@ function enablementDirectory(vault: string): string {
 function enable(vault: string, name: string): void {
   const directory = enablementDirectory(vault);
   const path = join(directory, `${name}.md`);
-  if (existsSync(path)) return;
+  const acceptExisting = () => {
+    if (isEnablementMarker(path, name)) return;
+    throw new ExtensionError("enablement_conflict", `cannot enable extension '${name}': ${path} is not its enablement marker`, 5);
+  };
+  if (existsSync(path)) return acceptExisting();
   mkdirSync(directory, { recursive: true });
   try {
     writeFileSync(path, `---\nkind: extension\nextension: ${name}\n---\n# ${name}\n`, { flag: "wx" });
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    acceptExisting();
   }
 }
 
