@@ -76,16 +76,18 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
   const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
   let committed = 0;
   if (owned.length) {
-    git("add", "--", ...owned);
-    const staged = git("diff", "--cached", "--name-only", "--", ...owned)
-      .split("\n")
-      .filter(Boolean);
+    const pathspecs = owned.join("\0");
+    run(vault, ["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspecs);
+    const ownedFiles = new Set(owned);
+    const staged = git("diff", "--cached", "--name-only", "-z")
+      .split("\0")
+      .filter((path) => path && (path.startsWith(`${cfg.logDir}/`) || ownedFiles.has(path)));
     if (staged.length) {
       const onlyLog = staged.every((path) => path.startsWith(`${cfg.logDir}/`));
       const message = onlyLog
         ? `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`
         : `brain: ${staged.length} owned ${staged.length === 1 ? "file" : "files"} from ${cfg.machine}`;
-      git("commit", "--quiet", "-m", message, "--", ...owned);
+      run(vault, ["commit", "--quiet", "-m", message, "--pathspec-from-file=-", "--pathspec-file-nul"], pathspecs);
       committed = staged.length;
     }
   }
@@ -136,11 +138,12 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
   return { mode, committed, pulled, pushed, remote: true };
 }
 
-function run(cwd: string, args: string[]): string {
+function run(cwd: string, args: string[], input?: string): string {
   try {
     return execFileSync("git", ["-C", cwd, ...args], {
       encoding: "utf8",
-      stdio: ["ignore", "pipe", "pipe"],
+      input,
+      stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     }).trim();
   } catch (err) {

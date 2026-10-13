@@ -20,7 +20,7 @@ import { basename, parseNote, type Frontmatter, type Link } from "./note.js";
 import { stateRoot, vaultStateDir } from "./paths.js";
 import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX } from "./source.js";
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // Folders that are never notes. Dot-folders (.git, .obsidian, .trash, .brain)
 // are skipped wholesale.

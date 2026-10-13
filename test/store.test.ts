@@ -109,6 +109,17 @@ test("the index survives reopening and rebuilds on demand", () => {
   rebuilt.close();
 });
 
+test("an index written by an older parser is rebuilt from the vault, not reused", () => {
+  const old = Store.open(vault);
+  old.refresh();
+  old.db.exec("UPDATE meta SET value = '1' WHERE key = 'schema_version'; UPDATE notes SET title = 'stale'");
+  old.close();
+  const reopened = Store.open(vault);
+  assert.equal(reopened.refresh().added, 3);
+  assert.equal(reopened.db.prepare("SELECT count(*) AS n FROM notes WHERE title = 'stale'").get()!.n, 0);
+  reopened.close();
+});
+
 test("search ranks a title match above a passing body mention", () => {
   const store = Store.open(vault);
   store.refresh();

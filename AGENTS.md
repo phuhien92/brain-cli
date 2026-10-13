@@ -16,7 +16,8 @@ holds the rules an agent changing the code must not break.
    never be replaced. No command edits, moves or deletes a note or source. The writable set
    includes `sources/` so provenance can travel with the vault without weakening the
    create-only rule that keeps two machines conflict-free.
-3. **`sync` commits only what brain owns**: the log folder, `sources/` and `brain.json`. A conflict
+3. **`sync` commits only what brain owns**: the log folder, ingested source pairs in `sources/` and
+   `brain.json`. A conflict
    aborts the rebase and exits 5 naming the files; it never resolves one.
 4. **Exports never lose an edit.** A file outside the vault is overwritten only if it is
    byte-identical to what brain last wrote there (or `--force`). Exports are regular files,
