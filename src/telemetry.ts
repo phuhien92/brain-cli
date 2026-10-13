@@ -22,6 +22,53 @@ import { homedir, platform, arch } from "node:os";
 import { join } from "node:path";
 
 export const TELEMETRY_SCHEMA = "brain.telemetry.v1";
+
+// The collector: PostHog. A project API key ("phc_…") can only send events,
+// never read them, and PostHog documents it as safe to publish in client
+// code. Empty = not configured yet: opted-in events stay queued locally.
+export const POSTHOG_KEY = "";
+export const POSTHOG_HOST = "https://us.i.posthog.com";
+
+interface Collector {
+  kind: "posthog" | "custom";
+  url: string;
+  key?: string;
+}
+
+// BRAIN_TELEMETRY_URL points at a custom collector that receives the raw
+// brain.telemetry.v1 batch (self-hosting, tests). Otherwise PostHog, when a
+// key is set (built in, or BRAIN_POSTHOG_KEY for a fork's own project).
+export function collector(): Collector | null {
+  if (process.env.BRAIN_TELEMETRY_URL) return { kind: "custom", url: process.env.BRAIN_TELEMETRY_URL };
+  const key = process.env.BRAIN_POSTHOG_KEY || POSTHOG_KEY;
+  if (!key) return null;
+  const host = (process.env.BRAIN_POSTHOG_HOST || POSTHOG_HOST).replace(/\/+$/, "");
+  return { kind: "posthog", url: `${host}/batch/`, key };
+}
+
+// One brain event as a PostHog event. Anonymous by construction: the random
+// install id is the distinct id, no person profile is created, GeoIP lookup is
+// off, and only the day is sent as the timestamp (noon UTC), never the time.
+export function toPostHog(key: string, events: Event[]): unknown {
+  return {
+    api_key: key,
+    batch: events.map((e) => {
+      const { install, day, schema, ...props } = e;
+      return {
+        event: "brain_command",
+        distinct_id: install,
+        timestamp: `${day}T12:00:00Z`,
+        properties: {
+          ...props,
+          schema,
+          $process_person_profile: false,
+          $geoip_disable: true,
+          $lib: "brain-cli",
+        },
+      };
+    }),
+  };
+}
 const QUEUE_CAP = 500; // events kept while unsent; oldest dropped first
 const FLUSH_EVERY_MS = 24 * 60 * 60 * 1000;
 
@@ -95,10 +142,11 @@ export interface Status {
 export function status(userConfigTelemetry?: unknown): Status {
   const s = readSettings();
   const env = (process.env.BRAIN_TELEMETRY ?? "").toLowerCase();
-  const collector = process.env.BRAIN_TELEMETRY_URL || null;
+  const c = collector();
+  const collectorLabel = c ? (c.kind === "posthog" ? `PostHog (${new URL(c.url).host})` : c.url) : null;
   const queued = queue().length;
-  const off = (reason: string): Status => ({ enabled: false, reason, collector, queued, install: s.install });
-  const on = (reason: string): Status => ({ enabled: true, reason, collector, queued, install: s.install });
+  const off = (reason: string): Status => ({ enabled: false, reason, collector: collectorLabel, queued, install: s.install });
+  const on = (reason: string): Status => ({ enabled: true, reason, collector: collectorLabel, queued, install: s.install });
   if (process.env.DO_NOT_TRACK && process.env.DO_NOT_TRACK !== "0") return off("DO_NOT_TRACK is set");
   if (["0", "false", "off", "no"].includes(env)) return off("BRAIN_TELEMETRY is off");
   if (["1", "true", "on", "yes"].includes(env)) return on("BRAIN_TELEMETRY is on");
@@ -189,7 +237,7 @@ export function record(
       writeFileSync(file("telemetry-queue.jsonl"), q.slice(-QUEUE_CAP).map((e) => JSON.stringify(e)).join("\n") + "\n");
     }
     const due = Date.now() - s.lastFlush > FLUSH_EVERY_MS;
-    if (due && process.env.BRAIN_TELEMETRY_URL && existsSync(binPath)) {
+    if (due && collector() && existsSync(binPath)) {
       s.lastFlush = Date.now();
       const child = spawn(process.execPath, ["--no-warnings=ExperimentalWarning", binPath, "telemetry", "flush"], {
         detached: true,
@@ -207,15 +255,16 @@ export function record(
 // Post the queue to the collector; on success, clear it. Runs in the detached
 // background process, or by hand.
 export async function flush(): Promise<{ sent: number; error: string | null }> {
-  const url = process.env.BRAIN_TELEMETRY_URL;
+  const c = collector();
   const events = queue();
-  if (!url) return { sent: 0, error: "no collector configured (BRAIN_TELEMETRY_URL)" };
+  if (!c) return { sent: 0, error: "no collector configured (no PostHog project key yet)" };
   if (!events.length) return { sent: 0, error: null };
   try {
-    const res = await fetch(url, {
+    const body = c.kind === "posthog" ? toPostHog(c.key!, events) : { schema: TELEMETRY_SCHEMA, events };
+    const res = await fetch(c.url, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ schema: TELEMETRY_SCHEMA, events }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return { sent: 0, error: `collector answered ${res.status}` };

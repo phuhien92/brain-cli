@@ -8,7 +8,7 @@ import { dirname, join, resolve } from "node:path";
 import { after, before, beforeEach, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { telemetryName } from "../src/cli.js";
-import { parseAnswer, shouldAsk } from "../src/telemetry.js";
+import { parseAnswer, shouldAsk, toPostHog, type Event } from "../src/telemetry.js";
 
 const BIN = resolve(dirname(fileURLToPath(import.meta.url)), "../../bin/brain.js");
 let root: string;
@@ -20,6 +20,8 @@ function env(extra: Record<string, string> = {}) {
   delete e.DO_NOT_TRACK;
   delete e.BRAIN_TELEMETRY;
   delete e.BRAIN_TELEMETRY_URL;
+  delete e.BRAIN_POSTHOG_KEY;
+  delete e.BRAIN_POSTHOG_HOST;
   return { ...e, ...extra };
 }
 function brain(args: string[], extra: Record<string, string> = {}) {
@@ -138,6 +140,7 @@ test("flush posts the queue to the collector and clears it; no collector means n
   const noCollector = JSON.parse(brain(["telemetry", "flush", "--json"]).stdout).data;
   assert.equal(noCollector.sent, 0);
   assert.match(noCollector.error, /no collector/);
+  assert.equal(JSON.parse(brain(["telemetry", "--json"]).stdout).data.collector, null);
 
   let received: { schema: string; events: unknown[] } | null = null;
   const server = createServer((req, res) => {
@@ -164,4 +167,47 @@ test("flush posts the queue to the collector and clears it; no collector means n
   assert.equal(received!.schema, "brain.telemetry.v1");
   assert.equal(received!.events.length, 2);
   assert.equal(shown().events.length, 0, "queue cleared after a successful send");
+});
+
+test("PostHog: anonymous events — install id as distinct id, no person profile, no GeoIP, day-only timestamp", async () => {
+  brain(["telemetry", "enable"]);
+  brain(["search", "secret severance figures"]);
+  let received: { path: string; body: any } | null = null;
+  const server = createServer((req, res) => {
+    let b = "";
+    req.on("data", (c) => (b += c));
+    req.on("end", () => {
+      received = { path: req.url ?? "", body: JSON.parse(b) };
+      res.end("{\"status\":1}");
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as { port: number }).port;
+  const out = await new Promise<string>((done) => {
+    const p = spawn(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, "telemetry", "flush", "--json"], {
+      cwd: vault,
+      env: env({ BRAIN_POSTHOG_KEY: "phc_test", BRAIN_POSTHOG_HOST: `http://127.0.0.1:${port}` }),
+    });
+    let s = "";
+    p.stdout.on("data", (c) => (s += c));
+    p.on("close", () => done(s));
+  });
+  server.close();
+  assert.equal(JSON.parse(out).data.sent, 1);
+  assert.equal(received!.path, "/batch/");
+  assert.equal(received!.body.api_key, "phc_test");
+  const ev = received!.body.batch[0];
+  assert.equal(ev.event, "brain_command");
+  assert.match(ev.distinct_id, /^[0-9a-f-]{36}$/);
+  assert.match(ev.timestamp, /^\d{4}-\d{2}-\d{2}T12:00:00Z$/);
+  assert.equal(ev.properties.$process_person_profile, false);
+  assert.equal(ev.properties.$geoip_disable, true);
+  assert.equal(ev.properties.command, "search");
+  assert.ok(!JSON.stringify(received!.body).includes("severance"));
+});
+
+test("toPostHog moves only the documented fields", () => {
+  const e: Event = { schema: "brain.telemetry.v1", install: "id", day: "2026-10-13", command: "get", exit: 3, error: "not_found", ms: "<100", notes: "<1k", sync: "none", integrations: 2, scoped: true, json: true, version: "0.9.0", node: "22", os: "darwin-arm64" };
+  const body = toPostHog("k", [e]) as { batch: { properties: Record<string, unknown> }[] };
+  assert.deepEqual(Object.keys(body.batch[0]!.properties).sort(), ["$geoip_disable", "$lib", "$process_person_profile", "command", "error", "exit", "integrations", "json", "ms", "node", "notes", "os", "schema", "scoped", "sync", "version"]);
 });

@@ -71,10 +71,24 @@ machine name appears anywhere in the queued events.
 
 Nothing is written there unless you opted in, apart from your choice itself.
 
-**Remotely: nowhere yet.** No collector is configured in this version, so opted-in events stay
-in the local queue and `brain telemetry flush` reports "no collector configured". When a
-collector exists, its address, owner and retention will be listed here before any version
-sends to it.
+**Remotely: [PostHog](https://posthog.com)**, once the project key is published in a release
+(`POSTHOG_KEY` in `src/telemetry.ts`; until then nothing is sent and `brain telemetry` says
+`collector: not configured`). Each event becomes a PostHog event named `brain_command`:
+
+- **anonymous** — the random install id is the distinct id, and `$process_person_profile:
+  false` means PostHog creates no person profile;
+- **no location** — `$geoip_disable: true` turns off PostHog's IP-to-location lookup;
+- **day only** — the timestamp is the day at noon UTC, never the time you ran the command;
+- **only the fields above** — `test/telemetry.test.ts` checks the PostHog payload field by field.
+
+What no client can hide: PostHog receives each send from your IP address, as any web server
+would. The brain-cli PostHog project has **"Discard client IP data"** turned on, so it is not
+stored. The project key in the code can only send events, never read them; PostHog documents
+such keys as safe to publish.
+
+A fork can send to its own PostHog project with `BRAIN_POSTHOG_KEY` and `BRAIN_POSTHOG_HOST`
+(EU cloud: `https://eu.i.posthog.com`), or to any collector that accepts the raw
+`brain.telemetry.v1` batch with `BRAIN_TELEMETRY_URL`.
 
 ## How it is sent
 
