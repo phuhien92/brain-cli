@@ -10,7 +10,8 @@
     "bin",
     "dist/src",
     "skills",
-    "agents"
+    "agents",
+    "examples"
   ],
   "engines": {
     "node": ">=22.13"

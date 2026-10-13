@@ -1,0 +1,205 @@
+#!/usr/bin/env node
+
+// Reference kind-1 extension. The source API is deliberately small so tests
+// can supply a local fake server through BRAIN_MEETINGS_API_URL. Production
+// credentials and live account setup are outside this example.
+
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+
+const SCHEMA = "brain.v1";
+const CONTROL_CHARACTERS = /[\u0000-\u001f\u007f-\u009f]/;
+
+function envelope(command, ok, value) {
+  process.stdout.write(JSON.stringify(ok
+    ? { schema: SCHEMA, command, ok: true, data: value }
+    : { schema: SCHEMA, command, ok: false, error: value }) + "\n");
+}
+
+function fail(code, message, exit = 1) {
+  envelope("meetings.import", false, { code, message });
+  process.exitCode = exit;
+}
+
+function brain(args, input) {
+  const bin = process.env.BRAIN_BIN;
+  if (!bin) throw new Error("BRAIN_BIN was not provided by brain");
+  let prefix;
+  try {
+    prefix = JSON.parse(process.env.BRAIN_BIN_ARGS_JSON ?? "[]");
+    if (!Array.isArray(prefix) || prefix.some((arg) => typeof arg !== "string")) throw new Error();
+  } catch {
+    throw new Error("BRAIN_BIN_ARGS_JSON was not a string list");
+  }
+  const result = spawnSync(bin, [...prefix, ...args, "--json"], {
+    env: process.env,
+    encoding: "utf8",
+    input,
+    maxBuffer: 16 * 1024 * 1024,
+  });
+  let body;
+  try {
+    body = JSON.parse(result.stdout);
+  } catch {
+    throw new Error(`brain ${args.slice(0, 2).join(" ")} did not return JSON${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
+  }
+  if (result.status !== 0 || body.schema !== SCHEMA || body.ok !== true) {
+    throw new Error(body?.error?.message || `brain ${args.slice(0, 2).join(" ")} failed`);
+  }
+  return body.data;
+}
+
+function marker(id) {
+  return createHash("sha256").update(String(id)).digest("hex");
+}
+
+function oneLine(value) {
+  return String(value ?? "").replace(/\s+/g, " ").trim();
+}
+
+function protectedUrl(value) {
+  const token = process.env.BRAIN_EXT_REDACT_TOKEN;
+  if (!token || !/^[0-9a-f-]{36}$/.test(token)) throw new Error("brain did not provide a redaction token");
+  return `<!-- brain-protected-url:${token}:${Buffer.from(value).toString("base64url")} -->`;
+}
+
+function sourceUrl(value) {
+  const raw = oneLine(value);
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    url.username = "";
+    url.password = "";
+    url.search = "";
+    url.hash = "";
+    return url.toString().replace(/\(/g, "%28").replace(/\)/g, "%29");
+  } catch {
+    return "";
+  }
+}
+
+function sourceCreated(value) {
+  const raw = oneLine(value);
+  const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  const instant = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2})(?:\.\d+)?)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(raw);
+  const parts = dateOnly ?? instant;
+  if (!parts) return "";
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  const day = Number(parts[3]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  if (month < 1 || month > 12 || day < 1 || day > days[month - 1]) return "";
+  if (instant) {
+    if (Number(instant[4]) > 23 || Number(instant[5]) > 59 || Number(instant[6] ?? 0) > 59) return "";
+    if (instant[7] !== undefined && (Number(instant[7]) > 23 || Number(instant[8]) > 59)) return "";
+  }
+  const date = new Date(dateOnly ? `${raw}T00:00:00.000Z` : raw);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString();
+}
+
+function validateMeeting(value, index) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`meetings[${index}] must be an object`);
+  if (typeof value.id !== "string" || !oneLine(value.id)) throw new Error(`meetings[${index}].id must be a non-empty string`);
+  if (typeof value.title !== "string" || !oneLine(value.title)) throw new Error(`meetings[${index}].title must be a non-empty string`);
+  if (typeof value.date !== "string" || !sourceCreated(value.date)) throw new Error(`meetings[${index}].date must be an ISO date or timestamp`);
+  for (const field of ["summary", "url"]) {
+    if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`meetings[${index}].${field} must be a string`);
+  }
+  for (const field of ["attendees", "actionItems"]) {
+    if (value[field] !== undefined && (!Array.isArray(value[field]) || value[field].some((item) => typeof item !== "string"))) {
+      throw new Error(`meetings[${index}].${field} must be a list of strings`);
+    }
+  }
+  for (const field of ["id", "title", "date", "summary", "url"]) {
+    if (typeof value[field] === "string" && CONTROL_CHARACTERS.test(value[field])) {
+      throw new Error(`meetings[${index}].${field} cannot contain control characters`);
+    }
+  }
+  for (const field of ["attendees", "actionItems"]) {
+    if (Array.isArray(value[field]) && value[field].some((item) => CONTROL_CHARACTERS.test(item))) {
+      throw new Error(`meetings[${index}].${field} cannot contain control characters`);
+    }
+  }
+  if (oneLine(value.url) && !sourceUrl(value.url)) throw new Error(`meetings[${index}].url must be an HTTP URL`);
+  return value;
+}
+
+function bodyFor(meeting) {
+  const attendees = Array.isArray(meeting.attendees) ? meeting.attendees.map(oneLine).filter(Boolean) : [];
+  const actions = Array.isArray(meeting.actionItems) ? meeting.actionItems.map(oneLine).filter(Boolean) : [];
+  const summary = oneLine(meeting.summary);
+  const source = sourceUrl(meeting.url);
+  const lines = [
+    `Date: ${oneLine(meeting.date) || "unknown"}`,
+    `Attendees: ${attendees.join(", ") || "not listed"}`,
+    "",
+    "## Summary",
+    summary || "No source summary was provided.",
+    "",
+    "## Action items",
+    ...(actions.length ? actions.map((item) => `- ${item}`) : ["- None listed."]),
+    "",
+    "## Source",
+    source ? `[Open in the meeting source](${protectedUrl(source)})` : "No source link was provided.",
+  ];
+  return lines.join("\n");
+}
+
+async function main() {
+  let deliveredArgs = process.argv.slice(2);
+  if (process.env.BRAIN_EXTENSION_ARGS_JSON !== undefined) {
+    const parsed = JSON.parse(process.env.BRAIN_EXTENSION_ARGS_JSON);
+    if (!Array.isArray(parsed) || parsed.some((arg) => typeof arg !== "string")) throw new Error("BRAIN_EXTENSION_ARGS_JSON must be a list of strings");
+    deliveredArgs = parsed;
+  }
+  const args = deliveredArgs.filter((arg) => !["--json", "--quiet", "-q"].includes(arg));
+  if (args[0] !== "import") {
+    fail("usage", "usage: brain meetings import [--since <duration>]", 2);
+    return;
+  }
+  let since = "7d";
+  for (let i = 1; i < args.length; i++) {
+    if (args[i] === "--since" && args[i + 1]) since = args[++i];
+    else if (args[i].startsWith("--since=")) since = args[i].slice("--since=".length);
+    else {
+      fail("usage", `unknown meetings argument '${args[i]}'`, 2);
+      return;
+    }
+  }
+
+  const endpoint = new URL(process.env.BRAIN_MEETINGS_API_URL || "https://api.granola.ai/v1/meetings");
+  endpoint.searchParams.set("since", since);
+  const response = await fetch(endpoint, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`meeting source answered ${response.status}`);
+  const payload = await response.json();
+  const rawMeetings = payload?.meetings;
+  if (!Array.isArray(rawMeetings)) throw new Error("meeting source response needs a meetings list");
+  const meetings = rawMeetings.map(validateMeeting);
+
+  const added = [];
+  let skipped = 0;
+  for (const meeting of meetings) {
+    const key = marker(meeting.id);
+    const result = brain([
+      "log", "add", "meeting", oneLine(meeting.title),
+      "--source-id", key,
+      "--source-created", sourceCreated(meeting.date),
+      "--body", "-",
+    ], bodyFor(meeting));
+    if (!result.added) {
+      skipped++;
+      continue;
+    }
+    added.push(result.path);
+  }
+  envelope("meetings.import", true, { added, skipped, received: meetings.length, since });
+}
+
+try {
+  await main();
+} catch (err) {
+  fail("source_failed", err instanceof Error ? err.message : String(err));
+}

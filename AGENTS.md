@@ -40,8 +40,10 @@ holds the rules an agent changing the code must not break.
 11. **`brain context` never fails.** It runs inside other tools' startup hooks: on any
    error it prints nothing and exits 0. The installer never edits a harness's settings
    file; it prints the snippet.
-12. **Notes never leave the machine** except through the user's own `brain sync` to the
-   vault's remote. Two other things may: anonymous telemetry — off unless a person said yes
+12. **brain core never sends notes off the machine** except through the user's own `brain sync`
+   to the vault's remote. An installed extension is separately approved local code with the
+   user's OS permissions; its declared network hosts are disclosure, not enforcement. Two
+   other core features may send data: anonymous telemetry — off unless a person said yes
    to the one-time terminal question or opted in explicitly; never asked of agents, scripts,
    CI or hooks — whose fields are
    exactly `Event` in `src/telemetry.ts` and docs/telemetry.md — adding a field means updating

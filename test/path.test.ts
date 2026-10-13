@@ -18,7 +18,7 @@ let vault: string;
 function brain(args: string[], env: Record<string, string> = {}) {
   const r = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, ...args], {
     cwd: vault,
-    env: { ...process.env, BRAIN_VAULT: "", BRAIN_AS: "", BRAIN_STATE_DIR: join(root, "state"), BRAIN_CONFIG: join(root, "machine.json"), ...env },
+    env: { ...process.env, BRAIN_VAULT: "", BRAIN_AS: "", BRAIN_STATE_DIR: join(root, "state"), BRAIN_CONFIG: join(root, "machine.json"), BRAIN_EXTENSIONS_DIR: join(root, "extensions"), ...env },
     encoding: "utf8",
   });
   return { code: r.status, stdout: r.stdout, stderr: r.stderr };
@@ -40,6 +40,7 @@ test("every name prints one bare absolute path, so $(brain path log) works", () 
     sources: join(vault, "sources"),
     config: join(vault, "brain.json"),
     "user-config": join(root, "machine.json"),
+    extensions: join(root, "extensions"),
     state: indexDir(vault, join(root, "state")),
     index: join(indexDir(vault, join(root, "state")), "index.db"),
     "telemetry-queue": join(root, "state", "telemetry-queue.jsonl"),
@@ -70,12 +71,13 @@ test("reads only: printing every path creates no file or directory", () => {
   assert.deepEqual(readdirSync(vault).sort(), [".obsidian", "brain.json"]);
 });
 
-test("overrides: --vault, BRAIN_VAULT, BRAIN_CONFIG and BRAIN_STATE_DIR all move the answer", () => {
+test("overrides: --vault, BRAIN_VAULT, BRAIN_CONFIG, BRAIN_EXTENSIONS_DIR and BRAIN_STATE_DIR all move the answer", () => {
   const other = join(root, "Other");
   mkdirSync(join(other, ".obsidian"), { recursive: true });
   assert.equal(brain(["path", "vault", "--vault", other]).stdout.trim(), other);
   assert.equal(brain(["path", "log"], { BRAIN_VAULT: other }).stdout.trim(), join(other, "log"));
   assert.equal(brain(["path", "user-config"], { BRAIN_CONFIG: join(root, "elsewhere.json") }).stdout.trim(), join(root, "elsewhere.json"));
+  assert.equal(brain(["path", "extensions"], { BRAIN_EXTENSIONS_DIR: join(root, "other-extensions") }).stdout.trim(), join(root, "other-extensions"));
   assert.equal(brain(["path", "telemetry-queue"], { BRAIN_STATE_DIR: join(root, "s2") }).stdout.trim(), join(root, "s2", "telemetry-queue.jsonl"));
 });
 

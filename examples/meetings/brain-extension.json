@@ -1,0 +1,13 @@
+{
+  "name": "meetings",
+  "version": "0.1.0",
+  "brain": ">=0.10 <1",
+  "description": "Import meeting summaries and source links without transcripts",
+  "command": "bin/brain-meetings",
+  "permissions": {
+    "read": [],
+    "write": ["meeting"],
+    "network": ["api.granola.ai"],
+    "environment": ["BRAIN_MEETINGS_API_URL"]
+  }
+}

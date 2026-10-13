@@ -1,11 +1,12 @@
 # Design: extensions and a local web interface
 
-*Status: proposed (2026-10-13). Nothing here is built yet. Comments welcome as issues.*
+*Status: command extensions (kind 1) are implemented. Hooks (kind 2) and the local UI
+remain proposed. See [the extension documentation](../extensions.md) for the shipped contract.*
 
 brain's core should stay small: index, search, get, log, sync, scopes. Most good ideas —
 a Granola importer, embeddings, a Readwise sync, a lint rule, a view for a new tool —
-belong to the people who want them. This document proposes how anyone can add those
-**without changing brain's code**, and a local web page for editing configuration.
+belong to the people who want them. This document records the implemented command model and
+proposes hooks and a local web page for editing configuration.
 
 ## What we can learn from tools that already do this
 
@@ -37,19 +38,10 @@ Why that and not plugins loaded into brain:
 The cost is process start-up time, so extensions hook **events that are rare relative to
 a search**: a note changed, an entry added, a sync finished — not every query.
 
-### Kind 1 — commands: `brain <name>`
+### Kind 1 — commands: `brain <name>` (implemented)
 
-The gh model. An extension adds a subcommand:
-
-```sh
-brain ext install github:someone/brain-granola     # clones, pins to a commit, shows the manifest
-brain granola import --since 2026-10-01            # runs the extension's executable
-```
-
-The executable gets `BRAIN_VAULT`, `BRAIN_BIN` (the brain that launched it),
-`BRAIN_AS=<extension name>` and `BRAIN_EXT_DIR`, and does its work by calling
-`brain … --json` itself. Because it runs **as its own integration**, everything it reads
-and writes goes through the scope its manifest declares.
+The shipped install, manifest, launcher, scope and process contracts are documented in
+[`docs/extensions.md`](../extensions.md).
 
 Good fits: importers (Granola, Notion, Readwise, Kindle highlights → log entries),
 reports, one-off migrations, a `brain bench` for the benchmark.
@@ -77,42 +69,13 @@ Embeddings are the clearest example: semantic search can arrive as a `note.index
 `search.after` extension with its own model and store, so brain's core keeps no model,
 no network and no native dependency, and users who never want it never pay for it.
 
-### The manifest: `brain-extension.json`
+### Proposed hook manifest addition
 
-```json
-{
-  "name": "granola",
-  "version": "0.1.0",
-  "brain": ">=0.7 <1",
-  "description": "Import Granola meeting notes as 'meeting' log entries",
-  "command": "bin/brain-granola",
-  "hooks": { "context.build": "bin/context-hook" },
-  "permissions": {
-    "read": ["Meetings/"],
-    "write": ["meeting"],
-    "network": ["api.granola.ai"]
-  }
-}
-```
+Hooks would extend the implemented [`brain-extension.json` contract](../extensions.md#manifest)
+with a mapping such as `"hooks": { "context.build": "bin/context-hook" }`. Its exact schema,
+permissions and enablement behavior remain to be designed with the first hook.
 
-`permissions.read` / `write` become the extension's integration scope, enforced by brain.
-`network` is a **declaration** shown at install time — brain cannot enforce it, and the
-docs will say so, the same honesty as for scopes.
-
-### Trust
-
-An extension is code running on your machine with your permissions. So:
-
-- **Install is explicit and shows the manifest first**: what it reads, writes, contacts.
-  No `$PATH` discovery, no auto-install, no extension installing another.
-- **Pinned to a commit.** `brain ext upgrade` shows the diff of the manifest's
-  permissions before moving the pin.
-- **Per-vault enable.** `brain.json` lists which installed extensions a vault uses, so a
-  work vault and a personal vault can differ.
-- **Off switch.** `BRAIN_NO_EXTENSIONS=1` runs pure core, for debugging and for agents you
-  do not trust with extensions.
-
-### Discovery and contribution
+### Proposed discovery and contribution
 
 No central server at first. Extensions are git repos named `brain-<name>` with the GitHub
 topic `brain-extension`, and an `awesome` list in this repo. `brain ext create <name>`
@@ -145,10 +108,9 @@ Rules it must follow:
 
 ## Order of work
 
-1. **Lifecycle, lint and the benchmark** (roadmap step 4) first: `lint.run` and
-   `brain bench` are the first consumers of the extension contract, so the contract is
-   designed against real needs.
+1. **Lifecycle and lint** (roadmap step 4). Done; the benchmark remains future work.
 2. **Extension commands** (kind 1) and the manifest, with `brain ext install/list/remove`.
+   Done, designed against the meetings reference extension.
 3. **Hooks** (kind 2), one event at a time, starting with `context.build` and `log.added`.
 4. **`brain ui`**, once there is enough configuration to deserve a page.
 
@@ -156,5 +118,7 @@ Rules it must follow:
 
 - Should hook output that changes ranking (`search.after`) ever be on by default, or only
   per call? Proposed: per call, so search stays explainable.
-- Windows: extension executables need a launcher convention (`.cmd`/`.exe`).
 - Does a hosted index of extensions ever make sense, or is a GitHub topic enough?
+
+The implemented Windows launcher convention is documented in
+[the extension docs](../extensions.md#windows-launchers).
