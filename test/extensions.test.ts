@@ -96,8 +96,8 @@ function echoExtension(path: string, name = "echoer"): string {
     name,
     command: "bin/command.mjs",
     description: "test extension",
-    permissions: { read: ["Allowed/"], write: ["event"], network: ["api.example.test"] },
-  }, `process.stdout.write(JSON.stringify({schema:"brain.v1",command:"${name}",ok:true,data:{args:process.argv.slice(2),vault:process.env.BRAIN_VAULT,as:process.env.BRAIN_AS,machine:process.env.BRAIN_MACHINE,dir:process.env.BRAIN_EXT_DIR}})+"\\n")`);
+    permissions: { read: ["Allowed/"], write: ["event"], network: ["api.example.test"], environment: ["BRAIN_TEST_ALLOWED"] },
+  }, `process.stdout.write(JSON.stringify({schema:"brain.v1",command:"${name}",ok:true,data:{args:process.argv.slice(2),vault:process.env.BRAIN_VAULT,as:process.env.BRAIN_AS,machine:process.env.BRAIN_MACHINE,dir:process.env.BRAIN_EXT_DIR,allowed:process.env.BRAIN_TEST_ALLOWED??null,secret:process.env.AWS_SECRET_ACCESS_KEY??null}})+"\\n")`);
 }
 
 test("install needs human permission approval and exposes the declared permissions", { skip: process.platform === "win32" }, (t) => {
@@ -116,6 +116,7 @@ test("install needs human permission approval and exposes the declared permissio
 
   const installed = interactiveInstall(f, source);
   assert.equal(installed.code, 0, installed.stdout + installed.stderr);
+  assert.match(installed.stdout + installed.stderr, /BRAIN_TEST_ALLOWED/);
   assert.equal(readdirSync(f.vault).includes("brain.json"), false, "enabling an extension does not create mutable vault config");
   assert.match(readFileSync(join(f.vault, "log", "extensions", "echoer.md"), "utf8"), /extension: echoer/);
 
@@ -124,9 +125,9 @@ test("install needs human permission approval and exposes the declared permissio
   const record = listed.body.data.extensions[0];
   assert.equal(record.name, "echoer");
   assert.equal(record.enabled, true);
-  assert.deepEqual(record.manifest.permissions, { read: ["Allowed/"], write: ["event"], network: ["api.example.test"] });
+  assert.deepEqual(record.manifest.permissions, { read: ["Allowed/"], write: ["event"], network: ["api.example.test"], environment: ["BRAIN_TEST_ALLOWED"] });
 
-  const invoked = json(f, ["echoer", "hello"]);
+  const invoked = json(f, ["echoer", "hello"], { BRAIN_TEST_ALLOWED: "declared-value", AWS_SECRET_ACCESS_KEY: "ambient-secret" });
   assert.equal(invoked.code, 0);
   assert.equal(invoked.stdout.trim().split("\n").length, 1);
   assert.equal(invoked.body.schema, "brain.v1");
@@ -134,6 +135,8 @@ test("install needs human permission approval and exposes the declared permissio
   assert.equal(invoked.body.data.machine, "test-machine");
   assert.equal(invoked.body.data.vault, realpathSync(f.vault));
   assert.match(invoked.body.data.dir, /extensions\/echoer$/);
+  assert.equal(invoked.body.data.allowed, "declared-value");
+  assert.equal(invoked.body.data.secret, null);
   assert.deepEqual(invoked.body.data.args, ["hello", "--json"]);
 
   const leadingJson = brain(f, ["--json", "echoer", "leading"]);
@@ -200,6 +203,20 @@ test("install rejects terminal controls in permission text and unsupported sourc
     const result = interactiveInstall(f, source);
     assert.equal(result.code, 2, result.stdout + result.stderr);
     assert.match(result.stdout + result.stderr, /control characters/);
+  }
+
+  for (const [name, environment] of [
+    ["invalid-environment", ["BAD=NAME"]],
+    ["reserved-environment", ["brain_extension_scope"]],
+  ] as const) {
+    const source = makeExtension(join(f.root, name), {
+      name,
+      command: "bin/command.mjs",
+      permissions: { read: [], write: [], network: [], environment: [...environment] },
+    }, "");
+    const result = interactiveInstall(f, source);
+    assert.equal(result.code, 2, result.stdout + result.stderr);
+    assert.match(result.stdout + result.stderr, /environment permission/);
   }
 
   const alias = interactiveInstall(f, "github:example/brain-example");

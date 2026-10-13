@@ -201,6 +201,10 @@ const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view"
 const DEFAULT_EXTENSION_TIMEOUT_MS = 30_000;
 const MAX_EXTENSION_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
+const EXTENSION_RUNTIME_ENVIRONMENT = new Set([
+  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
+  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
+]);
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -989,6 +993,7 @@ async function confirmExtensionInstall(manifest: ExtensionManifest): Promise<boo
       `  reads:    ${show(manifest.permissions.read, "nothing")}`,
       `  writes:   ${show(manifest.permissions.write, "nothing")}`,
       `  contacts: ${show(manifest.permissions.network, "no hosts declared")}`,
+      `  receives: ${show(manifest.permissions.environment ?? [], "no ambient variables")}`,
       "",
       "This is code that runs with your operating-system permissions. brain enforces its",
       "read/write scope when it calls brain; declared network hosts are not sandboxed.",
@@ -1022,6 +1027,16 @@ for (const [key, value] of Object.entries(locked)) {
 await import(${JSON.stringify(pathToFileURL(BIN).href)});
 `, { mode: 0o700 });
   return { directory, path };
+}
+
+function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
+  const allowed = new Set([...EXTENSION_RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
+  const normalized = process.platform === "win32"
+    ? new Set([...allowed].map((key) => key.toUpperCase()))
+    : allowed;
+  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
+    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
+  ));
 }
 
 function commandPosition(argv: string[]): number {
@@ -1099,7 +1114,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     BRAIN_EXT_REDACT_TOKEN: redactToken,
   });
   const env: NodeJS.ProcessEnv = {
-    ...process.env,
+    ...extensionEnvironment(installed.manifest),
     BRAIN_VAULT: vault,
     BRAIN_BIN: childRunner.path,
     BRAIN_AS: parentAs || installed.manifest.name,

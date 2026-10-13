@@ -7,6 +7,7 @@
   "permissions": {
     "read": [],
     "write": ["meeting"],
-    "network": ["api.granola.ai"]
+    "network": ["api.granola.ai"],
+    "environment": ["BRAIN_MEETINGS_API_URL"]
   }
 }

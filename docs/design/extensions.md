@@ -92,14 +92,16 @@ no network and no native dependency, and users who never want it never pay for i
   "permissions": {
     "read": ["Meetings/"],
     "write": ["meeting"],
-    "network": ["api.granola.ai"]
+    "network": ["api.granola.ai"],
+    "environment": ["BRAIN_MEETINGS_API_URL"]
   }
 }
 ```
 
 `permissions.read` / `write` become the extension's integration scope, enforced by brain.
 `network` is a **declaration** shown at install time — brain cannot enforce it, and the
-docs will say so, the same honesty as for scopes.
+docs will say so, the same honesty as for scopes. `environment` names the ambient variables
+brain copies into the extension process; all others are withheld.
 
 ### Trust
 

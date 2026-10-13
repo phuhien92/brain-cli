@@ -47,7 +47,8 @@ An extension directory has a `brain-extension.json` at its root:
   "permissions": {
     "read": ["Projects/"],
     "write": ["example"],
-    "network": ["api.example.com"]
+    "network": ["api.example.com"],
+    "environment": ["EXAMPLE_API_TOKEN"]
   }
 }
 ```
@@ -58,6 +59,8 @@ An extension directory has a `brain-extension.json` at its root:
 - `permissions.read` lists vault folder prefixes; `"*"` means the whole vault.
 - `permissions.write` lists log kinds the extension may add.
 - `permissions.network` lists host names shown during approval.
+- `permissions.environment` lists ambient variable names copied into the extension process;
+  undeclared variables, including credentials, are not inherited.
 
 Read and write permissions become a normal brain integration scope. A network declaration is
 not a sandbox: extension code runs with the person's OS permissions, and brain cannot stop it
@@ -87,6 +90,9 @@ arguments. It sets:
 | `BRAIN_MACHINE` | current machine name |
 | `BRAIN_EXT_REDACT_TOKEN` | opaque token for marking a sanitized extension-generated source URL |
 | `BRAIN_EXTENSION_ARGS_JSON` | Windows `.cmd` launchers only: the command arguments as a JSON string list |
+
+The process also receives a minimal runtime environment (`PATH`, home/temp, locale, terminal, and
+required Windows process variables) plus values explicitly approved in `permissions.environment`.
 
 Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
 the manifest scope; the launcher restores its trusted scope and redaction context before dispatch.

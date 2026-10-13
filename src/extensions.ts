@@ -27,6 +27,7 @@ export interface ExtensionPermissions {
   read: string[];
   write: string[];
   network: string[];
+  environment?: string[];
 }
 
 export interface ExtensionManifest {
@@ -72,6 +73,11 @@ const SEMVER = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)(?:-(?:0|[1-9]\d*
 const RESERVED = new Set([
   "setup", "index", "search", "get", "log", "view", "export", "sync", "lifecycle", "lint",
   "integrations", "doctor", "path", "context", "agent", "feedback", "telemetry", "ext", "help",
+]);
+const RESERVED_ENVIRONMENT = new Set([
+  "BRAIN_AS", "BRAIN_BIN", "BRAIN_EXTENSION_ARGS_JSON", "BRAIN_EXTENSION_LAUNCHER",
+  "BRAIN_EXTENSION_PARENT_AS", "BRAIN_EXTENSION_SCOPE", "BRAIN_EXT_DIR", "BRAIN_EXT_REDACT",
+  "BRAIN_EXT_REDACT_TOKEN", "BRAIN_MACHINE", "BRAIN_VAULT",
 ]);
 
 function slug(s: string): string {
@@ -143,6 +149,12 @@ export function readManifest(directory: string): ExtensionManifest {
       throw new ExtensionError("invalid_manifest", `${path}: network permission '${host}' must be a host name, not a URL`, 2);
     }
   }
+  const environment = p.environment === undefined ? [] : strings(p.environment, `${path}: permissions.environment`);
+  for (const variable of environment) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(variable) || RESERVED_ENVIRONMENT.has(variable.toUpperCase())) {
+      throw new ExtensionError("invalid_manifest", `${path}: environment permission '${variable}' is not an allowed variable name`, 2);
+    }
+  }
   const brain = o.brain === undefined ? undefined : typeof o.brain === "string" ? o.brain : null;
   const description = o.description === undefined ? undefined : typeof o.description === "string" ? o.description.trim() : null;
   if (brain === null || description === null) throw new ExtensionError("invalid_manifest", `${path}: brain and description must be strings`, 2);
@@ -150,11 +162,13 @@ export function readManifest(directory: string): ExtensionManifest {
     throw new ExtensionError("invalid_manifest", `${path}: description cannot contain control characters`, 2);
   }
 
+  const permissions: ExtensionPermissions = { read, write, network };
+  if (p.environment !== undefined) permissions.environment = environment;
   const manifest: ExtensionManifest = {
     name,
     version,
     command,
-    permissions: { read, write, network },
+    permissions,
   };
   if (brain !== undefined) manifest.brain = brain;
   if (description !== undefined && description) manifest.description = description;
