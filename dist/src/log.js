@@ -2,8 +2,10 @@
 //
 // This is what makes the vault safe to sync between machines with plain git.
 // Two machines appending to one learnings.md produce a merge conflict on the
-// first sync; two machines each creating a new file never do. Every write in
-// this module creates a file that did not exist — none edits one.
+// first sync; ordinary entries use machine-specific names and never do.
+// Source imports deliberately use one deterministic path across machines so
+// identical imports merge and divergent content conflicts. Every write in this
+// module is still create-only — none edits an existing file.
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
