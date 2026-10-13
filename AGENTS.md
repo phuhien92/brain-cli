@@ -11,7 +11,7 @@ holds the rules an agent changing the code must not break.
    what was last exported to each path, whose loss only makes `export` refuse until
    `--force`, never overwrite.
 2. **Create, never edit.** The only writes into the vault are new files under the log
-   folder (`log add`, `log import`, `lifecycle …`) and immutable originals plus metadata
+   folder (`log add`, `log import`, `log retire`, `log replace`, `lifecycle …`) and immutable originals plus metadata
    sidecars under `sources/` (`ingest`), opened with the `wx` flag so an existing file can
    never be replaced. No command edits, moves or deletes a note or source. The writable set
    includes `sources/` so provenance can travel with the vault without weakening the
@@ -57,7 +57,7 @@ holds the rules an agent changing the code must not break.
   behind `brain path`, `doctor`, the index and telemetry; it never creates anything.
 - `src/config.ts` — `brain.json` (synced) and the machine-local user config: sync mode,
   integrations, `BRAIN_AS`, read scope.
-- `src/log.ts` — log entries: add, list, import, render a view, export with drift check.
+- `src/log.ts` — log entries: add, list, import, retire, render a view, export with drift check.
 - `src/sync.ts` — sync modes: git (commit the log, pull --rebase, push), none, command.
 - `src/lifecycle.ts` — categories, review windows, lifecycle events (`log/lifecycle/`) and
   each note's state (frontmatter, then events, latest wins).

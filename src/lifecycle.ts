@@ -73,7 +73,11 @@ export function lifecycleStates(store: Store, cfg: Config): Map<string, Lifecycl
   for (const r of rows) {
     const fm = JSON.parse(r.frontmatter) as Record<string, unknown>;
     if (r.path.startsWith(eventDir)) {
-      if (typeof fm.target === "string") events.push({ created: String(fm.created ?? ""), path: r.path, fm });
+      // Log-entry retirements share the append-only lifecycle folder but are
+      // handled by log views, not by note freshness state.
+      if (fm.action !== "retire" && typeof fm.target === "string") {
+        events.push({ created: String(fm.created ?? ""), path: r.path, fm });
+      }
       continue;
     }
     const category = fm.category;

@@ -71,6 +71,39 @@ test("archive hides a note from search (and lifecycle events never appear in sea
   assert.equal(brain(["search", "kent"]).body.data.results.length, 1);
 });
 
+test("log retire and replace append lifecycle events while views omit retired entries", () => {
+  const retired = brain(["log", "add", "learning", "Old wording", "--body", "Keep this detail", "--tag", "ops"]);
+  const retiredPath = retired.body.data.path as string;
+  const original = readFileSync(join(vault, retiredPath), "utf8");
+
+  const retirement = brain(["log", "retire", retiredPath, "--reason", "No longer true"]);
+  assert.equal(retirement.code, 0);
+  assert.equal(retirement.body.data.target, retiredPath);
+  assert.equal(readFileSync(join(vault, retiredPath), "utf8"), original, "retiring never edits the entry");
+  const event = readFileSync(join(vault, retirement.body.data.event), "utf8");
+  assert.match(event, /action: "retire"/);
+  assert.match(event, /reason: "No longer true"/);
+  assert.equal(brain(["view", "learning"]).body.data.entries, 0);
+  assert.ok(
+    brain(["lifecycle", "status"]).body.data.notes.every((note: { path: string }) => note.path !== retiredPath),
+    "retirements do not become note lifecycle states",
+  );
+
+  const old = brain(["log", "add", "learning", "Needs rewording", "--body", "Preserved body", "--tag", "ops"]);
+  const oldPath = old.body.data.path as string;
+  const replaced = brain(["log", "replace", oldPath, "--text", "Clear wording"]);
+  assert.equal(replaced.code, 0);
+  assert.equal(replaced.body.data.target, oldPath);
+  assert.match(replaced.body.data.replacement, /^log\/learning\//);
+  assert.equal(readFileSync(join(vault, oldPath), "utf8").includes("Needs rewording"), true);
+  const view = brain(["view", "learning"]).body.data.markdown as string;
+  assert.doesNotMatch(view, /Old wording|Needs rewording/);
+  assert.match(view, /- Clear wording\n {2}Preserved body/);
+  const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
+  assert.deepEqual(active.map((entry: { title: string }) => entry.title), ["Clear wording"]);
+  assert.equal(readdirSync(join(vault, "log/lifecycle")).length, 2);
+});
+
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {
   write("brain.json", JSON.stringify({ lifecycle: { windows: { "current-state": 60 } } }));
   assert.equal(brain(["get", "Finance/kent"]).body.data.lifecycle.overdue, false);

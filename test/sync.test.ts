@@ -2,7 +2,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, beforeEach, test } from "node:test";
@@ -106,6 +106,43 @@ test("two machines ingest sources concurrently and sync both immutable pairs wit
     assert.equal(readFileSync(join(mini.vault, path), "utf8"), readFileSync(join(laptop.vault, path), "utf8"));
   }
   assert.equal(git(mini.vault, "status", "--porcelain"), "");
+});
+
+test("a retirement from machine A removes the entry when machine B syncs and exports", () => {
+  const mini = machine("mini");
+  const laptop = machine("laptop");
+  const added = mini.run("log", "add", "learning", "Retire this everywhere");
+  const entry = added.body.data.path as string;
+  assert.equal(mini.run("sync").code, 0);
+  assert.equal(laptop.run("sync").code, 0);
+  assert.match(readFileSync(laptop.learnings, "utf8"), /Retire this everywhere/);
+
+  assert.equal(mini.run("log", "retire", entry, "--reason", "superseded").code, 0);
+  assert.equal(mini.run("sync").code, 0);
+  const synced = laptop.run("sync");
+  assert.equal(synced.code, 0, JSON.stringify(synced.body));
+  assert.doesNotMatch(readFileSync(mini.learnings, "utf8"), /Retire this everywhere/);
+  assert.equal(readFileSync(laptop.learnings, "utf8"), readFileSync(mini.learnings, "utf8"));
+});
+
+test("two machines can retire the same entry concurrently without conflict", () => {
+  const mini = machine("mini");
+  const laptop = machine("laptop");
+  const added = mini.run("log", "add", "learning", "Both machines retire this");
+  const entry = added.body.data.path as string;
+  assert.equal(mini.run("sync").code, 0);
+  assert.equal(laptop.run("sync").code, 0);
+
+  assert.equal(mini.run("log", "retire", entry, "--reason", "mini cleanup").code, 0);
+  assert.equal(laptop.run("log", "retire", entry, "--reason", "laptop cleanup").code, 0);
+  assert.equal(mini.run("sync").code, 0);
+  const laptopSync = laptop.run("sync");
+  assert.equal(laptopSync.code, 0, JSON.stringify(laptopSync.body));
+  assert.equal(mini.run("sync").code, 0);
+  assert.equal(readdirSync(join(mini.vault, "log/lifecycle")).length, 2);
+  assert.equal(readdirSync(join(laptop.vault, "log/lifecycle")).length, 2);
+  assert.doesNotMatch(readFileSync(mini.learnings, "utf8"), /Both machines retire this/);
+  assert.equal(readFileSync(laptop.learnings, "utf8"), readFileSync(mini.learnings, "utf8"));
 });
 
 test("sync commits only the log and sources, never a note being written", () => {

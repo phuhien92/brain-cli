@@ -30,6 +30,14 @@ export interface NewEntry {
   fields?: Record<string, string>; // extra frontmatter, e.g. a lifecycle event's target
 }
 
+export const RETIRE_ACTION = "retire";
+const LIFECYCLE_KIND = "lifecycle";
+
+export interface RetirementCandidate {
+  path: string;
+  title: string;
+}
+
 export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   const kind = slug(input.kind);
   if (!kind) throw new Error("an entry needs a kind, e.g. 'learning'");
@@ -67,13 +75,24 @@ export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   }
 }
 
-export function listEntries(store: Store, cfg: Config, opts: { kind?: string; limit?: number } = {}): Entry[] {
+export function listEntries(
+  store: Store,
+  cfg: Config,
+  opts: { kind?: string; limit?: number; includeRetired?: boolean } = {},
+): Entry[] {
   const rows = store.db
     .prepare(
       `SELECT path, title, frontmatter, tags FROM notes
         WHERE path LIKE ? ESCAPE '\\'
           AND json_extract(frontmatter, '$.kind') IS NOT NULL
           AND (? IS NULL OR json_extract(frontmatter, '$.kind') = ?)
+          AND (? = 1 OR path NOT IN (
+            SELECT json_extract(events.frontmatter, '$.target')
+              FROM notes AS events
+             WHERE events.path LIKE ? ESCAPE '\\'
+               AND json_extract(events.frontmatter, '$.action') = '${RETIRE_ACTION}'
+               AND json_extract(events.frontmatter, '$.target') IS NOT NULL
+          ))
         ORDER BY json_extract(frontmatter, '$.created') DESC, path DESC
         LIMIT ?`,
     )
@@ -81,6 +100,8 @@ export function listEntries(store: Store, cfg: Config, opts: { kind?: string; li
       cfg.logDir.replace(/[\\%_]/g, (c) => `\\${c}`) + "/%",
       opts.kind ?? null,
       opts.kind ?? null,
+      opts.includeRetired ? 1 : 0,
+      `${cfg.logDir}/${LIFECYCLE_KIND}`.replace(/[\\%_]/g, (c) => `\\${c}`) + "/%",
       opts.limit ?? -1,
     ) as { path: string; title: string; frontmatter: string; tags: string }[];
 
@@ -96,6 +117,25 @@ export function listEntries(store: Store, cfg: Config, opts: { kind?: string; li
       tags: JSON.parse(r.tags) as string[],
       body: entryBody(raw),
     };
+  });
+}
+
+// Record a retirement as a separate lifecycle entry. Multiple machines may
+// retire the same target; each event is valid and no existing file is touched.
+export function recordRetirement(
+  vault: string,
+  cfg: Config,
+  target: string,
+  opts: { reason?: string; replacement?: string } = {},
+): string {
+  const fields: Record<string, string> = { target, action: RETIRE_ACTION };
+  if (opts.reason) fields.reason = opts.reason;
+  if (opts.replacement) fields.replacement = opts.replacement;
+  return addEntry(vault, cfg, {
+    kind: LIFECYCLE_KIND,
+    title: `${target}: retired`,
+    body: opts.reason,
+    fields,
   });
 }
 
@@ -218,14 +258,23 @@ export function importFile(
   cfg: Config,
   kind: string,
   file: string,
-): { added: string[]; skipped: number } {
+): { added: string[]; skipped: number; retirementCandidates: RetirementCandidate[] } {
   const source = readFileSync(file, "utf8");
-  const existing = new Set(listEntries(store, cfg, { kind: slug(kind) }).map((e) => norm(e.title)));
+  const entryKind = slug(kind);
+  const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
+  const activeEntries = listEntries(store, cfg, { kind: entryKind });
+  // A retired title remains recorded: importing a stale generated file must
+  // not silently recreate it as a new active entry.
+  const existing = new Set(allEntries.map((e) => norm(e.title)));
   const added: string[] = [];
   let skipped = 0;
   // A millisecond apart and ending now, so the view (oldest first) keeps the
   // file's original order and nothing imported sorts after a later entry.
   const items = parseImport(source);
+  const imported = new Set(items.map((item) => norm(item.title)));
+  const retirementCandidates = activeEntries
+    .filter((entry) => !imported.has(norm(entry.title)))
+    .map(({ path, title }) => ({ path, title }));
   const base = Date.now() - items.length;
   items.forEach((item, i) => {
     if (existing.has(norm(item.title))) {
@@ -238,7 +287,7 @@ export function importFile(
   // What was just imported is now captured, so exporting over this file is no
   // longer a loss.
   store.setMeta(`export:${file}`, sha(source));
-  return { added, skipped };
+  return { added, skipped, retirementCandidates };
 }
 
 function stripComments(s: string): string {

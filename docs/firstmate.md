@@ -115,14 +115,24 @@ Optionally, back it up with a cron job so a machine that was off catches up on i
 
 firstmate's `/stow` curates `learnings.md` in place. If it does, the next `brain sync` or
 `brain export` sees that the file changed since brain wrote it and **refuses to overwrite
-it** — those edits are not in the log yet. To capture new bullets and re-export:
+it** — those edits are not in the log yet. To capture the curation and re-export:
 
 ```sh
-brain log import learning ~/firstmate/data/learnings.md   # adds only what is new
+brain log import learning ~/firstmate/data/learnings.md
+# Adds new bullets and lists logged entries missing from the file as candidates.
+# Review each candidate, then confirm removals explicitly:
+brain log retire log/learning/<entry-id>.md --reason "removed by /stow"
 brain export --force
 ```
 
-Know the limit: `import` captures *added* bullets. If stow *removed* or re-worded an entry,
-the log still holds the original, and the forced export brings it back. Retiring entries
-belongs to brain's lifecycle work (roadmap step 4); until then, prefer `brain log add` over
-`/stow` for learnings.
+`import` never retires anything automatically. For a direct rewording that has not already
+been imported, replace the old entry in one command instead:
+
+```sh
+brain log replace log/learning/<entry-id>.md --text "the corrected learning"
+```
+
+Both commands leave the original entry untouched and add lifecycle files under
+`log/lifecycle/`. After `brain sync`, every machine's generated view omits the retired
+entry. If two machines retire the same entry before syncing, both events remain valid and
+do not conflict.
