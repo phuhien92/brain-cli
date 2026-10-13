@@ -52,6 +52,7 @@ brain search pnpm --path firstmate --tag ops --limit 5
 brain search 'lease AND renewal' --raw   # SQLite FTS5 syntax: AND, NEAR, prefix*
 brain get "Projects/blog/runbook" # print a note by path, file name, title or alias
 brain get "Blog runbook" --meta  # frontmatter, tags, headings and links only
+brain get "Blog runbook" --section Deploy   # just that section — for long notes
 brain log add learning "..."     # record memory (see below)
 brain sync                       # share it with your other machines
 ```

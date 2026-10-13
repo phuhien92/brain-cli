@@ -7,7 +7,7 @@ import { addEntry, exportView, importFile, listEntries, renderView, type ExportR
 import { Store, type RefreshStats } from "./store.js";
 import { sync, SyncError } from "./sync.js";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -25,6 +25,9 @@ COMMANDS
       --raw                   Treat <query> as SQLite FTS5 syntax (AND, NEAR, prefix*)
   get <note>                  Print a note by path, file name, title or alias
       --meta                  Frontmatter, tags, headings and links only, no body
+      --section <heading>     Only that section: the heading and everything under it,
+                              up to the next heading of the same or higher level
+                              (repeatable; matched case-insensitively, by prefix)
 
   log add <kind> <title>      Record an entry as a new file: <log>/<kind>/<date>-<machine>-<slug>.md
       --body <text|->         Entry body (- reads stdin)
@@ -101,6 +104,7 @@ export async function main(argv: string[]): Promise<number> {
         path: { type: "string" },
         raw: { type: "boolean", default: false },
         meta: { type: "boolean", default: false },
+        section: { type: "string", multiple: true },
         body: { type: "string" },
         tag: { type: "string", multiple: true },
         kind: { type: "string" },
@@ -229,6 +233,19 @@ export async function main(argv: string[]): Promise<number> {
           });
         }
         const note = store.get(matches[0]!)!;
+        if (flags.section?.length) {
+          const { content, found, missing } = extractSections(note.content, flags.section);
+          if (!found.length) {
+            throw new CliError("not_found", `no section in ${note.path} matches ${flags.section.map((x) => `'${x}'`).join(", ")}`, 3, {
+              headings: note.headings,
+            });
+          }
+          const data = { ...note, content, sections: found, missing };
+          print(out, command, data, { vault, index }, () =>
+            content + (missing.length ? `\n(no section matched: ${missing.join(", ")})` : ""),
+          );
+          return 0;
+        }
         const data = flags.meta ? { ...note, content: undefined } : note;
         print(out, command, data, { vault, index }, () => (flags.meta ? formatMeta(note) : note.content));
         return 0;
@@ -421,6 +438,42 @@ function formatMeta(note: NonNullable<ReturnType<Store["get"]>>): string {
     lines.push("links:", ...note.links.map((l) => `  [[${l.target}${l.heading ? "#" + l.heading : ""}]]`));
   }
   return lines.join("\n");
+}
+
+// A section is its heading line plus everything up to the next heading of the
+// same or higher level. Headings inside fenced code are not headings. Requests
+// match a heading's text case-insensitively by prefix, so "Outcome Log"
+// finds "## Outcome Log (pending first)". Sections come back in note order.
+export function extractSections(
+  markdown: string,
+  wanted: string[],
+): { content: string; found: string[]; missing: string[] } {
+  const lines = markdown.split("\n");
+  const headings: { line: number; level: number; text: string }[] = [];
+  let fence: string | null = null;
+  lines.forEach((line, i) => {
+    const f = /^(```|~~~)/.exec(line);
+    if (f) fence = fence === f[1] ? null : (fence ?? f[1]!);
+    if (fence) return;
+    const h = /^(#{1,6})[ \t]+(.+?)[ \t#]*$/.exec(line);
+    if (h) headings.push({ line: i, level: h[1]!.length, text: h[2]!.trim() });
+  });
+  const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
+  const picked = new Map<number, string>();
+  const missing: string[] = [];
+  for (const w of wanted) {
+    const exact = headings.findIndex((h) => norm(h.text) === norm(w));
+    const idx = exact >= 0 ? exact : headings.findIndex((h) => norm(h.text).startsWith(norm(w)));
+    if (idx < 0) missing.push(w);
+    else picked.set(idx, headings[idx]!.text);
+  }
+  const order = [...picked.keys()].sort((a, b) => a - b);
+  const blocks = order.map((idx) => {
+    const h = headings[idx]!;
+    const next = headings.slice(idx + 1).find((n) => n.level <= h.level);
+    return lines.slice(h.line, next ? next.line : lines.length).join("\n").trimEnd();
+  });
+  return { content: blocks.join("\n\n") + (blocks.length ? "\n" : ""), found: order.map((i) => picked.get(i)!), missing };
 }
 
 function stem(path: string): string {

@@ -102,3 +102,37 @@ test("--quiet suppresses human output; errors still go to stderr", () => {
   assert.equal(r.code, 3);
   assert.match(r.stderr, /no note matches/);
 });
+
+test("extractSections: heading to next same-or-higher heading, prefix match, note order, code fences ignored", async () => {
+  const { extractSections } = await import("../src/cli.js");
+  const md = [
+    "# Title",
+    "intro",
+    "## Profile",
+    "p",
+    "### Detail",
+    "d",
+    "## Outcome Log (pending first)",
+    "o",
+    "```",
+    "## not a heading",
+    "```",
+    "## Loops",
+    "l",
+  ].join("\n");
+  const r = extractSections(md, ["outcome log", "Profile", "Missing"]);
+  assert.deepEqual(r.found, ["Profile", "Outcome Log (pending first)"]);
+  assert.deepEqual(r.missing, ["Missing"]);
+  assert.equal(r.content, "## Profile\np\n### Detail\nd\n\n## Outcome Log (pending first)\no\n```\n## not a heading\n```\n");
+});
+
+test("get --section returns only those sections, exit 3 when none match", () => {
+  writeFileSync(join(vault, "notes/state.md"), "# State\n## Profile\nme\n## History\nlong\n");
+  const r = json(["get", "notes/state", "--section", "profile"]);
+  assert.equal(r.code, 0);
+  assert.equal(r.body.data.content, "## Profile\nme\n");
+  assert.deepEqual(r.body.data.sections, ["Profile"]);
+  const none = json(["get", "notes/state", "--section", "nope"]);
+  assert.equal(none.code, 3);
+  assert.deepEqual(none.body.error.headings, ["State", "Profile", "History"]);
+});

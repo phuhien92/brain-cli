@@ -26,6 +26,9 @@ phrase).
 4. Narrow when results are noisy: `--path "<folder>"`, `--tag <tag>`.
 5. Cite the note path you relied on, so the user can open it.
 
+For a long note, read only what you need: `brain get "<path>" --section "<heading>" --json`
+(repeatable; `--meta` lists the headings first).
+
 `brain get` accepts a path, a file name, a note title or an alias. Exit code 4 means the
 name matched several notes; pick one from `error.candidates`.
 
