@@ -119,6 +119,27 @@ test("sync commits only the log and sources, never a note being written", () => 
   assert.match(git(join(root, "remote.git"), "log", "-1", "--format=%s"), /^brain: 1 log entry from mini$/);
 });
 
+test("sync commits only new source pairs and refuses a batch too large for one command line", () => {
+  const mini = machine("mini");
+  const sources = join(mini.vault, "sources");
+  mkdirSync(sources, { recursive: true });
+  writeFileSync(join(sources, "first.pdf"), "first\n");
+  writeFileSync(join(sources, "first.pdf.source.md"), "---\ntitle: First\n---\n");
+  assert.equal(mini.run("sync").code, 0);
+  assert.equal(git(mini.vault, "status", "--porcelain"), "");
+
+  for (let i = 0; i < 1200; i++) {
+    const name = `2026-10-13-mini-a-rather-long-source-title-number-${i}.pdf`;
+    writeFileSync(join(sources, name), `${i}\n`);
+    writeFileSync(join(sources, `${name}.source.md`), `---\ntitle: Source ${i}\n---\n`);
+  }
+  const r = mini.run("sync");
+  assert.equal(r.code, 1);
+  assert.equal(r.body.error.code, "git_failed");
+  assert.match(r.body.error.message, /2400 new source files are too many/);
+  assert.equal(git(mini.vault, "diff", "--cached", "--name-only"), "");
+});
+
 test("a note edited on both machines stops sync with exit 5 and names the file", () => {
   const mini = machine("mini");
   const laptop = machine("laptop");

@@ -34,7 +34,8 @@ nothing. Different files with the same title get a numeric suffix. Existing file
 never replaced. Machine names in file names let two machines ingest concurrently without
 a path conflict. Git-mode `brain sync` owns and commits each sidecar and its original along with the log
 folder and `brain.json`; other sync modes move the same files through the user's chosen
-service.
+service. A single sync commits up to a few thousand new source files; past that it stops
+with `git_failed` and asks you to commit them with git first.
 
 ## Cite a source
 

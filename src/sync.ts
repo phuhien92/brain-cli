@@ -11,7 +11,11 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "./config.js";
-import { SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
+import { SOURCES_DIR, SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";
+
+// Only sources not yet committed go on git's command line, so argv stays
+// bounded; past this a sync refuses rather than failing with E2BIG.
+const MAX_SOURCE_PATHSPEC_BYTES = 100_000;
 
 export interface SyncResult {
   mode: "git" | "none" | "command";
@@ -72,22 +76,31 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
     throw new SyncError("not_git", `${vault} is not a git repository: run 'git init' and add a remote, or set "sync": "none" in brain.json`);
   }
 
-  const sources = sourceSidecars(vault).flatMap((sidecar) => [sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length), sidecar]);
+  const managed = new Set(sourceSidecars(vault).flatMap((sidecar) => [sidecar.slice(0, -SOURCE_SIDECAR_SUFFIX.length), sidecar]));
+  const pending = [
+    ...git("ls-files", "-z", "--others", "--modified", "--exclude-standard", "--", SOURCES_DIR).split("\0"),
+    ...git("diff", "--cached", "--name-only", "--relative", "-z", "--", SOURCES_DIR).split("\0"),
+  ];
+  const sources = [...new Set(pending)].filter((p) => managed.has(p) && existsSync(join(vault, p)));
+  if (sources.join(" ").length > MAX_SOURCE_PATHSPEC_BYTES) {
+    throw new SyncError(
+      "git_failed",
+      `${sources.length} new source files are too many to commit in one sync; commit them in ${SOURCES_DIR}/ with git, then run brain sync again`,
+    );
+  }
   const owned = [cfg.logDir, ...sources, "brain.json"].filter((p) => existsSync(join(vault, p)));
   let committed = 0;
   if (owned.length) {
-    const pathspecs = owned.join("\0");
-    run(vault, ["add", "--pathspec-from-file=-", "--pathspec-file-nul"], pathspecs);
-    const ownedFiles = new Set(owned);
-    const staged = git("diff", "--cached", "--name-only", "-z")
-      .split("\0")
-      .filter((path) => path && (path.startsWith(`${cfg.logDir}/`) || ownedFiles.has(path)));
+    git("add", "--", ...owned);
+    const staged = git("diff", "--cached", "--name-only", "--", ...owned)
+      .split("\n")
+      .filter(Boolean);
     if (staged.length) {
       const onlyLog = staged.every((path) => path.startsWith(`${cfg.logDir}/`));
       const message = onlyLog
         ? `brain: ${staged.length} log ${staged.length === 1 ? "entry" : "entries"} from ${cfg.machine}`
         : `brain: ${staged.length} owned ${staged.length === 1 ? "file" : "files"} from ${cfg.machine}`;
-      run(vault, ["commit", "--quiet", "-m", message, "--pathspec-from-file=-", "--pathspec-file-nul"], pathspecs);
+      git("commit", "--quiet", "-m", message, "--", ...owned);
       committed = staged.length;
     }
   }
@@ -138,12 +151,11 @@ export function sync(vault: string, cfg: Config, opts: { push?: boolean } = {}):
   return { mode, committed, pulled, pushed, remote: true };
 }
 
-function run(cwd: string, args: string[], input?: string): string {
+function run(cwd: string, args: string[]): string {
   try {
     return execFileSync("git", ["-C", cwd, ...args], {
       encoding: "utf8",
-      input,
-      stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+      stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
     }).trim();
   } catch (err) {
