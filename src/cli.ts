@@ -27,7 +27,7 @@ import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
-import { addEntry, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
+import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
@@ -81,7 +81,7 @@ COMMANDS
       --title <title>          Source title (default: the input file name)
       --tag <tag>             Tag the source (repeatable)
 
-  log add <kind> <title>      Record an entry as a new file: <log>/<kind>/<date>-<machine>-<slug>.md
+  log add <kind> <title>      Record an entry; --source-id <sha256> makes source imports create-only idempotent
       --body <text|->         Entry body (- reads stdin)
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
@@ -284,6 +284,7 @@ async function run(argv: string[]): Promise<number> {
         section: { type: "string", multiple: true },
         lines: { type: "string" },
         body: { type: "string" },
+        "source-id": { type: "string" },
         tag: { type: "string", multiple: true },
         kind: { type: "string" },
         force: { type: "boolean", default: false },
@@ -577,7 +578,7 @@ async function run(argv: string[]): Promise<number> {
         if (sub === "add") {
           const [kind = "", ...titleWords] = rest;
           let title = titleWords.join(" ").trim();
-          if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t]', 2);
+          if (!slug(kind) || !title) throw new CliError("usage", 'usage: brain log add <kind> <title> [--body <text|->] [--tag t] [--source-id <sha256>]', 2);
           if (cfg.as) permit(cfg.as.write.includes(slug(kind)), `add '${slug(kind)}' entries (it may write: ${cfg.as.write.join(", ") || "nothing"})`);
           let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           if (process.env.BRAIN_EXT_REDACT === "1") {
@@ -594,23 +595,40 @@ async function run(argv: string[]): Promise<number> {
               };
               const token = process.env.BRAIN_EXT_REDACT_TOKEN;
               const wrapper = token && /^[0-9a-f-]{36}$/.test(token)
-                ? new RegExp(`<!-- brain-protected:${token}:([A-Za-z0-9_-]+) -->`, "g")
+                ? new RegExp(`<!-- brain-protected-url:${token}:([A-Za-z0-9_-]+) -->`, "g")
                 : null;
               const protectedBody = wrapper
                 ? original.replace(wrapper, (all, encoded: string) => {
                     const value = Buffer.from(encoded, "base64url").toString("utf8");
-                    return Buffer.from(value).toString("base64url") === encoded ? protect(value) : all;
+                    if (Buffer.from(value).toString("base64url") !== encoded) return all;
+                    try {
+                      const url = new URL(value);
+                      const safe = (url.protocol === "https:" || url.protocol === "http:")
+                        && !url.username && !url.password && !url.search && !url.hash && url.toString() === value;
+                      return safe ? protect(value) : all;
+                    } catch {
+                      return all;
+                    }
                   })
                 : original;
-              body = redact(protectedBody.replace(/<!-- brain-source-id: [0-9a-f]{64} -->/g, "<source-id>")).replace(
+              body = redact(protectedBody).replace(
                 new RegExp(`${guard}-(\\d+)-end`, "g"),
                 (_all, index: string) => protectedValues[Number(index)] ?? "",
               );
             }
           }
-          const path = addEntry(vault, cfg, { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag });
+          const input = { kind, title, body: body === undefined ? undefined : String(body), tags: flags.tag };
+          const sourceId = flags["source-id"];
+          if (sourceId !== undefined && !/^[0-9a-f]{64}$/.test(sourceId)) {
+            throw new CliError("usage", "--source-id must be a SHA-256 hash", 2);
+          }
+          const result = sourceId === undefined
+            ? { path: addEntry(vault, cfg, input), added: true }
+            : addEntryOnce(store, cfg, input, sourceId);
           index = store.refresh();
-          print(out, "log.add", { path, kind: slug(kind), machine: cfg.machine }, { vault, index }, () => path);
+          print(out, "log.add", { ...result, kind: slug(kind), machine: cfg.machine }, { vault, index }, () =>
+            result.added ? result.path : `already recorded: ${result.path}`,
+          );
           return 0;
         }
         if (sub === "import") {
@@ -1105,7 +1123,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
     const error = envelope!.error as Record<string, unknown>;
     tError = error.code as string;
   }
-  if (!out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
+  if (out.json || !out.quiet) process.stdout.write(lines[0]!.trim() + "\n");
   return result.code ?? 1;
 }
 

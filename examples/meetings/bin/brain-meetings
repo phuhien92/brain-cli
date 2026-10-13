@@ -49,10 +49,10 @@ function oneLine(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
 
-function protectedMetadata(value) {
+function protectedUrl(value) {
   const token = process.env.BRAIN_EXT_REDACT_TOKEN;
   if (!token || !/^[0-9a-f-]{36}$/.test(token)) throw new Error("brain did not provide a redaction token");
-  return `<!-- brain-protected:${token}:${Buffer.from(value).toString("base64url")} -->`;
+  return `<!-- brain-protected-url:${token}:${Buffer.from(value).toString("base64url")} -->`;
 }
 
 function sourceUrl(value) {
@@ -65,7 +65,7 @@ function sourceUrl(value) {
     url.password = "";
     url.search = "";
     url.hash = "";
-    return url.toString();
+    return url.toString().replace(/\(/g, "%28").replace(/\)/g, "%29");
   } catch {
     return "";
   }
@@ -87,13 +87,12 @@ function validateMeeting(value, index) {
   return value;
 }
 
-function bodyFor(meeting, key) {
+function bodyFor(meeting) {
   const attendees = Array.isArray(meeting.attendees) ? meeting.attendees.map(oneLine).filter(Boolean) : [];
   const actions = Array.isArray(meeting.actionItems) ? meeting.actionItems.map(oneLine).filter(Boolean) : [];
   const summary = oneLine(meeting.summary);
   const source = sourceUrl(meeting.url);
   const lines = [
-    protectedMetadata(`<!-- brain-source-id: ${key} -->`),
     `Date: ${oneLine(meeting.date) || "unknown"}`,
     `Attendees: ${attendees.join(", ") || "not listed"}`,
     "",
@@ -104,7 +103,7 @@ function bodyFor(meeting, key) {
     ...(actions.length ? actions.map((item) => `- ${item}`) : ["- None listed."]),
     "",
     "## Source",
-    source ? `[Open in the meeting source](${protectedMetadata(source.replace(/[()]/g, (c) => `\\${c}`))})` : "No source link was provided.",
+    source ? `[Open in the meeting source](${protectedUrl(source)})` : "No source link was provided.",
   ];
   return lines.join("\n");
 }
@@ -140,20 +139,16 @@ async function main() {
   if (!Array.isArray(rawMeetings)) throw new Error("meeting source response needs a meetings list");
   const meetings = rawMeetings.map(validateMeeting);
 
-  const seen = new Set();
-
   const added = [];
   let skipped = 0;
   for (const meeting of meetings) {
     const key = marker(meeting.id);
-    const recorded = seen.has(key) || (brain(["search", key, "--limit", "1"]).results ?? []).length > 0;
-    if (recorded) {
+    const result = brain(["log", "add", "meeting", oneLine(meeting.title), "--source-id", key, "--body", "-"], bodyFor(meeting));
+    if (!result.added) {
       skipped++;
       continue;
     }
-    const result = brain(["log", "add", "meeting", oneLine(meeting.title), "--body", "-"], bodyFor(meeting, key));
     added.push(result.path);
-    seen.add(key);
   }
   envelope("meetings.import", true, { added, skipped, received: meetings.length, since });
 }

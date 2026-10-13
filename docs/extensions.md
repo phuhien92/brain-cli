@@ -83,17 +83,17 @@ arguments. It sets:
 | `BRAIN_AS` | extension name, or the existing integration name when already scoped |
 | `BRAIN_EXT_DIR` | this extension's installed directory |
 | `BRAIN_MACHINE` | current machine name |
-| `BRAIN_EXT_REDACT_TOKEN` | opaque token for marking extension-generated source metadata |
+| `BRAIN_EXT_REDACT_TOKEN` | opaque token for marking a sanitized extension-generated source URL |
 | `BRAIN_EXTENSION_ARGS_JSON` | Windows `.cmd` launchers only: the command arguments as a JSON string list |
 
 Extensions should call `BRAIN_BIN … --json` instead of reading the vault. Those child calls use
 the manifest scope. If the original command was already under `BRAIN_AS`, brain uses the
 intersection of that integration's scope and the extension's permissions – an extension can
 narrow a caller but cannot widen it. Inputs an extension sends through `brain log add` are run
-through core redaction before the new note is created. To retain an extension-generated source
-marker or link, encode its UTF-8 bytes as base64url inside
-`<!-- brain-protected:<BRAIN_EXT_REDACT_TOKEN>:<encoded-value> -->`. Never wrap source-provided
-summary, attendee, or action text.
+through core redaction before the new note is created. To retain a sanitized HTTP(S) source URL,
+remove credentials, query, and fragment, encode its canonical UTF-8 bytes as base64url, and place it inside
+`<!-- brain-protected-url:<BRAIN_EXT_REDACT_TOKEN>:<encoded-url> -->`. Core rejects other protected values.
+Use `brain log add … --source-id <sha256>` for exact create-only source deduplication.
 
 The process must write exactly one JSON line to stdout using the existing envelope:
 

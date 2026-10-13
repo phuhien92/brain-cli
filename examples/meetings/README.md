@@ -13,6 +13,7 @@ The endpoint returns `{ "meetings": [...] }`, where each item has `id`, `title`,
 account setup or credentials; its tests use a local fake server.
 
 Only the source summary, action items, attendees, date, and link are written. A
-`transcript` field in the response is ignored. Source IDs are stored only as hashes and
-make repeated imports idempotent. The child `brain log add` call inherits the extension
-scope and asks core to redact sensitive values before it creates a note.
+`transcript` field in the response is ignored. Source IDs are stored only as hashes through
+`brain log add --source-id`, whose create-only path makes repeated and concurrent imports
+idempotent. The child call inherits the extension scope and asks core to redact sensitive
+values before it creates a note.

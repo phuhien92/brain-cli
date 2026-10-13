@@ -6,7 +6,7 @@
 // this module creates a file that did not exist — none edits one.
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { slug, type Config, type ExportTarget } from "./config.js";
 import type { Store } from "./store.js";
@@ -40,6 +40,49 @@ export interface RetirementCandidate {
 }
 
 export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
+  const { dir, name, content } = prepareEntry(vault, cfg, input);
+
+  // 'wx' fails if the file exists, so a same-second, same-title entry gets a
+  // suffix instead of silently replacing the first.
+  for (let n = 1; ; n++) {
+    const file = join(dir, n === 1 ? `${name}.md` : `${name}-${n}.md`);
+    try {
+      writeFileSync(file, content, { flag: "wx" });
+      return `${cfg.logDir}/${slug(input.kind)}/${file.slice(dir.length + 1)}`;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    }
+  }
+}
+
+export function addEntryOnce(store: Store, cfg: Config, input: NewEntry, sourceId: string): { path: string; added: boolean } {
+  if (!/^[0-9a-f]{64}$/.test(sourceId)) throw new Error("source ID must be a SHA-256 hash");
+  const kind = slug(input.kind);
+  const prefix = `${cfg.logDir}/${kind}/`.replace(/[\\%_]/g, (c) => `\\${c}`) + "%";
+  const indexed = store.db.prepare(
+    `SELECT path FROM notes
+      WHERE path LIKE ? ESCAPE '\\'
+        AND json_extract(frontmatter, '$.kind') = ?
+        AND json_extract(frontmatter, '$.source-id') = ?
+      ORDER BY path LIMIT 1`,
+  ).get(prefix, kind, sourceId) as { path: string } | undefined;
+  if (indexed) return { path: indexed.path, added: false };
+  const withSource = { ...input, fields: { ...input.fields, "source-id": sourceId } };
+  const { dir, content } = prepareEntry(store.vault, cfg, withSource);
+  const suffix = `-${sourceId}.md`;
+  const existing = readdirSync(dir, { withFileTypes: true }).find((entry) => entry.isFile() && entry.name.endsWith(suffix));
+  if (existing) return { path: `${cfg.logDir}/${kind}/${existing.name}`, added: false };
+  const file = join(dir, `${cfg.machine}-${sourceId}.md`);
+  try {
+    writeFileSync(file, content, { flag: "wx" });
+    return { path: `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`, added: true };
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    return { path: `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`, added: false };
+  }
+}
+
+function prepareEntry(vault: string, cfg: Config, input: NewEntry): { dir: string; name: string; content: string } {
   const kind = slug(input.kind);
   if (!kind) throw new Error("an entry needs a kind, e.g. 'learning'");
   const title = input.title.replace(/\s+/g, " ").trim();
@@ -62,18 +105,7 @@ export function addEntry(vault: string, cfg: Config, input: NewEntry): string {
   lines.push("---", `# ${title}`, "");
   const body = (input.body ?? "").replace(/\r\n/g, "\n").trim();
   const content = lines.join("\n") + (body ? `\n${body}\n` : "");
-
-  // 'wx' fails if the file exists, so a same-second, same-title entry gets a
-  // suffix instead of silently replacing the first.
-  for (let n = 1; ; n++) {
-    const file = join(dir, n === 1 ? `${name}.md` : `${name}-${n}.md`);
-    try {
-      writeFileSync(file, content, { flag: "wx" });
-      return `${cfg.logDir}/${kind}/${file.slice(dir.length + 1)}`;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
-    }
-  }
+  return { dir, name, content };
 }
 
 export function listEntries(

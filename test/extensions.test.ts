@@ -2,7 +2,7 @@ import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -142,6 +142,10 @@ test("install needs human permission approval and exposes the declared permissio
   const leadingVault = json(f, ["--vault", f.vault, "echoer", "vault-first"]);
   assert.equal(leadingVault.code, 0, leadingVault.stderr);
   assert.deepEqual(leadingVault.body.data.args, ["vault-first", "--json"]);
+  const quietJson = brain(f, ["echoer", "--json", "--quiet"]);
+  assert.equal(quietJson.code, 0, quietJson.stderr);
+  assert.equal(quietJson.stdout.trim().split("\n").length, 1);
+  assert.equal(JSON.parse(quietJson.stdout).schema, "brain.v1");
 
   const secondVault = join(f.root, "second-vault");
   mkdirSync(join(secondVault, ".obsidian"), { recursive: true });
@@ -342,6 +346,23 @@ if(action==="write-allowed"||action==="write-denied") {
   const narrowed = json(f, ["probe", "--as", "narrow"]);
   assert.deepEqual(narrowed.body.data.paths, [], "Allowed ∩ Private is empty; extension permission cannot widen the caller");
   assert.equal(narrowed.body.data.as, "narrow", "the parent scope is delivered through BRAIN_AS");
+
+  const redactionSource = makeExtension(join(f.root, "redaction-source"), {
+    name: "redaction-probe",
+    command: "bin/command.mjs",
+    permissions: { read: [], write: ["event"], network: [] },
+  }, `
+import { spawnSync } from "node:child_process";
+const encoded=Buffer.from("private@example.com").toString("base64url");
+const body="<!-- brain-protected:"+process.env.BRAIN_EXT_REDACT_TOKEN+":"+encoded+" -->";
+const r=spawnSync(process.execPath,[process.env.BRAIN_BIN,"log","add","event","redaction probe","--body","-","--json"],{env:process.env,encoding:"utf8",input:body});
+process.stdout.write(r.stdout); process.stderr.write(r.stderr); process.exitCode=r.status;
+`);
+  assert.equal(interactiveInstall(f, redactionSource).code, 0);
+  const redacted = json(f, ["redaction-probe"]);
+  assert.equal(redacted.code, 0);
+  const redactedNote = readFileSync(join(f.vault, ...redacted.body.data.path.split("/")), "utf8");
+  assert.ok(!redactedNote.includes("private@example.com"), "extensions cannot protect arbitrary values from redaction");
 });
 
 test("meetings imports redacted summaries and links from a fake server, never transcripts, and deduplicates source IDs", { skip: process.platform === "win32" }, async (t) => {
@@ -349,11 +370,12 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   writeFileSync(join(f.vault, "Alice.md"), "# Alice\n");
   assert.equal(interactiveInstall(f, MEETINGS).code, 0);
   let requested = "";
+  const firstSourceId = "granola-source-secret-id";
   const secondSourceId = "another-granola-source-secret-id";
   const poisonedMarker = createHash("sha256").update(secondSourceId).digest("hex");
   const payload: { meetings: Array<Record<string, unknown>> } = {
     meetings: [{
-      id: "granola-source-secret-id",
+      id: firstSourceId,
       title: "Weekly planning",
       date: "2026-10-13",
       attendees: ["Alice <alice@example.com>", "Bob"],
@@ -397,6 +419,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const meetingDir = join(f.vault, "log", "meeting");
   const files = readdirSync(meetingDir);
   assert.equal(files.length, 1);
+  assert.match(files[0]!, new RegExp(`-${createHash("sha256").update(firstSourceId).digest("hex")}\\.md$`));
   const note = readFileSync(join(meetingDir, files[0]!), "utf8");
   assert.match(note, /Weekly planning/);
   assert.match(note, /2026-10-13/);
@@ -404,12 +427,18 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.match(note, /literal brain-extension-url-0 and <!-- brain-source-marker-0 -->/);
   assert.match(note, /<email>/);
   assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/1234567\)/);
-  assert.match(note, /brain-source-id: [0-9a-f]{64}/);
-  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "source-secret@example.com", "7654321", "99887766", "private-source", "granola-source-secret-id", poisonedMarker]) {
+  assert.match(note, /source-id: "[0-9a-f]{64}"/);
+  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "source-secret@example.com", "7654321", "99887766", "private-source", "granola-source-secret-id"]) {
     assert.ok(!note.includes(forbidden), `meeting note must not contain ${forbidden}`);
   }
-  assert.equal((note.match(/<!-- brain-source-id: [0-9a-f]{64} -->/g) ?? []).length, 1);
+  assert.equal((note.match(/source-id: "[0-9a-f]{64}"/g) ?? []).length, 1);
   assert.equal((note.match(/1234567/g) ?? []).length, 1, "the private number is redacted, while the intentional source URL stays usable");
+
+  renameSync(join(meetingDir, files[0]!), join(meetingDir, "renamed-first.md"));
+  const renamedRepeat = await invoke();
+  assert.equal(renamedRepeat.code, 0, renamedRepeat.stderr);
+  assert.equal(JSON.parse(renamedRepeat.stdout).data.skipped, 1, "source identity survives a user rename");
+  assert.equal(readdirSync(meetingDir).length, 1);
 
   payload.meetings[0]!.id = secondSourceId;
   const second = await invoke();
@@ -425,6 +454,8 @@ test("meetings imports redacted summaries and links from a fake server, never tr
     assert.ok(!recurring.includes("<note-"), "vault note titles must not be redacted from imported content");
   }
 
+  const archived = json(f, ["lifecycle", "archive", secondBody.data.added[0], "--reason", "idempotency check"]);
+  assert.equal(archived.code, 0, archived.stderr);
   const third = await invoke();
   assert.equal(third.code, 0, third.stderr);
   const thirdBody = JSON.parse(third.stdout);
@@ -464,33 +495,13 @@ test("meetings imports redacted summaries and links from a fake server, never tr
     assert.equal(readdirSync(meetingDir).length, 2, `${field} validation must happen before any note is written`);
   }
 
-  const oldSourceId = "meeting-recorded-before-the-newest-100000";
-  const oldMarker = createHash("sha256").update(oldSourceId).digest("hex");
-  const fakeBrain = join(f.root, "fake-brain.mjs");
-  writeFileSync(fakeBrain, `
-const args = process.argv.slice(2).filter((arg) => arg !== "--json");
-if (args[0] !== "search" || args[1] !== ${JSON.stringify(oldMarker)} || !args.includes("--limit") || !args.includes("1")) process.exit(9);
-process.stdout.write(JSON.stringify({schema:"brain.v1",command:"search",ok:true,data:{results:[{path:"log/meeting/old.md"}]}})+"\\n");
-`);
-  responsePayload = { meetings: [{ ...valid, id: oldSourceId }] };
-  const completeHistory = await new Promise<{ code: number | null; stdout: string; stderr: string }>((done) => {
-    const child = spawn(process.execPath, [join(MEETINGS, "bin", "brain-meetings"), "import", "--json"], {
-      env: environment(f, {
-        BRAIN_BIN: fakeBrain,
-        BRAIN_EXT_REDACT_TOKEN: "00000000-0000-0000-0000-000000000000",
-        BRAIN_MEETINGS_API_URL: `http://127.0.0.1:${port}/meetings`,
-      }),
-    });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.setEncoding("utf8").on("data", (chunk) => (stdout += chunk));
-    child.stderr.setEncoding("utf8").on("data", (chunk) => (stderr += chunk));
-    child.on("close", (code) => done({ code, stdout, stderr }));
-  });
-  assert.equal(completeHistory.code, 0, completeHistory.stderr);
-  const completeBody = JSON.parse(completeHistory.stdout);
-  assert.equal(completeBody.data.added.length, 0);
-  assert.equal(completeBody.data.skipped, 1, "source IDs remain idempotent beyond the newest 100,000 entries");
+  responsePayload = { meetings: [{ ...valid, id: "concurrent-source" }] };
+  const concurrent = await Promise.all([invoke(), invoke()]);
+  for (const result of concurrent) assert.equal(result.code, 0, result.stderr);
+  const concurrentBodies = concurrent.map((result) => JSON.parse(result.stdout));
+  assert.equal(concurrentBodies.reduce((sum, body) => sum + body.data.added.length, 0), 1);
+  assert.equal(concurrentBodies.reduce((sum, body) => sum + body.data.skipped, 0), 1);
+  assert.equal(readdirSync(meetingDir).length, 3, "concurrent imports create one source entry");
 });
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {
