@@ -63,6 +63,8 @@ function sourceUrl(value) {
     if (url.protocol !== "https:" && url.protocol !== "http:") return "";
     url.username = "";
     url.password = "";
+    url.search = "";
+    url.hash = "";
     return url.toString();
   } catch {
     return "";
@@ -138,15 +140,14 @@ async function main() {
   if (!Array.isArray(rawMeetings)) throw new Error("meeting source response needs a meetings list");
   const meetings = rawMeetings.map(validateMeeting);
 
-  const current = brain(["view", "meeting"]);
   const seen = new Set();
-  for (const match of String(current.markdown ?? "").matchAll(/<!-- brain-source-id: ([0-9a-f]{64}) -->/g)) seen.add(match[1]);
 
   const added = [];
   let skipped = 0;
   for (const meeting of meetings) {
     const key = marker(meeting.id);
-    if (seen.has(key)) {
+    const recorded = seen.has(key) || (brain(["search", key, "--limit", "1"]).results ?? []).length > 0;
+    if (recorded) {
       skipped++;
       continue;
     }

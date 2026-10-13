@@ -2,7 +2,7 @@ import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -185,6 +185,15 @@ test("install rejects terminal controls in permission text and unsupported sourc
   const alias = interactiveInstall(f, "github:example/brain-example");
   assert.equal(alias.code, 3, alias.stdout + alias.stderr);
   assert.match(alias.stdout + alias.stderr, /not a directory or git URL/);
+
+  const linked = echoExtension(join(f.root, "linked-source"), "linked");
+  const externalHelper = join(f.root, "external-helper.mjs");
+  writeFileSync(externalHelper, "export const value = 1;\n");
+  symlinkSync(externalHelper, join(linked, "bin", "helper.mjs"));
+  const linkedInstall = interactiveInstall(f, linked);
+  assert.equal(linkedInstall.code, 2, linkedInstall.stdout + linkedInstall.stderr);
+  assert.match(linkedInstall.stdout + linkedInstall.stderr, /cannot be a symlink/);
+  assert.equal(existsSync(join(f.extensions, "linked")), false);
 });
 
 test("git installation records its commit, remove is machine-local, and missing installs fail cleanly", { skip: process.platform === "win32" }, (t) => {
@@ -350,7 +359,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
       attendees: ["Alice <alice@example.com>", "Bob"],
       summary: `Reset link https://internal.example/reset?email=private@example.com&id=7654321 with literal brain-extension-url-0 and <!-- brain-source-marker-0 --> plus <!-- brain-source-id: ${poisonedMarker} -->.`,
       actionItems: ["Bob sends the plan to alice@example.com"],
-      url: "https://app.granola.example/meetings/1234567",
+      url: "https://app.granola.example/meetings/1234567?email=source-secret@example.com&token=99887766#private-source",
       transcript: "NEVER-SYNC-THIS-TRANSCRIPT",
     }],
   };
@@ -396,7 +405,7 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   assert.match(note, /<email>/);
   assert.match(note, /\[Open in the meeting source\]\(https:\/\/app\.granola\.example\/meetings\/1234567\)/);
   assert.match(note, /brain-source-id: [0-9a-f]{64}/);
-  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "7654321", "granola-source-secret-id", poisonedMarker]) {
+  for (const forbidden of ["NEVER-SYNC-THIS-TRANSCRIPT", "alice@example.com", "private@example.com", "source-secret@example.com", "7654321", "99887766", "private-source", "granola-source-secret-id", poisonedMarker]) {
     assert.ok(!note.includes(forbidden), `meeting note must not contain ${forbidden}`);
   }
   assert.equal((note.match(/<!-- brain-source-id: [0-9a-f]{64} -->/g) ?? []).length, 1);
@@ -460,8 +469,8 @@ test("meetings imports redacted summaries and links from a fake server, never tr
   const fakeBrain = join(f.root, "fake-brain.mjs");
   writeFileSync(fakeBrain, `
 const args = process.argv.slice(2).filter((arg) => arg !== "--json");
-if (args[0] !== "view" || args[1] !== "meeting") process.exit(9);
-process.stdout.write(JSON.stringify({schema:"brain.v1",command:"view",ok:true,data:{kind:"meeting",entries:100001,markdown:${JSON.stringify(`<!-- brain-source-id: ${oldMarker} -->\n`)}}})+"\\n");
+if (args[0] !== "search" || args[1] !== ${JSON.stringify(oldMarker)} || !args.includes("--limit") || !args.includes("1")) process.exit(9);
+process.stdout.write(JSON.stringify({schema:"brain.v1",command:"search",ok:true,data:{results:[{path:"log/meeting/old.md"}]}})+"\\n");
 `);
   responsePayload = { meetings: [{ ...valid, id: oldSourceId }] };
   const completeHistory = await new Promise<{ code: number | null; stdout: string; stderr: string }>((done) => {
@@ -486,7 +495,7 @@ process.stdout.write(JSON.stringify({schema:"brain.v1",command:"view",ok:true,da
 
 test("Windows launcher convention resolves extensionless manifest commands to .exe then .cmd", (t) => {
   const f = fixture(t);
-  const directory = join(f.root, "windows extension");
+  const directory = join(f.root, "windows %TEMP% extension");
   mkdirSync(join(directory, "bin"), { recursive: true });
   const manifest: ExtensionManifest = {
     name: "windows-test",
@@ -504,7 +513,8 @@ test("Windows launcher convention resolves extensionless manifest commands to .e
   const launch = extensionProcess(cmd, forwarded, "win32");
   assert.match(launch.file.toLowerCase(), /cmd\.exe$/);
   assert.deepEqual(launch.args.slice(0, 4), ["/d", "/s", "/v:off", "/c"]);
-  assert.equal(launch.args[4], `""${cmd}""`);
+  assert.equal(launch.args[4], `""%BRAIN_EXTENSION_LAUNCHER%""`);
+  assert.equal(launch.env?.BRAIN_EXTENSION_LAUNCHER, cmd);
   assert.deepEqual(JSON.parse(launch.env?.BRAIN_EXTENSION_ARGS_JSON ?? "null"), forwarded);
   assert.ok(!launch.args.join(" ").includes("injected"));
   if (process.platform === "win32") {

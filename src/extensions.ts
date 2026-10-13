@@ -12,7 +12,6 @@ import {
   lstatSync,
   mkdirSync,
   readFileSync,
-  readlinkSync,
   readdirSync,
   realpathSync,
   renameSync,
@@ -196,8 +195,8 @@ export function extensionProcess(launcher: string, args: string[], platform = pr
   if (platform !== "win32" || extname(launcher).toLowerCase() !== ".cmd") return { file: launcher, args };
   return {
     file: process.env.ComSpec || process.env.COMSPEC || "cmd.exe",
-    args: ["/d", "/s", "/v:off", "/c", `""${launcher}""`],
-    env: { BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
+    args: ["/d", "/s", "/v:off", "/c", `""%BRAIN_EXTENSION_LAUNCHER%""`],
+    env: { BRAIN_EXTENSION_LAUNCHER: launcher, BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
     windowsVerbatimArguments: true,
   };
 }
@@ -297,10 +296,10 @@ function installationHash(directory: string): string {
       const path = join(parent, entry.name);
       const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
       const info = lstatSync(path);
-      const type = entry.isDirectory() ? "directory" : entry.isSymbolicLink() ? "symlink" : entry.isFile() ? "file" : "other";
+      if (entry.isSymbolicLink()) throw new ExtensionError("invalid_manifest", `extension entry '${relativePath}' cannot be a symlink`, 2);
+      const type = entry.isDirectory() ? "directory" : entry.isFile() ? "file" : "other";
       hash.update(`${type}\0${relativePath}\0${info.mode & 0o111}\0`);
       if (entry.isDirectory()) visit(path, relativePath);
-      else if (entry.isSymbolicLink()) hash.update(readlinkSync(path));
       else if (entry.isFile()) hash.update(readFileSync(path));
       else throw new ExtensionError("invalid_manifest", `unsupported extension entry '${relativePath}'`, 2);
       hash.update("\0");
@@ -322,12 +321,13 @@ export async function installExtension(
   let destination: string | null = null;
   try {
     const metadata = prepare(source, stage);
+    const stagedHash = installationHash(stage);
     const manifest = readManifest(stage);
     resolveLauncher(stage, manifest);
     destination = extensionDirectory(manifest.name);
     if (existsSync(destination)) {
       const current = installedManifest(manifest.name)!;
-      if (installationHash(current.directory) !== installationHash(stage)) {
+      if (installationHash(current.directory) !== stagedHash) {
         throw new ExtensionError(
           "install_conflict",
           `extension '${manifest.name}' is already installed with different code or manifest; remove it before reinstalling`,

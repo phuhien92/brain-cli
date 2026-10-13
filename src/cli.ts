@@ -1017,6 +1017,7 @@ async function runExtensionCommand(name: string, rawArgs: string[], out: Out): P
   }>((done) => {
     const launch = extensionProcess(launcher, invocation.args);
     delete env.BRAIN_EXTENSION_ARGS_JSON;
+    delete env.BRAIN_EXTENSION_LAUNCHER;
     const child = spawn(launch.file, launch.args, {
       cwd: installed.directory,
       detached: process.platform !== "win32",
