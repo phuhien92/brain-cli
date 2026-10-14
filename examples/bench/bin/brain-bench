@@ -81,22 +81,14 @@ function invocationArgs() {
 }
 
 function parseArgs(argv) {
-  const options = { json: false, quiet: false, file: null, vault: null, methods: METHODS };
+  const options = { json: false, quiet: false, file: null, vault: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--json") options.json = true;
     else if (arg === "--quiet" || arg === "-q") options.quiet = true;
     else if (arg === "--vault") options.vault = argv[++i];
     else if (arg.startsWith("--vault=")) options.vault = arg.slice("--vault=".length);
-    else if (arg === "--methods" || arg.startsWith("--methods=")) {
-      const value = arg === "--methods" ? argv[++i] : arg.slice("--methods=".length);
-      const wanted = String(value ?? "").split(",").map((m) => m.trim()).filter(Boolean);
-      const unknown = wanted.filter((m) => !METHODS.includes(m));
-      if (!wanted.length || unknown.length) {
-        throw new BenchError("usage", `--methods takes a comma list of ${METHODS.join(", ")}`, 2);
-      }
-      options.methods = METHODS.filter((m) => wanted.includes(m));
-    } else if (arg === "-h" || arg === "--help") options.help = true;
+    else if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg.startsWith("-") && arg !== "-") throw new BenchError("usage", `unknown option ${arg}`, 2);
     else if (options.file === null) options.file = arg;
     else throw new BenchError("usage", "brain bench takes one questions file", 2);
@@ -104,11 +96,11 @@ function parseArgs(argv) {
   return options;
 }
 
-const USAGE = `usage: brain bench <questions.jsonl|-> [--methods grep,obsidian,brain] [--json]
+const USAGE = `usage: brain bench <questions.jsonl|-> [--json] [--quiet|-q]
 
 Each line of the questions file is {"id": "...", "question": "...", "expect": "path/to/note.md"}.
-"expect" may also be a list of acceptable notes. A relative path is read from the vault root;
-"-" reads stdin. Counts are deterministic; timings are not.`;
+A relative path is read from the vault root; "-" reads stdin. --quiet suppresses the successful
+human-readable table. Counts are deterministic; timings are not.`;
 
 // Questions live outside the index: brain indexes only .md files and grep is
 // told to skip the questions file, so neither method can find the answer key.
@@ -137,14 +129,13 @@ function readQuestions(file, vault) {
     } catch {
       throw new BenchError("bad_questions", `line ${i + 1} is not JSON`, 2);
     }
-    const expect = Array.isArray(q?.expect) ? q.expect : [q?.expect];
-    if (typeof q?.question !== "string" || !q.question.trim() || !expect.length || expect.some((e) => typeof e !== "string" || !e.trim())) {
+    if (typeof q?.question !== "string" || !q.question.trim() || typeof q?.expect !== "string" || !q.expect.trim()) {
       throw new BenchError("bad_questions", `line ${i + 1} needs "question" and "expect"`, 2);
     }
     questions.push({
       id: typeof q.id === "string" && q.id ? q.id : `q${questions.length + 1}`,
       question: q.question.trim(),
-      expect: expect.map(normalizeExpect),
+      expect: normalizeExpect(q.expect),
     });
   });
   if (!questions.length) throw new BenchError("bad_questions", "the questions file has no questions", 2);
@@ -177,7 +168,7 @@ function requireGrep(result, operation) {
 }
 
 function rankOf(paths, expect) {
-  const i = paths.findIndex((p) => expect.includes(p));
+  const i = paths.findIndex((p) => p === expect);
   return i === -1 ? null : i + 1;
 }
 
@@ -229,7 +220,7 @@ function grepMethod(vault, question, expect, questionsFile) {
   for (const path of list.slice(0, READ_LIMIT)) {
     cost.calls++;
     cost.bytes += statSync(join(vault, ...path.split("/"))).size;
-    if (expect.includes(path)) break;
+    if (path === expect) break;
   }
   return { rank: rankOf(list, expect), cost };
 }
@@ -302,12 +293,26 @@ function brainCall(launcher, vault, args) {
     throw new Error(`brain ${args[0]} did not return JSON${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
   }
   if (!body.ok) throw new Error(`brain ${args[0]} failed: ${body.error?.message ?? "unknown error"}`);
-  // The envelope's vault path and index timings depend on the machine and the
-  // moment, not on the question; leave them out so counts are reproducible.
-  const stable = JSON.stringify(body, (key, value) => {
-    if (key === "vault" || key === "index" || key === "mtime" || key === "overdue") return undefined;
-    return value;
-  });
+  const stableBody = { ...body };
+  delete stableBody.vault;
+  delete stableBody.index;
+  if (body.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+    stableBody.data = { ...body.data };
+    delete stableBody.data.mtime;
+    if (body.data.lifecycle && typeof body.data.lifecycle === "object" && !Array.isArray(body.data.lifecycle)) {
+      stableBody.data.lifecycle = { ...body.data.lifecycle };
+      delete stableBody.data.lifecycle.overdue;
+    }
+    if (Array.isArray(body.data.results)) {
+      stableBody.data.results = body.data.results.map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item) || !item.lifecycle || typeof item.lifecycle !== "object" || Array.isArray(item.lifecycle)) return item;
+        const copy = { ...item, lifecycle: { ...item.lifecycle } };
+        delete copy.lifecycle.overdue;
+        return copy;
+      });
+    }
+  }
+  const stable = JSON.stringify(stableBody);
   return { body, bytes: Buffer.byteLength(stable) };
 }
 
@@ -380,17 +385,57 @@ function table(data) {
   return lines.join("\n") + "\n";
 }
 
-function countNotes(dir) {
+function frontmatterString(text, key) {
+  const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)?.[1];
+  if (block === undefined) return null;
+  const line = block.split(/\r?\n/).find((candidate) => candidate.startsWith(`${key}:`));
+  if (!line) return null;
+  let value = line.slice(key.length + 1).trim();
+  if (/^".*"$/.test(value)) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  if (/^'.*'$/.test(value)) return value.slice(1, -1);
+  return value.replace(/\s+#.*$/, "");
+}
+
+function extensionDirectory(vault) {
+  const configPath = join(vault, "brain.json");
+  const config = existsSync(configPath) ? JSON.parse(readFileSync(configPath, "utf8")) : {};
+  const logDir = String(config?.log?.dir ?? "log").replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
+  return `${logDir}/extensions`;
+}
+
+function isExtensionMarker(vault, path, directory) {
+  if (!path.startsWith(`${directory}/`)) return false;
+  const file = path.slice(directory.length + 1);
+  if (file.includes("/") || !file.endsWith(".md")) return false;
+  const name = file.slice(0, -3);
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return false;
+  const text = readFileSync(join(vault, ...path.split("/")), "utf8");
+  return frontmatterString(text, "kind") === "extension" && frontmatterString(text, "extension") === name;
+}
+
+function countNotes(vault) {
   let n = 0;
+  const enablementDirectory = extensionDirectory(vault);
   const visit = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       if (entry.name.startsWith(".")) continue;
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.includes(entry.name)) visit(join(d, entry.name));
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) n++;
+      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
+        const full = join(d, entry.name);
+        const path = toPosix(relative(vault, full));
+        if (path.startsWith("sources/") && existsSync(full + ".source.md")) continue;
+        if (!isExtensionMarker(vault, path, enablementDirectory)) n++;
+      }
     }
   };
-  visit(dir);
+  visit(vault);
   return n;
 }
 
@@ -414,28 +459,20 @@ function main() {
     methods[name] = { available: false, skipped: reason };
     process.stderr.write(`brain bench: skipping ${name}: ${reason}\n`);
   };
-  const want = (name) => options.methods.includes(name);
-  if (want("grep")) {
-    if (onPath("grep")) methods.grep = { available: true };
-    else skip("grep", "grep was not found on PATH");
-  }
+  if (onPath("grep")) methods.grep = { available: true };
+  else skip("grep", "grep was not found on PATH");
   let obsidian = null;
-  if (want("obsidian")) {
-    obsidian = onPath("obsidian");
-    if (!obsidian) skip("obsidian", "the Obsidian CLI (obsidian) was not found on PATH");
-    else {
-      const probe = run(obsidian, ["version"], vault);
-      if (probe.error || probe.code !== 0) {
-        skip("obsidian", "the Obsidian CLI did not answer; is the Obsidian app running?");
-        obsidian = null;
-      } else methods.obsidian = { available: true };
-    }
+  obsidian = onPath("obsidian");
+  if (!obsidian) skip("obsidian", "the Obsidian CLI (obsidian) was not found on PATH");
+  else {
+    const probe = run(obsidian, ["version"], vault);
+    if (probe.error || probe.code !== 0) {
+      skip("obsidian", "the Obsidian CLI did not answer; is the Obsidian app running?");
+      obsidian = null;
+    } else methods.obsidian = { available: true };
   }
-  let launcher = null;
-  if (want("brain")) {
-    launcher = brainLauncher();
-    methods.brain = { available: true };
-  }
+  const launcher = brainLauncher();
+  methods.brain = { available: true };
 
   const rows = [];
   for (const q of questions) {

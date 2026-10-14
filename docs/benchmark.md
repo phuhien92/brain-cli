@@ -19,6 +19,7 @@ only the timings (`ms`) vary.
 brain ext install ./examples/bench      # approve in a terminal; read: whole vault, write: nothing
 brain bench questions.jsonl             # table on stderr, the brain.v1 envelope on stdout
 brain bench questions.jsonl --json      # envelope only
+brain bench questions.jsonl --quiet     # suppress successful human-readable output
 ```
 
 To rerun the public demo, copy it first, because enabling the extension writes a note into the vault:
@@ -35,9 +36,9 @@ Each line of the question file is one question and the note that answers it:
 {"id": "dentist", "question": "when is my next dental cleaning", "expect": "People/Dr Patel.md"}
 ```
 
-`expect` may be a list when more than one note is a right answer. A relative path is read
-from the vault root, an absolute path from anywhere, and `-` reads stdin. `--methods grep,brain`
-runs a subset.
+`expect` is one required note path. A relative question-file path is read from the vault root,
+an absolute path from anywhere, and `-` reads stdin. `--quiet` and `-q` suppress the successful
+human-readable table; diagnostics still go to stderr.
 
 Installing enables the extension by writing a note under the vault's log folder. To
 benchmark a vault without writing anything into it, run the script directly; it uses the
@@ -71,8 +72,9 @@ Each method models what an agent does, the same way for every question.
    --json --limit 5`, then `brain get <top hit> --meta --json` for its headings, then
    `brain get <top hit> --section <heading> --json` for the heading sharing the most words
    with the question (the whole note when none does). Always three calls. Tokens count the
-   whole JSON envelope except its `vault` path and `index` timings, which depend on the
-   machine and the moment, not on the question.
+   whole JSON envelope except its top-level `vault` path and `index` timings, the note's
+   `data.mtime`, and lifecycle `overdue` flags in `data.lifecycle` or search results. Those
+   values depend on the machine or date, not on the question.
 
 Found is the expected note's position in the list the method ranked: grep's file order,
 Obsidian's results, brain's results.
@@ -99,7 +101,7 @@ The Obsidian CLI was not installed.
 | --- | --- | --- | --- | --- |
 | grep | 9 / 14 | 14 / 14 | 3,224 | 36 |
 | Obsidian CLI | skipped | | | |
-| brain | **14 / 14** | 14 / 14 | 7,811 | 42 |
+| brain | **14 / 14** | 14 / 14 | 7,627 | 42 |
 
 On a vault this small, grep's lists are short and every note is under 2 KB, so reading whole
 files is cheap. brain gets the answer first every time but reads more: its JSON carries
@@ -117,13 +119,13 @@ results stay private; these are the totals.
 | --- | --- | --- | --- | --- |
 | grep | 6 / 33 | 18 / 33 | 1,639,426 | 188 |
 | Obsidian CLI | skipped (CLI not enabled) | | | |
-| brain | **23 / 33** | **28 / 33** | **93,557** | **99** |
+| brain | **23 / 33** | **28 / 33** | **93,112** | **99** |
 
 grep put the right note first for 6 questions and in the first five for 18. It read about
 1.6 million tokens, roughly 50,000 per question, because common words match long files that
 an agent then opens. brain put the right note first for 23 and in the first five for 28. It
 read about 2,800 tokens per question, **17× less**, in about half the calls.
-In wall time grep is faster (2.7 s for all 33 questions, against 8.5 s for brain's 99
+In wall time grep is faster (2.9 s for all 33 questions, against 9.4 s for brain's 99
 calls, most of it Node start-up). For an agent, the calls and tokens are what cost time.
 
 ## Scale: what happens at thousands of notes

@@ -105,6 +105,7 @@ test("brain bench runs the demo questions as an installed extension, determinist
   assert.equal(first.body.ok, true);
   const data = first.body.data;
   assert.equal(data.questions, 14);
+  assert.equal(data.vaultNotes, 18);
   assert.deepEqual(Object.keys(data.methods), ["grep", "obsidian", "brain"]);
   assert.equal(data.methods.obsidian.available, false, "no Obsidian CLI is installed");
   assert.match(first.stderr, /skipping obsidian/, "a missing method is skipped loudly");
@@ -118,6 +119,7 @@ test("brain bench runs the demo questions as an installed extension, determinist
 
   const standaloneRun = standalone(f, ["questions.jsonl", "--json"]);
   assert.equal(standaloneRun.code, 0);
+  assert.equal(standaloneRun.body.data.vaultNotes, 18);
   assert.deepEqual(withoutTimings(standaloneRun.body.data), withoutTimings(data), "the extension and the bare script agree");
 });
 
@@ -162,9 +164,9 @@ process.exit(1);
   );
   chmodSync(fake, 0o755);
   writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ id: "s", question: "how often should I feed the sourdough starter", expect: "Recipes/Sourdough starter" }) + "\n");
-  const r = standalone(f, [join(f.root, "q.jsonl"), "--methods", "obsidian", "--json"]);
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
   assert.equal(r.code, 0, JSON.stringify(r.body));
-  assert.deepEqual(Object.keys(r.body.data.methods), ["obsidian"]);
+  assert.deepEqual(Object.keys(r.body.data.methods), ["grep", "obsidian", "brain"]);
   const row = r.body.data.results[0];
   assert.equal(row.obsidian.rank, 2, "expect may omit .md");
   assert.equal(row.obsidian.top5, true);
@@ -181,10 +183,10 @@ test("brain bench counts stable payloads across mtimes and lifecycle dates", (t)
   const question = join(f.root, "q.jsonl");
   writeFileSync(join(f.vault, "Current.md"), "---\ncategory: current-state\nas-of: 2026-09-30\n---\n# Current\nStable benchmark marker.\n");
   writeFileSync(question, JSON.stringify({ question: "stable benchmark marker", expect: "Current.md" }) + "\n");
-  const first = standalone(f, [question, "--methods", "brain", "--json"], { ...f.env, BRAIN_TODAY: "2026-10-01" });
+  const first = standalone(f, [question, "--json"], { ...f.env, BRAIN_TODAY: "2026-10-01" });
   assert.equal(first.code, 0, JSON.stringify(first.body));
   utimesSync(join(f.vault, "Current.md"), new Date(1_000_000), new Date(1_000_000));
-  const second = standalone(f, [question, "--methods", "brain", "--json"], { ...f.env, BRAIN_TODAY: "2027-10-01" });
+  const second = standalone(f, [question, "--json"], { ...f.env, BRAIN_TODAY: "2027-10-01" });
   assert.equal(second.code, 0, JSON.stringify(second.body));
   assert.equal(second.body.data.methods.brain.totals.tokens, first.body.data.methods.brain.totals.tokens);
   assert.equal(second.body.data.results[0].brain.tokens, first.body.data.results[0].brain.tokens);
@@ -192,7 +194,7 @@ test("brain bench counts stable payloads across mtimes and lifecycle dates", (t)
 
 test("brain bench rejects scoped runs before direct methods traverse the vault", (t) => {
   const f = fixture(t);
-  const r = standalone(f, ["questions.jsonl", "--methods", "grep", "--json"], { ...f.env, BRAIN_AS: "work" });
+  const r = standalone(f, ["questions.jsonl", "--json"], { ...f.env, BRAIN_AS: "work" });
   assert.equal(r.code, 2);
   assert.equal(r.body.ok, false);
   assert.equal(r.body.error.code, "usage");
@@ -201,7 +203,7 @@ test("brain bench rejects scoped runs before direct methods traverse the vault",
 
 test("brain bench consumes the Windows extension argument environment contract", (t) => {
   const f = fixture(t);
-  const args = ["questions.jsonl", "--methods", "brain", "--json", "--vault", f.vault];
+  const args = ["questions.jsonl", "--json", "--vault", f.vault];
   const r = spawnSync(process.execPath, [SCRIPT], {
     cwd: f.root,
     env: { ...f.env, BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
@@ -210,7 +212,7 @@ test("brain bench consumes the Windows extension argument environment contract",
   assert.equal(r.status, 0, r.stdout + r.stderr);
   const body = JSON.parse(r.stdout);
   assert.equal(body.ok, true);
-  assert.deepEqual(Object.keys(body.data.methods), ["brain"]);
+  assert.deepEqual(Object.keys(body.data.methods), ["grep", "obsidian", "brain"]);
 });
 
 test("brain bench fails instead of scoring method command errors", { skip: process.platform === "win32" }, (t) => {
@@ -218,7 +220,7 @@ test("brain bench fails instead of scoring method command errors", { skip: proce
   const fake = join(f.bin, "obsidian");
   writeFileSync(fake, `#!/bin/sh\nif [ "$1" = version ]; then exit 0; fi\nif [ "$2" = search ]; then printf '["MEMORY.md"]\\n'; exit 0; fi\nprintf 'read broke\\n' >&2\nexit 7\n`);
   chmodSync(fake, 0o755);
-  const r = standalone(f, ["questions.jsonl", "--methods", "obsidian", "--json"]);
+  const r = standalone(f, ["questions.jsonl", "--json"]);
   assert.equal(r.code, 1);
   assert.equal(r.body.ok, false);
   assert.equal(r.body.error.code, "bench_failed");
@@ -227,8 +229,56 @@ test("brain bench fails instead of scoring method command errors", { skip: proce
 
 test("brain bench quiet suppresses the successful table", (t) => {
   const f = fixture(t);
-  const r = standalone(f, ["questions.jsonl", "--methods", "brain", "--quiet"]);
+  const r = standalone(f, ["questions.jsonl", "--quiet"]);
   assert.equal(r.code, 0, JSON.stringify(r.body));
   assert.equal(r.body.ok, true);
-  assert.equal(r.stderr, "");
+  assert.match(r.stderr, /skipping obsidian/);
+  assert.doesNotMatch(r.stderr, /method\s+top1\s+top5/);
+});
+
+test("brain bench counts user frontmatter named like dynamic metadata", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const fake = join(f.bin, "fake-brain");
+  const user = { index: "user-index-value", overdue: "user-overdue-value" };
+  writeFileSync(
+    fake,
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+const user = ${JSON.stringify(user)};
+const common = { schema: "brain.v1", command: args[0], ok: true, vault: "/machine/vault", index: { ms: 99 } };
+if (args[0] === "search") console.log(JSON.stringify({ ...common, data: { query: args[1], results: [{ path: "Target.md", lifecycle: { overdue: true, due: "2026-10-01" } }] } }));
+else console.log(JSON.stringify({ ...common, data: { path: "Target.md", frontmatter: user, headings: [], mtime: 123456789, lifecycle: { overdue: true, due: "2026-10-01" }, content: args.includes("--meta") ? undefined : "body" } }));
+`,
+  );
+  chmodSync(fake, 0o755);
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "target", expect: "Target.md" }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"], { ...f.env, BRAIN_BIN: fake, BRAIN_BIN_ARGS_JSON: "[]" });
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  const search = { schema: "brain.v1", command: "search", ok: true, data: { query: "target", results: [{ path: "Target.md", lifecycle: { due: "2026-10-01" } }] } };
+  const get = { schema: "brain.v1", command: "get", ok: true, data: { path: "Target.md", frontmatter: user, headings: [], lifecycle: { due: "2026-10-01" } } };
+  const content = { schema: "brain.v1", command: "get", ok: true, data: { path: "Target.md", frontmatter: user, headings: [], lifecycle: { due: "2026-10-01" }, content: "body" } };
+  const expected = Math.ceil(Buffer.byteLength(JSON.stringify(search) + JSON.stringify(get) + JSON.stringify(content)) / 4);
+  assert.equal(r.body.data.results[0].brain.tokens, expected);
+});
+
+test("brain bench note count matches indexed notes", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.vault, "brain.json"), JSON.stringify({ log: { dir: "memory" } }));
+  mkdirSync(join(f.vault, "memory", "extensions"), { recursive: true });
+  writeFileSync(join(f.vault, "memory", "extensions", "sample.md"), "---\nkind: extension\nextension: sample\n---\n# sample\n");
+  mkdirSync(join(f.vault, "sources"));
+  writeFileSync(join(f.vault, "sources", "paper.md"), "# Immutable original\n");
+  writeFileSync(join(f.vault, "sources", "paper.md.source.md"), "# Searchable source metadata\n");
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "next dental cleaning", expect: "People/Dr Patel.md" }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.equal(r.body.data.vaultNotes, 19, "18 demo notes plus the source sidecar");
+});
+
+test("brain bench requires one expected note", (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "dental cleaning", expect: ["People/Dr Patel.md"] }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(r.code, 2);
+  assert.equal(r.body.error.code, "bad_questions");
 });
