@@ -76,10 +76,6 @@ flowchart LR
   B -- "keeps current" --> I[("Index<br/>per machine, never synced")]
 ```
 
-The `--json` envelope is `brain.v1`. It may gain new optional fields, so consumers must
-ignore fields they do not recognize. A removed, renamed or retyped field, or a changed
-exit code, is a breaking change and bumps the schema version.
-
 The vault's notes and ingested source files stay the source of truth; the index is a
 per-machine cache; brain never edits a note or source. Full design, with the per-command flow and where every
 file lives: **[docs/architecture.md](docs/architecture.md)**.

@@ -35,7 +35,9 @@ This file travels with the vault, so every machine sees the same declarations.
   event. Direct `brain lifecycle …` commands need `"lifecycle"` too.
   Each kind is its own folder under `log/`, so integrations never write the same files.
 - **`views`** — kinds it needs as a single generated file (for tools that read one
-  `learnings.md`), with an optional header line.
+  `learnings.md`), with an optional header line. A view is always generated from its
+  owning integration's scope; under `--as`, `export` and `sync` regenerate only that
+  integration's views.
 
 ### 2. Give its paths on each machine
 

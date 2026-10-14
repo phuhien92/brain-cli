@@ -27,7 +27,7 @@ holds the rules an agent changing the code must not break.
 6. **The `--json` envelope is a contract.** One JSON line on stdout, `schema: "brain.v1"`,
    `ok`, and either `data` or `error.code`. Additive optional fields keep the same schema;
    consumers must ignore unknown fields. Removing, renaming or retyping a field, or changing
-   an exit code, means bumping `SCHEMA` in `src/cli.ts` and saying so in the README.
+   an exit code, means bumping `SCHEMA` in `src/cli.ts` and documenting it in `docs/cli.md`.
 7. **User input never reaches FTS5 unquoted** unless `--raw` was passed. `toMatchExpression`
    quotes every term.
 8. **Zero runtime dependencies.** `node:sqlite`, `node:util` `parseArgs` and a small

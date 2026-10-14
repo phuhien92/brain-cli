@@ -58,7 +58,7 @@ uses it — see [integrations.md](integrations.md):
 
 ```jsonc
 // <vault>/brain.json
-{ "integrations": { "firstmate": { "read": ["firstmate/"], "write": ["learning"],
+{ "integrations": { "firstmate": { "read": ["firstmate/"], "write": ["learning", "lifecycle"],
     "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } } } } }
 
 // ~/.config/brain/config.json — this machine only ($BRAIN_CONFIG overrides the path)
