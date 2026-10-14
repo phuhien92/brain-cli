@@ -3,7 +3,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -17,7 +17,9 @@ const BIN = join(ROOT, "bin/brain.js");
 let root: string;
 let vault: string;
 let server: Server;
+let base: string;
 let url: string;
+let round = 0;
 let requests: { userAgent: string | undefined; url: string | undefined }[] = [];
 let answer: { status: number; body: unknown } = { status: 200, body: [] };
 
@@ -63,17 +65,20 @@ async function until(cond: () => boolean, ms = 4000) {
 }
 
 before(async () => {
-  root = mkdtempSync(join(tmpdir(), "brain-update-"));
+  // Real path: on macOS the temp dir is /var/…, which brain reports as /private/var/….
+  root = realpathSync(mkdtempSync(join(tmpdir(), "brain-update-")));
   vault = join(root, "vault");
   mkdirSync(join(vault, ".obsidian"), { recursive: true });
   server = createServer((req, res) => {
-    requests.push({ userAgent: req.headers["user-agent"], url: req.url });
+    // A background check left over from an earlier test asks with that test's
+    // URL, so it can never be counted against this one.
+    if (req.url === new URL(url).pathname) requests.push({ userAgent: req.headers["user-agent"], url: req.url });
     res.statusCode = answer.status;
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify(answer.body));
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
-  url = `http://127.0.0.1:${(server.address() as { port: number }).port}/tags`;
+  base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 
 after(() => {
@@ -82,6 +87,7 @@ after(() => {
 });
 
 beforeEach(() => {
+  url = `${base}/tags/${++round}`;
   requests = [];
   answer = { status: 200, body: [] };
   rmSync(join(root, "state"), { recursive: true, force: true });
@@ -113,7 +119,7 @@ test("brain update --check asks GitHub, sends only a user agent, and prints the 
   assert.equal(data.command, `npm install -g github:phuhien92/brain-cli#v${newer()}`);
   assert.equal(requests.length, 1);
   assert.equal(requests[0]!.userAgent, `brain-cli/${VERSION}`);
-  assert.equal(requests[0]!.url, "/tags");
+  assert.equal(requests[0]!.url, new URL(url).pathname);
 });
 
 test("a failed check fails nothing: exit 0, the error reported, the last answer kept", async () => {
