@@ -1,7 +1,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,8 +64,8 @@ function files(dir: string, root = dir): string[] {
     .sort();
 }
 
-function standalone(f: Fixture, args: string[]) {
-  const r = spawnSync(process.execPath, [SCRIPT, ...args, "--vault", f.vault], { cwd: f.root, env: f.env, encoding: "utf8" });
+function standalone(f: Fixture, args: string[], env: NodeJS.ProcessEnv = f.env) {
+  const r = spawnSync(process.execPath, [SCRIPT, ...args, "--vault", f.vault], { cwd: f.root, env, encoding: "utf8" });
   return { code: r.status, stderr: r.stderr, body: JSON.parse(r.stdout) };
 }
 
@@ -174,4 +174,61 @@ process.exit(1);
   assert.equal(search[0], "vault=vault");
   assert.ok(search.includes("query=often OR feed OR sourdough OR starter"), search.join(" "));
   assert.deepEqual(calls.find((c) => c[1] === "read"), ["vault=vault", "read", "path=Projects/Garden Plan.md"]);
+});
+
+test("brain bench counts stable payloads across mtimes and lifecycle dates", (t) => {
+  const f = fixture(t);
+  const question = join(f.root, "q.jsonl");
+  writeFileSync(join(f.vault, "Current.md"), "---\ncategory: current-state\nas-of: 2026-09-30\n---\n# Current\nStable benchmark marker.\n");
+  writeFileSync(question, JSON.stringify({ question: "stable benchmark marker", expect: "Current.md" }) + "\n");
+  const first = standalone(f, [question, "--methods", "brain", "--json"], { ...f.env, BRAIN_TODAY: "2026-10-01" });
+  assert.equal(first.code, 0, JSON.stringify(first.body));
+  utimesSync(join(f.vault, "Current.md"), new Date(1_000_000), new Date(1_000_000));
+  const second = standalone(f, [question, "--methods", "brain", "--json"], { ...f.env, BRAIN_TODAY: "2027-10-01" });
+  assert.equal(second.code, 0, JSON.stringify(second.body));
+  assert.equal(second.body.data.methods.brain.totals.tokens, first.body.data.methods.brain.totals.tokens);
+  assert.equal(second.body.data.results[0].brain.tokens, first.body.data.results[0].brain.tokens);
+});
+
+test("brain bench rejects scoped runs before direct methods traverse the vault", (t) => {
+  const f = fixture(t);
+  const r = standalone(f, ["questions.jsonl", "--methods", "grep", "--json"], { ...f.env, BRAIN_AS: "work" });
+  assert.equal(r.code, 2);
+  assert.equal(r.body.ok, false);
+  assert.equal(r.body.error.code, "usage");
+  assert.match(r.body.error.message, /cannot run.*scope/i);
+});
+
+test("brain bench consumes the Windows extension argument environment contract", (t) => {
+  const f = fixture(t);
+  const args = ["questions.jsonl", "--methods", "brain", "--json", "--vault", f.vault];
+  const r = spawnSync(process.execPath, [SCRIPT], {
+    cwd: f.root,
+    env: { ...f.env, BRAIN_EXTENSION_ARGS_JSON: JSON.stringify(args) },
+    encoding: "utf8",
+  });
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  const body = JSON.parse(r.stdout);
+  assert.equal(body.ok, true);
+  assert.deepEqual(Object.keys(body.data.methods), ["brain"]);
+});
+
+test("brain bench fails instead of scoring method command errors", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const fake = join(f.bin, "obsidian");
+  writeFileSync(fake, `#!/bin/sh\nif [ "$1" = version ]; then exit 0; fi\nif [ "$2" = search ]; then printf '["MEMORY.md"]\\n'; exit 0; fi\nprintf 'read broke\\n' >&2\nexit 7\n`);
+  chmodSync(fake, 0o755);
+  const r = standalone(f, ["questions.jsonl", "--methods", "obsidian", "--json"]);
+  assert.equal(r.code, 1);
+  assert.equal(r.body.ok, false);
+  assert.equal(r.body.error.code, "bench_failed");
+  assert.match(r.body.error.message, /obsidian read failed: read broke/);
+});
+
+test("brain bench quiet suppresses the successful table", (t) => {
+  const f = fixture(t);
+  const r = standalone(f, ["questions.jsonl", "--methods", "brain", "--quiet"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.equal(r.body.ok, true);
+  assert.equal(r.stderr, "");
 });

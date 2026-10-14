@@ -68,12 +68,24 @@ function normalizeExpect(value) {
   return /\.md$/i.test(clean) ? clean : `${clean}.md`;
 }
 
+function invocationArgs() {
+  const argv = process.argv.slice(2);
+  if (argv.length || process.env.BRAIN_EXTENSION_ARGS_JSON === undefined) return argv;
+  try {
+    const args = JSON.parse(process.env.BRAIN_EXTENSION_ARGS_JSON);
+    if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string")) throw new Error();
+    return args;
+  } catch {
+    throw new BenchError("usage", "BRAIN_EXTENSION_ARGS_JSON was not a string list", 2);
+  }
+}
+
 function parseArgs(argv) {
-  const options = { json: false, file: null, vault: null, methods: METHODS };
+  const options = { json: false, quiet: false, file: null, vault: null, methods: METHODS };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--json") options.json = true;
-    else if (arg === "--quiet" || arg === "-q") continue;
+    else if (arg === "--quiet" || arg === "-q") options.quiet = true;
     else if (arg === "--vault") options.vault = argv[++i];
     else if (arg.startsWith("--vault=")) options.vault = arg.slice("--vault=".length);
     else if (arg === "--methods" || arg.startsWith("--methods=")) {
@@ -158,6 +170,12 @@ function run(file, args, cwd, input) {
   return { code: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", error: result.error };
 }
 
+function requireGrep(result, operation) {
+  if (result.error || (result.code !== 0 && result.code !== 1)) {
+    throw new Error(`grep ${operation} failed${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
+  }
+}
+
 function rankOf(paths, expect) {
   const i = paths.findIndex((p) => expect.includes(p));
   return i === -1 ? null : i + 1;
@@ -186,7 +204,7 @@ function grepMethod(vault, question, expect, questionsFile) {
     if (candidates === null) {
       const args = ["-rilF", "--include=*.md", ...SKIP_DIRS.map((d) => `--exclude-dir=${d}`), "-e", term, "."];
       const r = run("grep", args, vault);
-      if (r.error) throw r.error;
+      requireGrep(r, "search");
       cost.calls++;
       cost.bytes += Buffer.byteLength(r.stdout);
       found = r.stdout.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, ""));
@@ -197,7 +215,7 @@ function grepMethod(vault, question, expect, questionsFile) {
       for (let i = 0; i < candidates.length; i += 500) {
         const chunk = candidates.slice(i, i + 500).map((p) => `./${p}`);
         const r = run("grep", ["-ilF", "-e", term, "--", ...chunk], vault);
-        if (r.error) throw r.error;
+        requireGrep(r, "narrowing");
         cost.bytes += Buffer.byteLength(r.stdout);
         found.push(...r.stdout.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, "")));
       }
@@ -244,6 +262,7 @@ function obsidianMethod(bin, vault, question, expect, questionsFile) {
   const list = parseObsidianList(r.stdout).map((p) => toPosix(p).replace(/^\.?\/+/, "")).filter((p) => p !== questionsFile);
   if (list.length) {
     const read = run(bin, [target, "read", `path=${list[0]}`], vault);
+    if (read.error || read.code !== 0) throw new Error(`obsidian read failed${read.stderr ? `: ${read.stderr.trim()}` : ""}`);
     cost.calls++;
     cost.bytes += Buffer.byteLength(read.stdout);
   }
@@ -279,13 +298,17 @@ function brainCall(launcher, vault, args) {
   try {
     body = JSON.parse(result.stdout);
   } catch {}
-  if (!body || body.schema !== SCHEMA) {
+  if (result.error || result.status !== 0 || !body || body.schema !== SCHEMA) {
     throw new Error(`brain ${args[0]} did not return JSON${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
   }
+  if (!body.ok) throw new Error(`brain ${args[0]} failed: ${body.error?.message ?? "unknown error"}`);
   // The envelope's vault path and index timings depend on the machine and the
   // moment, not on the question; leave them out so counts are reproducible.
-  const { vault: _vault, index: _index, ...rest } = body;
-  return { body, bytes: Buffer.byteLength(JSON.stringify(rest)) };
+  const stable = JSON.stringify(body, (key, value) => {
+    if (key === "vault" || key === "index" || key === "mtime" || key === "overdue") return undefined;
+    return value;
+  });
+  return { body, bytes: Buffer.byteLength(stable) };
 }
 
 // The heading an agent would open: the one sharing the most words with the question.
@@ -315,11 +338,10 @@ function brainMethod(launcher, vault, question, expect) {
     return r.body;
   };
   const search = call(["search", question, "--limit", String(TOP)]);
-  if (!search.ok) throw new Error(`brain search failed: ${search.error?.message ?? "unknown error"}`);
   const list = search.data.results.map((r) => r.path);
   if (list.length) {
     const meta = call(["get", list[0], "--meta"]);
-    const heading = meta.ok ? bestHeading(meta.data.headings ?? [], question) : null;
+    const heading = bestHeading(meta.data.headings ?? [], question);
     call(heading ? ["get", list[0], "--section", heading] : ["get", list[0]]);
   }
   return { rank: rankOf(list, expect), cost };
@@ -373,7 +395,7 @@ function countNotes(dir) {
 }
 
 function main() {
-  const options = parseArgs(process.argv.slice(2));
+  const options = parseArgs(invocationArgs());
   if (options.help) {
     process.stderr.write(USAGE + "\n");
     envelope(true, { usage: USAGE });
@@ -383,6 +405,8 @@ function main() {
   const vaultArg = options.vault ?? process.env.BRAIN_VAULT ?? process.cwd();
   if (!existsSync(vaultArg) || !statSync(vaultArg).isDirectory()) throw new BenchError("not_found", `no vault at ${vaultArg}`, 3);
   const vault = realpathSync(vaultArg);
+  const scoped = process.env.BRAIN_EXTENSION_PARENT_AS || (!process.env.BRAIN_EXTENSION_SCOPE && process.env.BRAIN_AS);
+  if (scoped) throw new BenchError("usage", "brain bench cannot run with BRAIN_AS or --as because direct methods cannot enforce note scopes", 2);
   const { questions, inVault } = readQuestions(options.file, vault);
 
   const methods = {};
@@ -419,12 +443,8 @@ function main() {
     const measure = (name, fn) => {
       if (!methods[name]?.available) return;
       const start = process.hrtime.bigint();
-      try {
-        const { rank, cost } = fn();
-        row[name] = score(rank, cost, elapsed(start));
-      } catch (err) {
-        row[name] = { ...score(null, { bytes: 0, calls: 0 }, elapsed(start)), error: err.message };
-      }
+      const { rank, cost } = fn();
+      row[name] = score(rank, cost, elapsed(start));
     };
     measure("grep", () => grepMethod(vault, q.question, q.expect, inVault));
     measure("obsidian", () => obsidianMethod(obsidian, vault, q.question, q.expect, inVault));
@@ -443,7 +463,7 @@ function main() {
     methods: ordered,
     results: rows,
   };
-  if (!options.json) process.stderr.write(table(data));
+  if (!options.json && !options.quiet) process.stderr.write(table(data));
   envelope(true, data);
   return 0;
 }
