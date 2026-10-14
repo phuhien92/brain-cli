@@ -11,15 +11,17 @@ brain log add learning "pnpm cache breaks after macOS updates" --body "Run pnpm 
 # → log/learning/2026-10-13-mac-mini-pnpm-cache-breaks-after-macos-updates.md
 brain log 5                      # recent active entries, any kind
 brain log retire log/learning/<entry-id>.md --reason "obsolete"
-brain log replace log/learning/<entry-id>.md --text "corrected wording"
+brain log replace log/learning/<entry-id>.md --text "corrected title" --body "corrected detail"
 brain view learning              # every active learning, oldest first, as one markdown list
 brain sync                       # commit new entries, pull --rebase, push, re-export
 ```
 
 Ordinary entries include the machine and timestamp in their paths, so two machines do not
 create the same file. The single-file shape that existing tools expect is *generated* from
-the log, so it is never edited by two machines either. Each entry records which machine
-wrote it. Source importers can instead request a deterministic, create-only path with
+the log, so it is never edited by two machines either. Every active entry renders as its
+own bullet, including identical entries created on different machines, so each bullet can
+be retired or replaced independently. Each entry records which machine wrote it. Source
+importers can instead request a deterministic, create-only path with
 `--source-id`; matching imports then merge as the same file, while different content for one
 source ID deliberately produces a sync conflict. See [Command extensions](extensions.md#process-contract).
 
@@ -34,14 +36,19 @@ source ID deliberately produces a sync conflict. See [Command extensions](extens
   wrote it, it refuses, because those edits are not in any entry yet. Capture them with
   `brain log import`, then `brain export --force`.
 - **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
-  top-level list item, dropping HTML-comment markers from titles. Title-and-body text already
-  recorded is skipped, so importing on a second machine adds only what is new there. A body
-  change adds the new text and lists the old entry as a retirement candidate. Import never
-  retires entries automatically.
+  top-level list item, dropping HTML-comment markers from titles. Matching title-and-body
+  occurrences with active entries are skipped, while surplus identical list items become
+  separate entries. Title plus body is an entry's identity. Entries brain exported to that file and later removed
+  from it are listed as retirement candidates; an exported entry whose title remains with a
+  new body is a replacement candidate, not imported until `log replace` records it. Duplicate
+  titles are not guessed: ambiguous old entries are retirement candidates and new entries are
+  imported normally. Entries the file never held are never proposed, and import never retires
+  anything automatically.
 - **`brain log retire <entry-id> [--reason …]`** records an immutable lifecycle event;
   views and exports omit the entry while its original file remains untouched.
-  **`brain log replace <entry-id> --text …`** adds corrected text and retires the old entry;
-  the first line of `--text` is the new title and any remaining lines are its new body.
+  **`brain log replace <entry-id> --text <title> [--body <text|->]`** adds the corrected
+  entry and retires the old one. `--text` is always the title; omit `--body` for an empty
+  body, or use `--body -` to read the body from stdin.
   Concurrent retirements create separate event files and do not conflict.
 
 Configuration is split by what may travel: `brain.json` in the vault (the same on every
@@ -51,7 +58,7 @@ uses it — see [integrations.md](integrations.md):
 
 ```jsonc
 // <vault>/brain.json
-{ "integrations": { "firstmate": { "read": ["firstmate/"], "write": ["learning"],
+{ "integrations": { "firstmate": { "read": ["firstmate/"], "write": ["learning", "lifecycle"],
     "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } } } } }
 
 // ~/.config/brain/config.json — this machine only ($BRAIN_CONFIG overrides the path)

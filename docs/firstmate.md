@@ -36,7 +36,7 @@ In the vault's `brain.json` (it travels with the vault):
   "integrations": {
     "firstmate": {
       "read": ["firstmate/"],
-      "write": ["learning"],
+      "write": ["learning", "lifecycle"],
       "views": { "learning": { "header": "<!-- memory tiers: see the stow skill -->" } }
     }
   }
@@ -119,21 +119,25 @@ it** — those edits are not in the log yet. To capture the curation and re-expo
 
 ```sh
 brain log import learning ~/firstmate/data/learnings.md
-# Adds new bullets and lists active logged entries not present in the file.
-# Absence alone does not prove /stow removed one; review each before retiring it:
+# Adds new bullets. Entries brain exported to this file that are gone from it are listed
+# as retirement candidates; review each before retiring it:
 brain log retire log/learning/<entry-id>.md --reason "removed by /stow"
 brain export --force
 ```
 
-`import` never retires anything automatically. If a title stays the same but its indented
-body changes, import adds the new text and lists the old entry as a candidate. For a direct
-rewording that has not already been imported, replace the old entry in one command instead;
-the first line is the new title and later lines are the new body:
+`import` never retires anything automatically, and it only proposes entries brain itself
+exported to that file — an active entry the file never held is not a candidate. If an
+exported entry keeps its title but its indented body changes, import does not add the new
+text; it lists the old entry as a replacement candidate, and `export` keeps refusing until
+you replace it (the old file is never edited):
 
 ```sh
-brain log replace log/learning/<entry-id>.md --text 'the corrected learning
-supporting detail'
+brain log replace log/learning/<entry-id>.md --text 'the learning' --body 'the corrected detail'
+brain log import learning ~/firstmate/data/learnings.md   # now nothing is pending
+brain export
 ```
+
+Retiring and replacing need `"lifecycle"` among the integration's write kinds, as above.
 
 `retire` and `replace` leave the original entry untouched and add lifecycle files under
 `log/lifecycle/`. After `brain sync`, every machine's generated view omits the retired

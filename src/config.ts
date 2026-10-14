@@ -24,6 +24,7 @@ import { homedir, hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { ExtensionError, enabledExtensionNames, installedManifest, type ExtensionManifest } from "./extensions.js";
 import { userConfigFile } from "./paths.js";
+import type { Store } from "./store.js";
 
 export { userConfigFile };
 
@@ -31,6 +32,7 @@ export interface ExportTarget {
   kind: string;
   path: string; // absolute, ~ expanded
   header?: string;
+  owner?: string;
 }
 
 // How the vault's files reach other machines. brain never assumes one:
@@ -110,7 +112,7 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
     for (const [kind, path] of Object.entries(viewPaths)) {
       if (typeof path !== "string") throw new ConfigError(`${userConfigPath}: integrations.${name}.views.${kind} must be a path`);
       const header = objectAt(viewSpecs, kind).header;
-      views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined });
+      views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined, owner: name });
     }
     integrations[name] = {
       name,
@@ -202,6 +204,22 @@ export function inScope(path: string, scope: string[] | null): boolean {
   return scope === null || scope.some((prefix) => path.startsWith(prefix));
 }
 
+export function inReadScope(store: Store, cfg: Config, path: string, scope = readScope(cfg)): boolean {
+  if (scope === null) return true;
+  if (!inScope(path, scope)) return false;
+  const lifecyclePrefix = `${cfg.logDir}/lifecycle/`;
+  let target = path;
+  const seen = new Set<string>();
+  while (target.startsWith(lifecyclePrefix)) {
+    if (seen.has(target)) return false;
+    seen.add(target);
+    const next = store.get(target)?.frontmatter.target;
+    if (typeof next !== "string") return false;
+    target = next;
+  }
+  return inScope(target, scope);
+}
+
 function extensionIntegration(manifest: ExtensionManifest): Integration {
   return {
     name: manifest.name,
@@ -211,7 +229,7 @@ function extensionIntegration(manifest: ExtensionManifest): Integration {
   };
 }
 
-function integrationScope(integration: Integration, logDir: string): string[] | null {
+export function integrationScope(integration: Integration, logDir: string): string[] | null {
   if (integration.read === null) return null;
   return [...integration.read, ...integration.write.map((kind) => `${logDir}/${kind}/`)];
 }

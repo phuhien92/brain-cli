@@ -7,9 +7,9 @@ holds the rules an agent changing the code must not break.
 
 1. **The vault is the source of truth; the index is a cache.** The index (`$BRAIN_STATE_DIR/<vault>-<id>/index.db`, never inside the vault) can be
    deleted at any time and must rebuild to the same state. Never store anything in the
-   index that cannot be re-derived from the markdown — with one exception, the hash of
-   what was last exported to each path, whose loss only makes `export` refuse until
-   `--force`, never overwrite.
+   index that cannot be re-derived from the markdown — with one exception, the hash and
+   entry list of what was last exported to each path, whose loss only makes `export` refuse
+   until `--force`, never overwrite, and `import` propose no retirements.
 2. **Create, never edit.** The only writes into the vault are new files under the log
    folder (`log add`, `log import`, `log retire`, `log replace`, `lifecycle …`) and immutable originals plus metadata
    sidecars under `sources/` (`ingest`), opened with the `wx` flag so an existing file can
@@ -25,8 +25,9 @@ holds the rules an agent changing the code must not break.
 5. **Fresh on every read.** Every command that reads notes calls `Store.refresh()` before it answers. No
    watcher, no daemon, no "run index first" requirement.
 6. **The `--json` envelope is a contract.** One JSON line on stdout, `schema: "brain.v1"`,
-   `ok`, and either `data` or `error.code`. Changing its shape means bumping `SCHEMA` in
-   `src/cli.ts` and saying so in the README. Exit codes are part of it.
+   `ok`, and either `data` or `error.code`. Additive optional fields keep the same schema;
+   consumers must ignore unknown fields. Removing, renaming or retyping a field, or changing
+   an exit code, means bumping `SCHEMA` in `src/cli.ts` and documenting it in `docs/cli.md`.
 7. **User input never reaches FTS5 unquoted** unless `--raw` was passed. `toMatchExpression`
    quotes every term.
 8. **Zero runtime dependencies.** `node:sqlite`, `node:util` `parseArgs` and a small

@@ -7,7 +7,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { inScope, readScope, type Config } from "./config.js";
+import { inReadScope, inScope, readScope, type Config } from "./config.js";
 import { lifecycleStates } from "./lifecycle.js";
 import { LIFECYCLE_KIND } from "./log.js";
 import { basename, parseNote, type FrontmatterValue } from "./note.js";
@@ -39,7 +39,7 @@ export function lint(store: Store, cfg: Config): Finding[] {
     title: string;
     aliases: string;
     frontmatter: string;
-  }[]).filter((n) => inScope(n.path, scope));
+  }[]).filter((n) => inReadScope(store, cfg, n.path, scope));
   const allPaths = new Set(notes.map((n) => n.path));
   const lower = (s: string) => s.toLowerCase();
 
@@ -132,7 +132,7 @@ export function lint(store: Store, cfg: Config): Finding[] {
 
   // lifecycle: overdue reviews, bad metadata, events for notes that are gone
   for (const st of lifecycleStates(store, cfg).values()) {
-    if (!inScope(st.path, scope)) continue;
+    if (!inReadScope(store, cfg, st.path, scope)) continue;
     if (!allPaths.has(st.path)) {
       findings.push({
         rule: "lifecycle",

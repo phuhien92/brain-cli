@@ -6,7 +6,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { inScope, readScope } from "./config.js";
+import { inReadScope, inScope, readScope } from "./config.js";
 import { lifecycleStates } from "./lifecycle.js";
 import { LIFECYCLE_KIND } from "./log.js";
 import { basename, parseNote } from "./note.js";
@@ -22,7 +22,7 @@ export function lint(store, cfg) {
     const findings = [];
     const scope = readScope(cfg);
     const logPrefix = `${cfg.logDir}/`;
-    const notes = store.db.prepare("SELECT path, title, aliases, frontmatter FROM notes").all().filter((n) => inScope(n.path, scope));
+    const notes = store.db.prepare("SELECT path, title, aliases, frontmatter FROM notes").all().filter((n) => inReadScope(store, cfg, n.path, scope));
     const allPaths = new Set(notes.map((n) => n.path));
     const lower = (s) => s.toLowerCase();
     // Resolution tables, the way Obsidian resolves [[links]].
@@ -120,7 +120,7 @@ export function lint(store, cfg) {
     }
     // lifecycle: overdue reviews, bad metadata, events for notes that are gone
     for (const st of lifecycleStates(store, cfg).values()) {
-        if (!inScope(st.path, scope))
+        if (!inReadScope(store, cfg, st.path, scope))
             continue;
         if (!allPaths.has(st.path)) {
             findings.push({

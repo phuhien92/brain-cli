@@ -71,7 +71,7 @@ export function loadConfig(vault, opts = {}) {
             if (typeof path !== "string")
                 throw new ConfigError(`${userConfigPath}: integrations.${name}.views.${kind} must be a path`);
             const header = objectAt(viewSpecs, kind).header;
-            views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined });
+            views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined, owner: name });
         }
         integrations[name] = {
             name,
@@ -158,6 +158,25 @@ export function readScope(cfg) {
 export function inScope(path, scope) {
     return scope === null || scope.some((prefix) => path.startsWith(prefix));
 }
+export function inReadScope(store, cfg, path, scope = readScope(cfg)) {
+    if (scope === null)
+        return true;
+    if (!inScope(path, scope))
+        return false;
+    const lifecyclePrefix = `${cfg.logDir}/lifecycle/`;
+    let target = path;
+    const seen = new Set();
+    while (target.startsWith(lifecyclePrefix)) {
+        if (seen.has(target))
+            return false;
+        seen.add(target);
+        const next = store.get(target)?.frontmatter.target;
+        if (typeof next !== "string")
+            return false;
+        target = next;
+    }
+    return inScope(target, scope);
+}
 function extensionIntegration(manifest) {
     return {
         name: manifest.name,
@@ -166,7 +185,7 @@ function extensionIntegration(manifest) {
         views: [],
     };
 }
-function integrationScope(integration, logDir) {
+export function integrationScope(integration, logDir) {
     if (integration.read === null)
         return null;
     return [...integration.read, ...integration.write.map((kind) => `${logDir}/${kind}/`)];
