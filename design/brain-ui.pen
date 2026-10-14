@@ -13032,15 +13032,37 @@
                 "contract": "brain.logo.v1",
                 "state": "implemented",
                 "asset": "assets/logo.svg",
-                "backgroundToken": "brand.background",
-                "foregroundToken": "brand.onBackground"
+                "backgroundToken": "brand.gradient",
+                "backgroundStartToken": "brand.backgroundStart",
+                "backgroundEndToken": "brand.backgroundEnd",
+                "foregroundToken": "brand.onLight",
+                "haloToken": "brand.markHalo",
+                "accentToken": "brand.accent"
               },
               "clip": true,
               "width": 128,
               "height": 128,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 28,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 2,
               "layout": "none",
               "children": [
@@ -13051,11 +13073,54 @@
                   "x": 0,
                   "y": 0,
                   "name": "Logo gradient tile",
-                  "fill": "$brandBackground",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 225,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "$brandBackgroundStart",
+                        "position": 0
+                      },
+                      {
+                        "color": "$brandBackgroundEnd",
+                        "position": 1
+                      }
+                    ]
+                  },
                   "width": 128,
                   "height": 128,
                   "stroke": "$brandOnBackground",
                   "strokeWidth": 2
+                },
+                {
+                  "type": "path",
+                  "id": "H3VWU",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 10,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
                 },
                 {
                   "type": "path",
@@ -13077,8 +13142,33 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 6,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "Mkgj6",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Linked note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 7.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13102,7 +13192,7 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 3.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -13122,7 +13212,7 @@
                   "fill": "$brandPaper",
                   "width": 14,
                   "height": 14,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -13140,7 +13230,7 @@
                   "fill": "$brandPaper",
                   "width": 12,
                   "height": 12,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -13158,7 +13248,7 @@
                   "fill": "$brandPaper",
                   "width": 13,
                   "height": 13,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -13173,10 +13263,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -13194,7 +13284,7 @@
                   "fill": "$brandPaper",
                   "width": 10,
                   "height": 10,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 }
               ]
@@ -13299,9 +13389,27 @@
               "clip": true,
               "width": 40,
               "height": 40,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 8.75,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 0.75,
               "layout": "none",
               "children": [
@@ -13312,11 +13420,54 @@
                   "x": 0,
                   "y": 0,
                   "name": "Logo gradient tile",
-                  "fill": "$brandBackground",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 225,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "$brandBackgroundStart",
+                        "position": 0
+                      },
+                      {
+                        "color": "$brandBackgroundEnd",
+                        "position": 1
+                      }
+                    ]
+                  },
                   "width": 40,
                   "height": 40,
                   "stroke": "$brandOnBackground",
                   "strokeWidth": 0.75
+                },
+                {
+                  "type": "path",
+                  "id": "u4XNA",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 40,
+                  "height": 40,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 3.125,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
                 },
                 {
                   "type": "path",
@@ -13338,8 +13489,33 @@
                   "fill": "#00000000",
                   "width": 40,
                   "height": 40,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "alNy4",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Linked note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 40,
+                  "height": 40,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 2.34375,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13363,7 +13539,7 @@
                   "fill": "#00000000",
                   "width": 40,
                   "height": 40,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.09375,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -13383,7 +13559,7 @@
                   "fill": "$brandPaper",
                   "width": 4.375,
                   "height": 4.375,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.78125
                 },
                 {
@@ -13401,7 +13577,7 @@
                   "fill": "$brandPaper",
                   "width": 3.75,
                   "height": 3.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.78125
                 },
                 {
@@ -13419,7 +13595,7 @@
                   "fill": "$brandPaper",
                   "width": 4.0625,
                   "height": 4.0625,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.78125
                 },
                 {
@@ -13434,10 +13610,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 5,
                   "height": 5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.78125
                 },
                 {
@@ -13455,7 +13631,7 @@
                   "fill": "$brandPaper",
                   "width": 3.125,
                   "height": 3.125,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.78125
                 }
               ]
@@ -13525,7 +13701,25 @@
               "x": 24,
               "y": 214,
               "name": "Brand swatch Deep",
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "width": 28,
               "height": 28
             },
@@ -13536,7 +13730,7 @@
               "y": 221,
               "name": "Brand token Deep",
               "fill": "$muted",
-              "content": "Background #21C995",
+              "content": "Gradient #075E46 → #21C995",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13548,18 +13742,20 @@
               "x": 182,
               "y": 214,
               "name": "Brand swatch Signal",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "width": 28,
-              "height": 28
+              "height": 28,
+              "stroke": "$border",
+              "strokeWidth": 1
             },
             {
               "type": "text",
               "id": "SNzqN",
               "x": 220,
               "y": 221,
-              "name": "Brand token Indigo",
+              "name": "Brand token On dark",
               "fill": "$muted",
-              "content": "On background #052F3E",
+              "content": "On dark #F4F8F6",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13571,7 +13767,7 @@
               "x": 340,
               "y": 214,
               "name": "Brand swatch Bracket",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnLight",
               "width": 28,
               "height": 28
             },
@@ -13582,7 +13778,7 @@
               "y": 221,
               "name": "Brand token Bracket",
               "fill": "$muted",
-              "content": "Brackets #052F3E",
+              "content": "On light #052F3E",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13617,7 +13813,7 @@
               "x": 656,
               "y": 214,
               "name": "Brand swatch Wordmark",
-              "fill": "$brandOnBackground",
+              "fill": "$brandAccent",
               "width": 28,
               "height": 28
             },
@@ -13628,7 +13824,7 @@
               "y": 221,
               "name": "Brand token Active",
               "fill": "$muted",
-              "content": "Wordmark #052F3E",
+              "content": "Accent #FBBF24",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13696,7 +13892,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 600,
-              "content": "• Use one identity mark per structural chrome region.\n• Keep mint text off white surfaces.\n• Do not restore indigo, amber, gradients or decorative graphs.",
+              "content": "• Use one identity mark per structural chrome region.\n• Keep mint text off white surfaces.\n• Keep the approved green gradient and amber focus node; do not restore indigo, lavender, or decorative graphs.",
               "fontFamily": "$font-ui",
               "fontSize": "$font-body",
               "fontWeight": "normal"
@@ -13807,12 +14003,55 @@
               "name": "A · Linked Vault mark",
               "width": 116,
               "height": 116,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 25.52,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 1.8125,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "wgLVS",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault mark · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 116,
+                  "height": 116,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 9.0625,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "l02CV",
@@ -13833,8 +14072,33 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 5.4375,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "vUOdN",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault mark · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 116,
+                  "height": 116,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 6.796875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13858,7 +14122,7 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 3.171875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -13878,7 +14142,7 @@
                   "fill": "$brandPaper",
                   "width": 12.6875,
                   "height": 12.6875,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.265625
                 },
                 {
@@ -13896,7 +14160,7 @@
                   "fill": "$brandPaper",
                   "width": 10.875,
                   "height": 10.875,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.265625
                 },
                 {
@@ -13914,7 +14178,7 @@
                   "fill": "$brandPaper",
                   "width": 11.78125,
                   "height": 11.78125,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.265625
                 },
                 {
@@ -13929,10 +14193,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 14.5,
                   "height": 14.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.265625
                 },
                 {
@@ -13950,7 +14214,7 @@
                   "fill": "$brandPaper",
                   "width": 9.0625,
                   "height": 9.0625,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.265625
                 }
               ]
@@ -14042,12 +14306,55 @@
               "name": "A · Linked Vault 48 pixel",
               "width": 48,
               "height": 48,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 10.56,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 0.75,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "fCr4E",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 48 pixel · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 48,
+                  "height": 48,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 3.75,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "k9AH6L",
@@ -14068,8 +14375,33 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.25,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "v2u4Z0",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 48 pixel · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 48,
+                  "height": 48,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 2.8125,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -14093,7 +14425,7 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.3125,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -14113,7 +14445,7 @@
                   "fill": "$brandPaper",
                   "width": 5.25,
                   "height": 5.25,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.9375
                 },
                 {
@@ -14131,7 +14463,7 @@
                   "fill": "$brandPaper",
                   "width": 4.5,
                   "height": 4.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.9375
                 },
                 {
@@ -14149,7 +14481,7 @@
                   "fill": "$brandPaper",
                   "width": 4.875,
                   "height": 4.875,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.9375
                 },
                 {
@@ -14164,10 +14496,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 6,
                   "height": 6,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.9375
                 },
                 {
@@ -14185,7 +14517,7 @@
                   "fill": "$brandPaper",
                   "width": 3.75,
                   "height": 3.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.9375
                 }
               ]
@@ -14198,12 +14530,55 @@
               "name": "A · Linked Vault 32 pixel",
               "width": 32,
               "height": 32,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 7.04,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 0.75,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "o1f8tr",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 32 pixel · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 32,
+                  "height": 32,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 2.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "o5yhU",
@@ -14224,8 +14599,33 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "qhXH8",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 32 pixel · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 32,
+                  "height": 32,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -14249,7 +14649,7 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -14269,7 +14669,7 @@
                   "fill": "$brandPaper",
                   "width": 3.5,
                   "height": 3.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -14287,7 +14687,7 @@
                   "fill": "$brandPaper",
                   "width": 3,
                   "height": 3,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -14305,7 +14705,7 @@
                   "fill": "$brandPaper",
                   "width": 3.25,
                   "height": 3.25,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -14320,10 +14720,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 4,
                   "height": 4,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -14341,7 +14741,7 @@
                   "fill": "$brandPaper",
                   "width": 2.5,
                   "height": 2.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 }
               ]
@@ -14354,10 +14754,54 @@
               "name": "A · Linked Vault 16 pixel",
               "width": 16,
               "height": 16,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 3.52,
+              "stroke": "$brandOnLight",
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "VC0nN",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 16 pixel · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.252,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "y8tBDr",
@@ -14378,9 +14822,33 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.752,
                   "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "SeXdr",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 16 pixel · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.252,
                   "strokeLinecap": "round"
                 },
                 {
@@ -14403,7 +14871,7 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.752,
                   "strokeLinecap": "round"
                 },
@@ -14422,7 +14890,7 @@
                   "fill": "$brandPaper",
                   "width": 1.75,
                   "height": 1.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -14440,7 +14908,7 @@
                   "fill": "$brandPaper",
                   "width": 1.5,
                   "height": 1.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -14458,7 +14926,7 @@
                   "fill": "$brandPaper",
                   "width": 1.625,
                   "height": 1.625,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -14473,10 +14941,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 2,
                   "height": 2,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -14494,7 +14962,7 @@
                   "fill": "$brandPaper",
                   "width": 1.25,
                   "height": 1.25,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 }
               ]
@@ -15484,12 +15952,55 @@
               "name": "Recommended 64",
               "width": 64,
               "height": 64,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 14.08,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 1,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "CsybZ",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 64 · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 64,
+                  "height": 64,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "GWDrH",
@@ -15510,8 +16021,33 @@
                   "fill": "#00000000",
                   "width": 64,
                   "height": 64,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 3,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "G2Qx1",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 64 · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 64,
+                  "height": 64,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 3.75,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15535,7 +16071,7 @@
                   "fill": "#00000000",
                   "width": 64,
                   "height": 64,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.75,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15555,7 +16091,7 @@
                   "fill": "$brandPaper",
                   "width": 7,
                   "height": 7,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.25
                 },
                 {
@@ -15573,7 +16109,7 @@
                   "fill": "$brandPaper",
                   "width": 6,
                   "height": 6,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.25
                 },
                 {
@@ -15591,7 +16127,7 @@
                   "fill": "$brandPaper",
                   "width": 6.5,
                   "height": 6.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.25
                 },
                 {
@@ -15606,10 +16142,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 8,
                   "height": 8,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.25
                 },
                 {
@@ -15627,7 +16163,7 @@
                   "fill": "$brandPaper",
                   "width": 5,
                   "height": 5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.25
                 }
               ]
@@ -15640,12 +16176,55 @@
               "name": "Recommended 32",
               "width": 32,
               "height": 32,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 7.04,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 0.75,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "x51Tru",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 32 · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 32,
+                  "height": 32,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 2.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "A80Sr",
@@ -15666,8 +16245,33 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "mYlaG",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 32 · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 32,
+                  "height": 32,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15691,7 +16295,7 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15711,7 +16315,7 @@
                   "fill": "$brandPaper",
                   "width": 3.5,
                   "height": 3.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -15729,7 +16333,7 @@
                   "fill": "$brandPaper",
                   "width": 3,
                   "height": 3,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -15747,7 +16351,7 @@
                   "fill": "$brandPaper",
                   "width": 3.25,
                   "height": 3.25,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -15762,10 +16366,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 4,
                   "height": 4,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 },
                 {
@@ -15783,7 +16387,7 @@
                   "fill": "$brandPaper",
                   "width": 2.5,
                   "height": 2.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.625
                 }
               ]
@@ -15796,10 +16400,54 @@
               "name": "Recommended 16",
               "width": 16,
               "height": 16,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 3.52,
+              "stroke": "$brandOnLight",
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "CxmtD",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 16 · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.252,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "RgxO4",
@@ -15820,9 +16468,33 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.752,
                   "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "YaERI",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 16 · Linked-note graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 1.252,
                   "strokeLinecap": "round"
                 },
                 {
@@ -15845,7 +16517,7 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.752,
                   "strokeLinecap": "round"
                 },
@@ -15864,7 +16536,7 @@
                   "fill": "$brandPaper",
                   "width": 1.75,
                   "height": 1.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -15882,7 +16554,7 @@
                   "fill": "$brandPaper",
                   "width": 1.5,
                   "height": 1.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -15900,7 +16572,7 @@
                   "fill": "$brandPaper",
                   "width": 1.625,
                   "height": 1.625,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -15915,10 +16587,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 2,
                   "height": 2,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 },
                 {
@@ -15936,7 +16608,7 @@
                   "fill": "$brandPaper",
                   "width": 1.25,
                   "height": 1.25,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.3125
                 }
               ]
@@ -16496,7 +17168,25 @@
               "x": 720,
               "y": 92,
               "name": "Field swatch",
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "width": 28,
               "height": 28
             },
@@ -16509,7 +17199,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Background\n#21C995",
+              "content": "Gradient · #075E46 → #21C995",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -16522,9 +17212,11 @@
               "x": 910,
               "y": 92,
               "name": "Signal swatch",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "width": 28,
-              "height": 28
+              "height": 28,
+              "stroke": "$border",
+              "strokeWidth": 1
             },
             {
               "type": "text",
@@ -16535,7 +17227,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "On background\n#052F3E",
+              "content": "On dark · #F4F8F6",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -16548,7 +17240,7 @@
               "x": 1100,
               "y": 92,
               "name": "Bracket swatch",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnLight",
               "width": 28,
               "height": 28
             },
@@ -16561,7 +17253,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Bracket\n#052F3E",
+              "content": "On light · #052F3E",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -16600,7 +17292,7 @@
               "x": 910,
               "y": 156,
               "name": "Wordmark swatch",
-              "fill": "$brandOnBackground",
+              "fill": "$brandAccent",
               "width": 28,
               "height": 28
             },
@@ -16613,7 +17305,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Wordmark\n#052F3E",
+              "content": "Accent · #FBBF24",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -16629,9 +17321,27 @@
           "name": "Recommendation strip",
           "width": 1344,
           "height": 98,
-          "fill": "$brandBackground",
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "$brandBackgroundStart",
+                "position": 0
+              },
+              {
+                "color": "$brandBackgroundEnd",
+                "position": 1
+              }
+            ]
+          },
           "cornerRadius": 18,
-          "stroke": "$brandOnBackground",
+          "stroke": "$brandOnLight",
           "strokeWidth": 2,
           "layout": "none",
           "children": [
@@ -16641,7 +17351,7 @@
               "x": 24,
               "y": 19,
               "name": "Decision label",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "content": "RECOMMENDATION",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
@@ -16654,7 +17364,7 @@
               "x": 24,
               "y": 42,
               "name": "Decision statement",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "textGrowth": "fixed-width",
               "width": 1280,
               "content": "Choose A · Linked Vault – it keeps Brain recognizable, removes legacy ornament, and remains clear from 16 px to README scale.",
@@ -16744,7 +17454,12 @@
             "contract": "brain.banner.v1",
             "state": "implemented",
             "asset": "assets/banner.svg",
-            "backgroundToken": "brand.background",
+            "backgroundToken": "brand.gradient",
+            "backgroundStartToken": "brand.backgroundStart",
+            "backgroundEndToken": "brand.backgroundEnd",
+            "foregroundDarkToken": "brand.onDark",
+            "foregroundLightToken": "brand.onLight",
+            "accentToken": "brand.accent",
             "width": 1280,
             "height": 320,
             "wordmarkRendering": "outlined-paths"
@@ -16752,9 +17467,27 @@
           "clip": true,
           "width": 1280,
           "height": 320,
-          "fill": "$brandBackground",
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "$brandBackgroundStart",
+                "position": 0
+              },
+              {
+                "color": "$brandBackgroundEnd",
+                "position": 1
+              }
+            ]
+          },
           "cornerRadius": 24,
-          "stroke": "$brandOnBackground",
+          "stroke": "$brandOnLight",
           "strokeWidth": 2,
           "layout": "none",
           "children": [
@@ -16763,8 +17496,9 @@
               "id": "F3UBj",
               "x": 0,
               "y": 0,
-              "name": "A mint rail",
-              "fill": "$brandBackground",
+              "name": "Legacy mint rail (disabled)",
+              "enabled": false,
+              "fill": "$brandBackgroundEnd",
               "width": 12,
               "height": 320
             },
@@ -16776,12 +17510,55 @@
               "name": "A logo",
               "width": 128,
               "height": 128,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 28,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 2,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "z6Wkwm",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A logo · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 10,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "ecJwU",
@@ -16802,8 +17579,33 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 6,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "j0q00",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A logo · Graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 7.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16827,7 +17629,7 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 3.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -16847,7 +17649,7 @@
                   "fill": "$brandPaper",
                   "width": 14,
                   "height": 14,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -16865,7 +17667,7 @@
                   "fill": "$brandPaper",
                   "width": 12,
                   "height": 12,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -16883,7 +17685,7 @@
                   "fill": "$brandPaper",
                   "width": 13,
                   "height": 13,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -16898,10 +17700,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 },
                 {
@@ -16919,7 +17721,7 @@
                   "fill": "$brandPaper",
                   "width": 10,
                   "height": 10,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.5
                 }
               ]
@@ -16943,7 +17745,7 @@
                 161,
                 87.421875
               ],
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "width": 161,
               "height": 87.421875
             },
@@ -16966,7 +17768,7 @@
                 130,
                 70.1875
               ],
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "width": 130,
               "height": 70.1875
             },
@@ -16976,7 +17778,7 @@
               "x": 220,
               "y": 138,
               "name": "A tagline",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "content": "Headless memory for your markdown vault.",
               "lineHeight": 1.35,
               "fontFamily": "$fontPortableSans",
@@ -16989,7 +17791,7 @@
               "x": 220,
               "y": 180,
               "name": "A support",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "content": "For any agent, on any machine.",
               "lineHeight": 1.35,
               "fontFamily": "$fontPortableSans",
@@ -17002,7 +17804,7 @@
               "x": 220,
               "y": 236,
               "name": "A proof line",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "textGrowth": "fixed-width",
               "width": 570,
               "content": "LOCAL-FIRST  ·  RANKED SEARCH  ·  ZERO RUNTIME DEPS",
@@ -17020,7 +17822,7 @@
               "name": "A terminal proof",
               "width": 396,
               "height": 216,
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnLight",
               "cornerRadius": 18,
               "layout": "none",
               "children": [
@@ -17030,7 +17832,7 @@
                   "x": 17,
                   "y": 17,
                   "name": "A terminal dot one",
-                  "fill": "$brandBackground",
+                  "fill": "$brandBackgroundEnd",
                   "width": 10,
                   "height": 10
                 },
@@ -17095,7 +17897,7 @@
                   "x": 24,
                   "y": 170,
                   "name": "A terminal status",
-                  "fill": "$brandBackground",
+                  "fill": "$brandBackgroundEnd",
                   "textGrowth": "fixed-width",
                   "width": 350,
                   "content": "3 notes · fresh on read · local",
@@ -17142,12 +17944,55 @@
               "name": "B logo",
               "width": 96,
               "height": 96,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 21.12,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 1.5,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "be9aB",
+                  "x": 0,
+                  "y": 0,
+                  "name": "B logo · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 96,
+                  "height": 96,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 7.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "g2DCLn",
@@ -17168,8 +18013,33 @@
                   "fill": "#00000000",
                   "width": 96,
                   "height": 96,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 4.5,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "fzCU3",
+                  "x": 0,
+                  "y": 0,
+                  "name": "B logo · Graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 96,
+                  "height": 96,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 5.625,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -17193,7 +18063,7 @@
                   "fill": "#00000000",
                   "width": 96,
                   "height": 96,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 2.625,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -17213,7 +18083,7 @@
                   "fill": "$brandPaper",
                   "width": 10.5,
                   "height": 10.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875
                 },
                 {
@@ -17231,7 +18101,7 @@
                   "fill": "$brandPaper",
                   "width": 9,
                   "height": 9,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875
                 },
                 {
@@ -17249,7 +18119,7 @@
                   "fill": "$brandPaper",
                   "width": 9.75,
                   "height": 9.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875
                 },
                 {
@@ -17264,10 +18134,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 12,
                   "height": 12,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875
                 },
                 {
@@ -17285,7 +18155,7 @@
                   "fill": "$brandPaper",
                   "width": 7.5,
                   "height": 7.5,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.875
                 }
               ]
@@ -17502,12 +18372,55 @@
               "name": "C logo",
               "width": 72,
               "height": 72,
-              "fill": "$brandBackground",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "cornerRadius": 15.84,
-              "stroke": "$brandOnBackground",
+              "stroke": "$brandOnLight",
               "strokeWidth": 1.125,
               "layout": "none",
               "children": [
+                {
+                  "type": "path",
+                  "id": "fUAmw",
+                  "x": 0,
+                  "y": 0,
+                  "name": "C logo · Wiki-link brackets · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 72,
+                  "height": 72,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 5.625,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
                 {
                   "type": "path",
                   "id": "A8ViC",
@@ -17528,8 +18441,33 @@
                   "fill": "#00000000",
                   "width": 72,
                   "height": 72,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 3.375,
+                  "strokeLinejoin": "round",
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "path",
+                  "id": "Cf95q",
+                  "x": 0,
+                  "y": 0,
+                  "name": "C logo · Graph · contrast halo",
+                  "metadata": {
+                    "type": "brain.logo-halo",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 72,
+                  "height": 72,
+                  "stroke": "$brandMarkHalo",
+                  "strokeWidth": 4.21875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -17553,7 +18491,7 @@
                   "fill": "#00000000",
                   "width": 72,
                   "height": 72,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.96875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -17573,7 +18511,7 @@
                   "fill": "$brandPaper",
                   "width": 7.875,
                   "height": 7.875,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.40625
                 },
                 {
@@ -17591,7 +18529,7 @@
                   "fill": "$brandPaper",
                   "width": 6.75,
                   "height": 6.75,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.40625
                 },
                 {
@@ -17609,7 +18547,7 @@
                   "fill": "$brandPaper",
                   "width": 7.3125,
                   "height": 7.3125,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.40625
                 },
                 {
@@ -17624,10 +18562,10 @@
                     "index": 4,
                     "state": "focus"
                   },
-                  "fill": "$brandOnBackground",
+                  "fill": "$brandAccent",
                   "width": 9,
                   "height": 9,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.40625
                 },
                 {
@@ -17645,7 +18583,7 @@
                   "fill": "$brandPaper",
                   "width": 5.625,
                   "height": 5.625,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 1.40625
                 }
               ]
@@ -17981,10 +18919,54 @@
                       "name": "Tab icon",
                       "width": 16,
                       "height": 16,
-                      "fill": "$brandBackground",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "linear",
+                        "enabled": true,
+                        "rotation": 225,
+                        "size": {
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "$brandBackgroundStart",
+                            "position": 0
+                          },
+                          {
+                            "color": "$brandBackgroundEnd",
+                            "position": 1
+                          }
+                        ]
+                      },
                       "cornerRadius": 3.52,
+                      "stroke": "$brandOnLight",
                       "layout": "none",
                       "children": [
+                        {
+                          "type": "path",
+                          "id": "dR5GX",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Tab icon · Brackets · contrast halo",
+                          "metadata": {
+                            "type": "brain.logo-halo",
+                            "role": "wiki-link-brackets"
+                          },
+                          "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                          "viewBox": [
+                            0,
+                            0,
+                            128,
+                            128
+                          ],
+                          "fill": "#00000000",
+                          "width": 16,
+                          "height": 16,
+                          "stroke": "$brandMarkHalo",
+                          "strokeWidth": 1.252,
+                          "strokeLinejoin": "round",
+                          "strokeLinecap": "round"
+                        },
                         {
                           "type": "path",
                           "id": "Xbebj",
@@ -18005,9 +18987,33 @@
                           "fill": "#00000000",
                           "width": 16,
                           "height": 16,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.752,
                           "strokeLinejoin": "round",
+                          "strokeLinecap": "round"
+                        },
+                        {
+                          "type": "path",
+                          "id": "d7D92",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Tab icon · Graph · contrast halo",
+                          "metadata": {
+                            "type": "brain.logo-halo",
+                            "role": "linked-note-graph"
+                          },
+                          "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                          "viewBox": [
+                            0,
+                            0,
+                            128,
+                            128
+                          ],
+                          "fill": "#00000000",
+                          "width": 16,
+                          "height": 16,
+                          "stroke": "$brandMarkHalo",
+                          "strokeWidth": 1.252,
                           "strokeLinecap": "round"
                         },
                         {
@@ -18030,7 +19036,7 @@
                           "fill": "#00000000",
                           "width": 16,
                           "height": 16,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.752,
                           "strokeLinecap": "round"
                         },
@@ -18049,7 +19055,7 @@
                           "fill": "$brandPaper",
                           "width": 1.75,
                           "height": 1.75,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.3125
                         },
                         {
@@ -18067,7 +19073,7 @@
                           "fill": "$brandPaper",
                           "width": 1.5,
                           "height": 1.5,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.3125
                         },
                         {
@@ -18085,7 +19091,7 @@
                           "fill": "$brandPaper",
                           "width": 1.625,
                           "height": 1.625,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.3125
                         },
                         {
@@ -18100,10 +19106,10 @@
                             "index": 4,
                             "state": "focus"
                           },
-                          "fill": "$brandOnBackground",
+                          "fill": "$brandAccent",
                           "width": 2,
                           "height": 2,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.3125
                         },
                         {
@@ -18121,7 +19127,7 @@
                           "fill": "$brandPaper",
                           "width": 1.25,
                           "height": 1.25,
-                          "stroke": "$brandOnBackground",
+                          "stroke": "$brandOnLight",
                           "strokeWidth": 0.3125
                         }
                       ]
@@ -18166,12 +19172,55 @@
                   "name": "Sidebar brand icon",
                   "width": 32,
                   "height": 32,
-                  "fill": "$brandBackground",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 225,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "$brandBackgroundStart",
+                        "position": 0
+                      },
+                      {
+                        "color": "$brandBackgroundEnd",
+                        "position": 1
+                      }
+                    ]
+                  },
                   "cornerRadius": 7.04,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.75,
                   "layout": "none",
                   "children": [
+                    {
+                      "type": "path",
+                      "id": "YqyyB",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Sidebar brand icon · Brackets · contrast halo",
+                      "metadata": {
+                        "type": "brain.logo-halo",
+                        "role": "wiki-link-brackets"
+                      },
+                      "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                      "viewBox": [
+                        0,
+                        0,
+                        128,
+                        128
+                      ],
+                      "fill": "#00000000",
+                      "width": 32,
+                      "height": 32,
+                      "stroke": "$brandMarkHalo",
+                      "strokeWidth": 2.5,
+                      "strokeLinejoin": "round",
+                      "strokeLinecap": "round"
+                    },
                     {
                       "type": "path",
                       "id": "f8YmGF",
@@ -18192,8 +19241,33 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 1.5,
+                      "strokeLinejoin": "round",
+                      "strokeLinecap": "round"
+                    },
+                    {
+                      "type": "path",
+                      "id": "IXyL1",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Sidebar brand icon · Graph · contrast halo",
+                      "metadata": {
+                        "type": "brain.logo-halo",
+                        "role": "linked-note-graph"
+                      },
+                      "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                      "viewBox": [
+                        0,
+                        0,
+                        128,
+                        128
+                      ],
+                      "fill": "#00000000",
+                      "width": 32,
+                      "height": 32,
+                      "stroke": "$brandMarkHalo",
+                      "strokeWidth": 1.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -18217,7 +19291,7 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
@@ -18237,7 +19311,7 @@
                       "fill": "$brandPaper",
                       "width": 3.5,
                       "height": 3.5,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -18255,7 +19329,7 @@
                       "fill": "$brandPaper",
                       "width": 3,
                       "height": 3,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -18273,7 +19347,7 @@
                       "fill": "$brandPaper",
                       "width": 3.25,
                       "height": 3.25,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -18288,10 +19362,10 @@
                         "index": 4,
                         "state": "focus"
                       },
-                      "fill": "$brandOnBackground",
+                      "fill": "$brandAccent",
                       "width": 4,
                       "height": 4,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -18309,7 +19383,7 @@
                       "fill": "$brandPaper",
                       "width": 2.5,
                       "height": 2.5,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     }
                   ]
@@ -19036,12 +20110,55 @@
                   "name": "Compact header icon",
                   "width": 32,
                   "height": 32,
-                  "fill": "$brandBackground",
+                  "fill": {
+                    "type": "gradient",
+                    "gradientType": "linear",
+                    "enabled": true,
+                    "rotation": 225,
+                    "size": {
+                      "height": 1
+                    },
+                    "colors": [
+                      {
+                        "color": "$brandBackgroundStart",
+                        "position": 0
+                      },
+                      {
+                        "color": "$brandBackgroundEnd",
+                        "position": 1
+                      }
+                    ]
+                  },
                   "cornerRadius": 7.04,
-                  "stroke": "$brandOnBackground",
+                  "stroke": "$brandOnLight",
                   "strokeWidth": 0.75,
                   "layout": "none",
                   "children": [
+                    {
+                      "type": "path",
+                      "id": "wVKGn",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Compact header icon · Brackets · contrast halo",
+                      "metadata": {
+                        "type": "brain.logo-halo",
+                        "role": "wiki-link-brackets"
+                      },
+                      "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
+                      "viewBox": [
+                        0,
+                        0,
+                        128,
+                        128
+                      ],
+                      "fill": "#00000000",
+                      "width": 32,
+                      "height": 32,
+                      "stroke": "$brandMarkHalo",
+                      "strokeWidth": 2.5,
+                      "strokeLinejoin": "round",
+                      "strokeLinecap": "round"
+                    },
                     {
                       "type": "path",
                       "id": "OqIJT",
@@ -19062,8 +20179,33 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 1.5,
+                      "strokeLinejoin": "round",
+                      "strokeLinecap": "round"
+                    },
+                    {
+                      "type": "path",
+                      "id": "pWMw5",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Compact header icon · Graph · contrast halo",
+                      "metadata": {
+                        "type": "brain.logo-halo",
+                        "role": "linked-note-graph"
+                      },
+                      "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                      "viewBox": [
+                        0,
+                        0,
+                        128,
+                        128
+                      ],
+                      "fill": "#00000000",
+                      "width": 32,
+                      "height": 32,
+                      "stroke": "$brandMarkHalo",
+                      "strokeWidth": 1.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -19087,7 +20229,7 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
@@ -19107,7 +20249,7 @@
                       "fill": "$brandPaper",
                       "width": 3.5,
                       "height": 3.5,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -19125,7 +20267,7 @@
                       "fill": "$brandPaper",
                       "width": 3,
                       "height": 3,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -19143,7 +20285,7 @@
                       "fill": "$brandPaper",
                       "width": 3.25,
                       "height": 3.25,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -19158,10 +20300,10 @@
                         "index": 4,
                         "state": "focus"
                       },
-                      "fill": "$brandOnBackground",
+                      "fill": "$brandAccent",
                       "width": 4,
                       "height": 4,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     },
                     {
@@ -19179,7 +20321,7 @@
                       "fill": "$brandPaper",
                       "width": 2.5,
                       "height": 2.5,
-                      "stroke": "$brandOnBackground",
+                      "stroke": "$brandOnLight",
                       "strokeWidth": 0.625
                     }
                   ]
@@ -19732,7 +20874,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 1240,
-              "content": "Keep the bracket-held knowledge graph, reduce its line and node count, remove gradients and background ornament, then map every remaining color to the Bright local-first semantic system.",
+              "content": "Keep the bracket-held knowledge graph, restore one diagonal green token gradient and one amber focus node, remove unrelated ornament, and keep every role anchored to Bright semantics.",
               "lineHeight": 1.5,
               "fontFamily": "$fontUi",
               "fontSize": 14,
@@ -19774,7 +20916,25 @@
               "x": 22,
               "y": 60,
               "name": "brand.field swatch",
-              "fill": "#21C995",
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 225,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "$brandBackgroundStart",
+                    "position": 0
+                  },
+                  {
+                    "color": "$brandBackgroundEnd",
+                    "position": 1
+                  }
+                ]
+              },
               "width": 22,
               "height": 22
             },
@@ -19787,7 +20947,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.background",
+              "content": "brand.gradient",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19802,7 +20962,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "color.action",
+              "content": "successInk → action",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19817,7 +20977,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#21C995",
+              "content": "#075E46 → #21C995",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19845,9 +21005,11 @@
               "x": 22,
               "y": 100,
               "name": "brand.signal swatch",
-              "fill": "#052F3E",
+              "fill": "$brandOnDark",
               "width": 22,
-              "height": 22
+              "height": 22,
+              "stroke": "$border",
+              "strokeWidth": 1
             },
             {
               "type": "text",
@@ -19858,7 +21020,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.onBackground",
+              "content": "brand.onDark",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19873,7 +21035,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "color.actionText",
+              "content": "color.canvas",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19888,7 +21050,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#052F3E",
+              "content": "#F4F8F6",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19903,7 +21065,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "brackets / graph / copy",
+              "content": "banner copy / dark start",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -19916,7 +21078,7 @@
               "x": 22,
               "y": 140,
               "name": "brand.bracket swatch",
-              "fill": "#052F3E",
+              "fill": "$brandOnLight",
               "width": 22,
               "height": 22
             },
@@ -19929,7 +21091,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.bracket",
+              "content": "brand.onLight",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19944,7 +21106,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "brand.onBackground",
+              "content": "color.actionText",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19974,7 +21136,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "wiki-link boundary",
+              "content": "mark core / light end",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -19987,7 +21149,7 @@
               "x": 22,
               "y": 180,
               "name": "brand.paper swatch",
-              "fill": "#F4F8F6",
+              "fill": "$brandAccent",
               "width": 22,
               "height": 22
             },
@@ -20000,7 +21162,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.paper",
+              "content": "brand.accent",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20015,7 +21177,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "canvas",
+              "content": "color.brandAccent",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20030,7 +21192,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#F4F8F6",
+              "content": "#FBBF24",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20045,7 +21207,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "paper note-node fill",
+              "content": "focus note node",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -20058,9 +21220,11 @@
               "x": 22,
               "y": 220,
               "name": "wordmark.primary swatch",
-              "fill": "#052F3E",
+              "fill": "$brandPaper",
               "width": 22,
-              "height": 22
+              "height": 22,
+              "stroke": "$border",
+              "strokeWidth": 1
             },
             {
               "type": "text",
@@ -20071,7 +21235,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "wordmark.primary",
+              "content": "brand.paper",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20086,7 +21250,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "brand.onBackground",
+              "content": "color.canvas",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20101,7 +21265,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#052F3E",
+              "content": "#F4F8F6",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20116,7 +21280,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "outlined “brain”",
+              "content": "paper note-node fill",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -20129,9 +21293,11 @@
               "x": 22,
               "y": 260,
               "name": "wordmark.suffix swatch",
-              "fill": "#052F3E",
+              "fill": "$brandMarkHalo",
               "width": 22,
-              "height": 22
+              "height": 22,
+              "stroke": "$border",
+              "strokeWidth": 1
             },
             {
               "type": "text",
@@ -20142,7 +21308,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "wordmark.suffix",
+              "content": "brand.markHalo",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20157,7 +21323,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "brand.onBackground",
+              "content": "brand.onDark",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20172,7 +21338,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#052F3E",
+              "content": "#F4F8F6",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20187,7 +21353,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "outlined “-cli”",
+              "content": "logo contrast halo",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -20272,7 +21438,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 300,
-              "content": "• indigo / lavender / amber removed\n• logo and banner share the action-green field\n• five-node graph simplified at micro size\n• decorative banner network removed\n• feature pills replaced by product proof",
+              "content": "• amber focus accent restored\n• diagonal green token gradient restored\n• one canonical graph at every size\n• decorative network and pills remain removed",
               "lineHeight": 1.55,
               "fontFamily": "$fontUi",
               "fontSize": 14,
@@ -20287,7 +21453,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 610,
-              "content": "Source: assets/logo.svg:1–30 · assets/banner.svg:1–55",
+              "content": "Source: assets/logo.svg:1–28 · assets/banner.svg:1–61",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 11,
@@ -20391,7 +21557,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 260,
-              "content": "onBackground / background",
+              "content": "onDark / start · onLight / end",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20406,7 +21572,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "6.65:1",
+              "content": "7.26:1 · 6.65:1",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20421,7 +21587,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 260,
-              "content": "paper / background",
+              "content": "paper / end",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20451,7 +21617,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 260,
-              "content": "accentInk / canvas",
+              "content": "accent / start · end",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20466,7 +21632,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "7.26:1",
+              "content": "4.66:1 · 1.28:1 + dark edge",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20481,7 +21647,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 200,
-              "content": "Dark text and icon strokes on the green field pass WCAG AA at 6.65:1. Paper nodes use a dark edge because their fill alone is not sufficient contrast. The 16 px avatar is symbolic, not text.",
+              "content": "Paper copy on the dark start passes at 7.26:1; dark ink on the bright end passes at 6.65:1. A paper halo under the dark mark core preserves edge contrast through the transition. The yellow focus node uses a dark outline on the bright end.",
               "lineHeight": 1.5,
               "fontFamily": "$fontUi",
               "fontSize": 13,
@@ -20566,7 +21732,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 290,
-              "content": "• repeated marks in cards, lists, or status badges\n• mint text on white\n• gradients, amber nodes, or indigo fallback\n• shrinking the full banner below 640 px",
+              "content": "• repeated marks in cards, lists, or status badges\n• mint text on white\n• indigo / lavender fallback or extra accent colors\n• shrinking the full banner below 640 px",
               "lineHeight": 1.55,
               "fontFamily": "$fontUi",
               "fontSize": 13,
@@ -20582,9 +21748,27 @@
           "name": "Captain choice",
           "width": 1344,
           "height": 72,
-          "fill": "$brandBackground",
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "$brandBackgroundStart",
+                "position": 0
+              },
+              {
+                "color": "$brandBackgroundEnd",
+                "position": 1
+              }
+            ]
+          },
           "cornerRadius": 16,
-          "stroke": "$brandOnBackground",
+          "stroke": "$brandOnLight",
           "strokeWidth": 2,
           "layout": "none",
           "children": [
@@ -20594,7 +21778,7 @@
               "x": 22,
               "y": 15,
               "name": "Choice label",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "content": "APPROVED DIRECTION",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
@@ -20607,7 +21791,7 @@
               "x": 22,
               "y": 36,
               "name": "Choice text",
-              "fill": "$brandOnBackground",
+              "fill": "$brandOnDark",
               "textGrowth": "fixed-width",
               "width": 1280,
               "content": "A · Linked Vault with Banner A · Product proof is implemented in the repository SVGs and canonical design sources.",
@@ -20912,11 +22096,15 @@
     },
     "brandField": {
       "type": "color",
-      "value": "$brandBackground"
+      "value": "$brandBackgroundEnd"
+    },
+    "brandBackgroundEnd": {
+      "type": "color",
+      "value": "$action"
     },
     "brandBackground": {
       "type": "color",
-      "value": "$action"
+      "value": "$brandBackgroundEnd"
     },
     "brandSignal": {
       "type": "color",
@@ -20924,11 +22112,15 @@
     },
     "brandInk": {
       "type": "color",
-      "value": "$brandOnBackground"
+      "value": "$brandOnLight"
+    },
+    "brandOnLight": {
+      "type": "color",
+      "value": "$actionText"
     },
     "brandOnBackground": {
       "type": "color",
-      "value": "$actionText"
+      "value": "$brandOnLight"
     },
     "brandPaper": {
       "type": "color",
@@ -20941,6 +22133,22 @@
     "fontPortableMono": {
       "type": "string",
       "value": "Menlo"
+    },
+    "brandBackgroundStart": {
+      "type": "color",
+      "value": "$brand"
+    },
+    "brandOnDark": {
+      "type": "color",
+      "value": "$canvas"
+    },
+    "brandAccent": {
+      "type": "color",
+      "value": "#FBBF24"
+    },
+    "brandMarkHalo": {
+      "type": "color",
+      "value": "$brandOnDark"
     }
   },
   "fileToken": "be267aad-ec4e-4e9e-b49e-c92aeb1a9d49"

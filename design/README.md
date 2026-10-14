@@ -6,12 +6,13 @@
 
 Direction **A · Linked Vault** is implemented:
 
-- both the app-icon tile and banner field use `brand.background` → `color.action` (`#21C995`);
-- brackets, graph, edge strokes and banner copy use `brand.onBackground` → `color.actionText` (`#052F3E`);
-- paper nodes use `brand.paper` with an `onBackground` outline so their shape does not rely on low-contrast fill;
+- both the app-icon tile and banner field use the same diagonal `brand.gradient`, from `brand.backgroundStart` → `color.successInk` (`#075E46`) to `brand.backgroundEnd` → `color.action` (`#21C995`);
+- banner copy uses `brand.onDark` → `color.canvas` (`#F4F8F6`) on the dark side of the gradient;
+- brackets and graph edges use a `brand.markHalo` paper stroke beneath a `brand.onLight` → `color.actionText` (`#052F3E`) core, preserving their edge across both gradient ends;
+- paper nodes use `brand.paper` with an `onLight` outline, while the focus node uses the intentional `brand.accent` amber (`#FBBF24`) with the same dark outline;
 - the wordmark uses Manrope 750 for `brain` and IBM Plex Mono SemiBold for `-cli`;
 - display wordmark glyphs in `assets/banner.svg` are deterministic vector paths, not installed-font-dependent `<text>`;
-- indigo, lavender, amber identity colors, gradients, decorative graphs and feature pills are not part of the approved direction.
+- indigo, lavender, unrelated gradients, decorative graphs and feature pills are not part of the approved direction.
 
 The implementation outputs are `assets/logo.svg` and `assets/banner.svg`. The canonical mark geometry and 1280 × 320 banner contract are recorded in `design/tokens.json`. The banner keeps the exact positioning copy:
 
@@ -35,7 +36,7 @@ Use the full 4:1 banner at 640 px wide or larger. Below that, use the icon and w
 
 ## Accessibility and fallback
 
-`brand.onBackground` against `brand.background` is 6.65:1, passing WCAG AA for normal text. The paper node fill is not treated as sufficient contrast against green; its dark outline carries the edge contrast. The one-color fallback uses the same bracket-and-graph silhouette in one ink plus paper.
+No single foreground color passes on both ends of this gradient, so roles are placed deliberately: `brand.onDark` against `brand.backgroundStart` is 7.26:1, and `brand.onLight` against `brand.backgroundEnd` is 6.65:1. The logo combines a paper halo with a dark core; one of those edges remains visible throughout the transition. The amber focus node is 4.66:1 against the dark start and receives a dark outline on the bright end, where its fill alone is 1.28:1. Paper nodes use the same dark outline. The one-color fallback keeps the canonical bracket-and-graph silhouette in one ink plus paper.
 
 ## Maintaining the source
 

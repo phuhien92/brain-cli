@@ -1,18 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-labelledby="brain-logo-title brain-logo-description">
   <title id="brain-logo-title">brain-cli logo</title>
-  <desc id="brain-logo-description">A linked graph of notes held inside double wiki-link brackets.</desc>
-  <!-- Bright local-first brand.background uses color.action; brand.onBackground uses color.actionText. -->
+  <desc id="brain-logo-description">A linked graph of notes held inside double wiki-link brackets on a green gradient, with one yellow focus node.</desc>
+  <defs>
+    <linearGradient id="brand-gradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#075E46"/>
+      <stop offset="1" stop-color="#21C995"/>
+    </linearGradient>
+  </defs>
   <g id="linked-vault-mark">
-    <rect id="brand-background" x="1" y="1" width="126" height="126" rx="27" fill="#21C995" stroke="#052F3E" stroke-width="2"/>
+    <rect id="brand-background" x="1" y="1" width="126" height="126" rx="27" fill="url(#brand-gradient)" stroke="#052F3E" stroke-width="2"/>
+    <path id="wiki-link-brackets-halo" d="M31 30H22V98H31 M41 30H32V98H41 M97 30H106V98H97 M87 30H96V98H87"
+          fill="none" stroke="#F4F8F6" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
     <path id="wiki-link-brackets" d="M31 30H22V98H31 M41 30H32V98H41 M97 30H106V98H97 M87 30H96V98H87"
           fill="none" stroke="#052F3E" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="linked-note-graph-halo" d="M50 48L76 43L81 70L58 77L50 48 M58 77L66 90"
+          fill="none" stroke="#F4F8F6" stroke-width="7.5" stroke-linecap="round" stroke-linejoin="round"/>
     <path id="linked-note-graph" d="M50 48L76 43L81 70L58 77L50 48 M58 77L66 90"
           fill="none" stroke="#052F3E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
     <g id="note-nodes" fill="#F4F8F6" stroke="#052F3E" stroke-width="2.5">
       <circle cx="50" cy="48" r="7"/>
       <circle cx="76" cy="43" r="6"/>
       <circle cx="57.5" cy="76.5" r="6.5"/>
-      <circle cx="81" cy="70" r="8" fill="#052F3E"/>
+      <circle cx="81" cy="70" r="8" fill="#FBBF24"/>
       <circle cx="66" cy="90" r="5"/>
     </g>
   </g>

@@ -11,18 +11,33 @@ type BrandContract = {
   contract: string;
   direction: string;
   lifecycle: string;
-  backgroundToken: string;
-  foregroundToken: string;
+  backgroundGradient: {
+    role: string;
+    type: "linear";
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    penRotation: number;
+    startToken: string;
+    endToken: string;
+  };
+  foregroundDarkToken: string;
+  foregroundLightToken: string;
   logo: {
     viewBox: number[];
     bracketPath: string;
     graphPath: string;
+    foregroundToken: string;
+    haloToken: string;
+    accentToken: string;
     nodes: Array<{ cx: number; cy: number; r: number; role: "paper" | "focus" }>;
   };
   banner: {
     width: number;
     height: number;
-    backgroundToken: string;
+    backgroundRole: string;
+    wordmarkToken: string;
     wordmarkRendering: string;
     brainTypefaceToken: string;
     cliTypefaceToken: string;
@@ -41,6 +56,12 @@ type SvgElement = {
   attributes: Record<string, string>;
   children: SvgElement[];
 };
+type PenGradient = {
+  type: "gradient";
+  gradientType?: string;
+  rotation?: number;
+  colors?: Array<{ color: string; position: number }>;
+};
 type PenNode = {
   id: string;
   type: string;
@@ -50,7 +71,9 @@ type PenNode = {
   y?: number;
   width?: number;
   height?: number;
-  fill?: string;
+  fill?: string | PenGradient;
+  stroke?: string | PenGradient;
+  strokeWidth?: number;
   geometry?: string;
   metadata?: Record<string, unknown>;
   children?: PenNode[];
@@ -194,10 +217,25 @@ function penByMetadataType(type: string): PenNode {
   return match;
 }
 
+function isPenGradient(fill: PenNode["fill"]): fill is PenGradient {
+  return typeof fill === "object" && fill?.type === "gradient";
+}
+
+function assertPenGradient(fill: PenNode["fill"]): void {
+  assert.ok(isPenGradient(fill));
+  assert.equal(fill.gradientType, "linear");
+  assert.equal(fill.rotation, tokenDocument.brand.backgroundGradient.penRotation);
+  assert.deepEqual(fill.colors, [
+    { color: "$brandBackgroundStart", position: 0 },
+    { color: "$brandBackgroundEnd", position: 1 },
+  ]);
+}
+
 function assertCanonicalPenMark(mark: PenNode): void {
   assert.ok(mark.width);
   assert.equal(mark.height, mark.width);
-  const parts = (mark.children ?? []).filter((node) => node.metadata?.type === "brain.logo-part");
+  const children = mark.children ?? [];
+  const parts = children.filter((node) => node.metadata?.type === "brain.logo-part");
   const brackets = parts.filter((node) => node.metadata?.role === "wiki-link-brackets");
   const graphs = parts.filter((node) => node.metadata?.role === "linked-note-graph");
   const nodes = parts
@@ -220,6 +258,25 @@ function assertCanonicalPenMark(mark: PenNode): void {
     assert.ok(Math.abs((node.width ?? Number.NaN) - expected.r * 2 * scale) < 1e-9);
     assert.ok(Math.abs((node.height ?? Number.NaN) - expected.r * 2 * scale) < 1e-9);
   });
+
+  const halos = children.filter((node) => node.metadata?.type === "brain.logo-halo");
+  if (isPenGradient(mark.fill)) {
+    assertPenGradient(mark.fill);
+    assert.equal(halos.length, 2, `${mark.name} must have bracket and graph halos`);
+    const bracketHalo = halos.find((node) => node.metadata?.role === "wiki-link-brackets");
+    const graphHalo = halos.find((node) => node.metadata?.role === "linked-note-graph");
+    assert.deepEqual(normalizeLinePath(bracketHalo?.geometry ?? ""), normalizeLinePath(tokenDocument.brand.logo.bracketPath));
+    assert.deepEqual(normalizeLinePath(graphHalo?.geometry ?? ""), normalizeLinePath(tokenDocument.brand.logo.graphPath));
+    assert.equal(bracketHalo?.stroke, "$brandMarkHalo");
+    assert.equal(graphHalo?.stroke, "$brandMarkHalo");
+    assert.ok((bracketHalo?.strokeWidth ?? 0) > (brackets[0]?.strokeWidth ?? Number.POSITIVE_INFINITY));
+    assert.ok((graphHalo?.strokeWidth ?? 0) > (graphs[0]?.strokeWidth ?? Number.POSITIVE_INFINITY));
+    assert.equal(brackets[0]?.stroke, "$brandOnLight");
+    assert.equal(graphs[0]?.stroke, "$brandOnLight");
+    assert.equal(nodes.find((node) => node.metadata?.state === "focus")?.fill, "$brandAccent");
+  } else {
+    assert.equal(halos.length, 0, `${mark.name} monochrome fallback must stay one-color`);
+  }
 }
 
 function relativeLuminance(hex: string): number {
@@ -237,16 +294,41 @@ function contrastRatio(first: string, second: string): number {
 const logo = parseSvg(readFileSync(join(ROOT, "assets/logo.svg"), "utf8"));
 const banner = parseSvg(readFileSync(join(ROOT, "assets/banner.svg"), "utf8"));
 
-function assertCanonicalMark(mark: SvgElement): void {
-  const bracket = [mark, ...svgDescendants(mark)].find((node) => node.attributes.id === "wiki-link-brackets");
-  const graph = [mark, ...svgDescendants(mark)].find((node) => node.attributes.id === "linked-note-graph");
-  assert.equal(bracket?.attributes.d, tokenDocument.brand.logo.bracketPath);
-  assert.equal(graph?.attributes.d, tokenDocument.brand.logo.graphPath);
-  assert.equal(bracket?.attributes.stroke, resolveToken(tokenDocument.brand.foregroundToken));
-  assert.equal(graph?.attributes.stroke, resolveToken(tokenDocument.brand.foregroundToken));
+function assertSvgGradient(root: SvgElement): void {
+  const gradient = svgById(root, "brand-gradient");
+  const contract = tokenDocument.brand.backgroundGradient;
+  assert.equal(gradient.tag, "linearGradient");
+  assert.equal(Number(gradient.attributes.x1), contract.x1);
+  assert.equal(Number(gradient.attributes.y1), contract.y1);
+  assert.equal(Number(gradient.attributes.x2), contract.x2);
+  assert.equal(Number(gradient.attributes.y2), contract.y2);
+  const stops = gradient.children.filter((node) => node.tag === "stop");
+  assert.deepEqual(stops.map((stop) => stop.attributes.offset), ["0", "1"]);
+  assert.deepEqual(stops.map((stop) => stop.attributes["stop-color"]), [
+    resolveToken(contract.startToken),
+    resolveToken(contract.endToken),
+  ]);
+}
 
-  const nodeGroup = [mark, ...svgDescendants(mark)].find((node) => node.attributes.id === "note-nodes");
-  assert.ok(nodeGroup);
+function assertCanonicalMark(mark: SvgElement): void {
+  const bracket = svgById(mark, "wiki-link-brackets");
+  const graph = svgById(mark, "linked-note-graph");
+  const bracketHalo = svgById(mark, "wiki-link-brackets-halo");
+  const graphHalo = svgById(mark, "linked-note-graph-halo");
+  assert.equal(bracket.attributes.d, tokenDocument.brand.logo.bracketPath);
+  assert.equal(graph.attributes.d, tokenDocument.brand.logo.graphPath);
+  assert.equal(bracketHalo.attributes.d, tokenDocument.brand.logo.bracketPath);
+  assert.equal(graphHalo.attributes.d, tokenDocument.brand.logo.graphPath);
+  assert.equal(bracket.attributes.stroke, resolveToken(tokenDocument.brand.logo.foregroundToken));
+  assert.equal(graph.attributes.stroke, resolveToken(tokenDocument.brand.logo.foregroundToken));
+  assert.equal(bracketHalo.attributes.stroke, resolveToken(tokenDocument.brand.logo.haloToken));
+  assert.equal(graphHalo.attributes.stroke, resolveToken(tokenDocument.brand.logo.haloToken));
+  assert.ok(Number(bracketHalo.attributes["stroke-width"]) > Number(bracket.attributes["stroke-width"]));
+  assert.ok(Number(graphHalo.attributes["stroke-width"]) > Number(graph.attributes["stroke-width"]));
+
+  const nodeGroup = svgById(mark, "note-nodes");
+  assert.equal(nodeGroup.attributes.fill, resolveToken("brand.paper"));
+  assert.equal(nodeGroup.attributes.stroke, resolveToken(tokenDocument.brand.logo.foregroundToken));
   const circles = nodeGroup.children.filter((node) => node.tag === "circle");
   assert.equal(circles.length, tokenDocument.brand.logo.nodes.length);
   tokenDocument.brand.logo.nodes.forEach((expected, index) => {
@@ -256,26 +338,38 @@ function assertCanonicalMark(mark: SvgElement): void {
     assert.equal(Number(circle.attributes.cy), expected.cy);
     assert.equal(Number(circle.attributes.r), expected.r);
     if (expected.role === "focus") {
-      assert.equal(circle.attributes.fill, resolveToken(tokenDocument.brand.foregroundToken));
+      assert.equal(circle.attributes.fill, resolveToken(tokenDocument.brand.logo.accentToken));
     }
   });
 }
 
-test("brand contract maps one green background to a readable on-background token", () => {
+test("brand contract names one shared green gradient and endpoint-specific foregrounds", () => {
   assert.equal(tokenDocument.format, "brain.design-tokens.v1");
   assert.equal(tokenDocument.source, "design/brain-ui.pen");
   assert.equal(tokenDocument.brand.contract, "brain.brand.v1");
   assert.equal(tokenDocument.brand.direction, "A · Linked Vault");
   assert.equal(tokenDocument.brand.lifecycle, "implemented");
 
-  const background = resolveToken(tokenDocument.brand.backgroundToken);
-  const foreground = resolveToken(tokenDocument.brand.foregroundToken);
-  assert.equal(background, "#21C995");
-  assert.equal(foreground, "#052F3E");
-  assert.ok(contrastRatio(String(background), String(foreground)) >= 4.5);
+  const gradient = tokenDocument.brand.backgroundGradient;
+  const start = String(resolveToken(gradient.startToken));
+  const end = String(resolveToken(gradient.endToken));
+  const onDark = String(resolveToken(tokenDocument.brand.foregroundDarkToken));
+  const onLight = String(resolveToken(tokenDocument.brand.foregroundLightToken));
+  const accent = String(resolveToken(tokenDocument.brand.logo.accentToken));
+  assert.equal(gradient.role, "brand.gradient");
+  assert.equal(start, "#075E46");
+  assert.equal(end, "#21C995");
+  assert.equal(onDark, "#F4F8F6");
+  assert.equal(onLight, "#052F3E");
+  assert.equal(accent, "#FBBF24");
+  assert.ok(contrastRatio(onDark, start) >= 4.5);
+  assert.ok(contrastRatio(onLight, end) >= 4.5);
+  assert.ok(contrastRatio(accent, start) >= 4.5);
+  assert.ok(contrastRatio(accent, end) < 3);
+  assert.ok(contrastRatio(onLight, end) >= 4.5, "dark accent outline must carry the bright-end edge");
 });
 
-test("logo and banner share the canonical background and Linked Vault geometry", () => {
+test("logo and banner share the canonical gradient and Linked Vault geometry", () => {
   assert.equal(logo.tag, "svg");
   assert.equal(banner.tag, "svg");
   assert.equal(logo.attributes.viewBox, tokenDocument.brand.logo.viewBox.join(" "));
@@ -283,9 +377,11 @@ test("logo and banner share the canonical background and Linked Vault geometry",
   assert.equal(Number(banner.attributes.height), tokenDocument.brand.banner.height);
   assert.equal(banner.attributes.viewBox, `0 0 ${tokenDocument.brand.banner.width} ${tokenDocument.brand.banner.height}`);
 
-  const expectedBackground = String(resolveToken(tokenDocument.brand.backgroundToken));
-  assert.equal(svgById(logo, "brand-background").attributes.fill, expectedBackground);
-  assert.equal(svgById(banner, "brand-background").attributes.fill, expectedBackground);
+  assertSvgGradient(logo);
+  assertSvgGradient(banner);
+  assert.equal(svgById(logo, "brand-background").attributes.fill, "url(#brand-gradient)");
+  assert.equal(svgById(banner, "brand-background").attributes.fill, "url(#brand-gradient)");
+  assert.equal(svgById(banner, "mark-background").attributes.fill, "url(#brand-gradient)");
   assertCanonicalMark(svgById(logo, "linked-vault-mark"));
   assertCanonicalMark(svgById(banner, "linked-vault-mark"));
 });
@@ -293,6 +389,7 @@ test("logo and banner share the canonical background and Linked Vault geometry",
 test("banner display wordmark is outlined and supporting copy uses declared portable stacks", () => {
   assert.equal(tokenDocument.brand.banner.wordmarkRendering, "outlined-paths");
   const wordmark = svgById(banner, "wordmark");
+  assert.equal(wordmark.attributes.fill, resolveToken(tokenDocument.brand.banner.wordmarkToken));
   assert.equal(svgDescendants(wordmark).filter((node) => node.tag === "text").length, 0);
   const paths = wordmark.children.filter((node) => node.tag === "path");
   assert.equal(paths.length, 2);
@@ -300,21 +397,22 @@ test("banner display wordmark is outlined and supporting copy uses declared port
   assert.equal(paths[1]?.attributes["data-font-family"], resolveToken(tokenDocument.brand.banner.cliTypefaceToken));
 
   const positioning = svgById(banner, "positioning");
+  assert.equal(positioning.attributes.fill, resolveToken(tokenDocument.brand.foregroundDarkToken));
   assert.equal(positioning.attributes["font-family"], resolveToken(tokenDocument.brand.banner.supportingSansToken));
   const monoText = positioning.children.find((node) => node.attributes["font-family"] !== undefined);
   assert.equal(monoText?.attributes["font-family"], resolveToken(tokenDocument.brand.banner.supportingMonoToken));
 });
 
-test("serialized SVG output uses only Bright color tokens", () => {
+test("serialized SVG output uses one tokenized gradient and only declared colors", () => {
   const allowed = new Set(
     Object.entries(tokenDocument.tokens)
       .filter(([, token]) => token.type === "color")
       .map(([name]) => String(resolveToken(name)).toUpperCase()),
   );
   for (const [name, root] of [["logo", logo], ["banner", banner]] as const) {
-    assert.equal([root, ...svgDescendants(root)].some((node) => node.tag === "linearGradient"), false);
+    assert.equal([root, ...svgDescendants(root)].filter((node) => node.tag === "linearGradient").length, 1);
     for (const node of [root, ...svgDescendants(root)]) {
-      for (const attribute of ["fill", "stroke"] as const) {
+      for (const attribute of ["fill", "stroke", "stop-color"] as const) {
         const value = node.attributes[attribute];
         if (value?.startsWith("#")) {
           assert.ok(allowed.has(value.toUpperCase()), `${name} has off-token ${attribute} ${value}`);
@@ -326,12 +424,19 @@ test("serialized SVG output uses only Bright color tokens", () => {
 
 test("canonical Pen source matches the implemented asset contract", () => {
   assert.equal(penDocument.version, "2.21");
-  assert.equal(resolvePenVariable("brandBackground"), resolveToken(tokenDocument.brand.backgroundToken));
-  assert.equal(resolvePenVariable("brandOnBackground"), resolveToken(tokenDocument.brand.foregroundToken));
+  assert.equal(resolvePenVariable("brandBackgroundStart"), resolveToken(tokenDocument.brand.backgroundGradient.startToken));
+  assert.equal(resolvePenVariable("brandBackgroundEnd"), resolveToken(tokenDocument.brand.backgroundGradient.endToken));
+  assert.equal(resolvePenVariable("brandOnDark"), resolveToken(tokenDocument.brand.foregroundDarkToken));
+  assert.equal(resolvePenVariable("brandOnLight"), resolveToken(tokenDocument.brand.foregroundLightToken));
+  assert.equal(resolvePenVariable("brandMarkHalo"), resolveToken(tokenDocument.brand.logo.haloToken));
+  assert.equal(resolvePenVariable("brandAccent"), resolveToken(tokenDocument.brand.logo.accentToken));
 
   const logoSource = penByMetadataType("brain.logo.v1");
   assert.equal(logoSource.metadata?.state, "implemented");
-  assert.equal(logoSource.fill, "$brandBackground");
+  assert.equal(logoSource.metadata?.backgroundToken, tokenDocument.brand.backgroundGradient.role);
+  assert.equal(logoSource.metadata?.backgroundStartToken, tokenDocument.brand.backgroundGradient.startToken);
+  assert.equal(logoSource.metadata?.backgroundEndToken, tokenDocument.brand.backgroundGradient.endToken);
+  assertPenGradient(logoSource.fill);
   const logoParts = penDescendants(logoSource.children ?? []);
   const penBracketPath = logoParts.find((node) => node.metadata?.role === "wiki-link-brackets")?.geometry;
   const penGraphPath = logoParts.find((node) => node.metadata?.role === "linked-note-graph")?.geometry;
@@ -344,13 +449,15 @@ test("canonical Pen source matches the implemented asset contract", () => {
     node.children?.some((child) => child.metadata?.type === "brain.logo-part"),
   );
   assert.equal(logoCopies.length, 18);
+  assert.equal(logoCopies.filter((node) => isPenGradient(node.fill)).length, 15);
   logoCopies.forEach(assertCanonicalPenMark);
 
   const bannerSource = penByMetadataType("brain.banner.v1");
   assert.equal(bannerSource.metadata?.state, "implemented");
   assert.equal(bannerSource.width, tokenDocument.brand.banner.width);
   assert.equal(bannerSource.height, tokenDocument.brand.banner.height);
-  assert.equal(bannerSource.fill, "$brandBackground");
+  assert.equal(bannerSource.metadata?.backgroundToken, tokenDocument.brand.backgroundGradient.role);
+  assertPenGradient(bannerSource.fill);
   assert.equal(bannerSource.metadata?.wordmarkRendering, tokenDocument.brand.banner.wordmarkRendering);
   assert.equal(penDescendants(bannerSource.children ?? []).filter((node) => node.metadata?.type === "brain.outlined-wordmark").length, 2);
 
