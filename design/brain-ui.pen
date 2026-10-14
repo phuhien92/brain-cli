@@ -19613,7 +19613,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "green banner ground · brand.background",
+              "content": "paper note-node fill",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
