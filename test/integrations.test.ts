@@ -39,7 +39,7 @@ before(() => {
     JSON.stringify({
       sync: "none",
       integrations: {
-        "interview-coach": { read: ["Career HQ"], write: ["interview", "lifecycle"] },
+        "interview-coach": { read: ["Career HQ"], write: ["interview", "lifecycle"], views: { lifecycle: {} } },
         firstmate: { read: ["firstmate/"], write: ["learning", "lifecycle"], views: { learning: { header: "<!-- stow -->" } } },
         everything: { read: ["*"], write: [] },
       },
@@ -48,7 +48,12 @@ before(() => {
   userConfig = join(root, "config.json");
   writeFileSync(
     userConfig,
-    JSON.stringify({ integrations: { firstmate: { views: { learning: join(root, "fm/data/learnings.md") } } } }),
+    JSON.stringify({
+      integrations: {
+        firstmate: { views: { learning: join(root, "fm/data/learnings.md") } },
+        "interview-coach": { views: { lifecycle: join(root, "coach/data/lifecycle.md") } },
+      },
+    }),
   );
 });
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -82,10 +87,12 @@ test("an integration writes only its kinds and reads its own log", () => {
   const disposable = brain(["log", "add", "learning", "Retire through the integration"], { BRAIN_AS: "firstmate" });
   const privateRetirement = brain(["log", "retire", disposable.body.data.path, "--reason", "private crew reason [[secret-target]]"], { BRAIN_AS: "firstmate" });
   assert.equal(privateRetirement.code, 0);
-  assert.equal(
-    brain(["lifecycle", "set", privateRetirement.body.data.event, "--category", "news", "--as-of", "2026-01-01"], { BRAIN_AS: "firstmate" }).code,
-    0,
+  const nestedLifecycle = brain(
+    ["lifecycle", "set", privateRetirement.body.data.event, "--category", "news", "--as-of", "2026-01-01"],
+    { BRAIN_AS: "firstmate" },
   );
+  assert.equal(nestedLifecycle.code, 0);
+  assert.equal(brain(["get", nestedLifecycle.body.data.entry], { BRAIN_AS: "firstmate" }).code, 0);
   const replaceable = brain(["log", "add", "learning", "Replace through the integration"], { BRAIN_AS: "firstmate" });
   assert.equal(brain(["log", "replace", replaceable.body.data.path, "--text", "Replacement through the integration"], { BRAIN_AS: "firstmate" }).code, 0);
   const denied = brain(["log", "add", "interview", "Not mine"], { BRAIN_AS: "firstmate" });
@@ -104,6 +111,11 @@ test("an integration writes only its kinds and reads its own log", () => {
   const coachView = brain(["view", "lifecycle"], { BRAIN_AS: "interview-coach" });
   assert.match(coachView.body.data.markdown, /coach reason/);
   assert.doesNotMatch(coachView.body.data.markdown, /private crew reason/);
+  const coachExport = brain(["export"], { BRAIN_AS: "interview-coach" });
+  assert.equal(coachExport.code, 0);
+  const exportedLifecycle = readFileSync(join(root, "coach/data/lifecycle.md"), "utf8");
+  assert.match(exportedLifecycle, /coach reason/);
+  assert.doesNotMatch(exportedLifecycle, /private crew reason|secret-target/);
   const coachContext = brain(["context"], { BRAIN_AS: "interview-coach", BRAIN_TODAY: "2026-10-13" });
   assert.doesNotMatch(coachContext.body.data.context, /Retire through the integration|past their review date/);
   const coachLint = brain(["lint"], { BRAIN_AS: "interview-coach", BRAIN_TODAY: "2026-10-13" });

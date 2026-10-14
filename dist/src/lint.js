@@ -6,8 +6,8 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { inScope, readScope } from "./config.js";
-import { inReadScope, lifecycleStates } from "./lifecycle.js";
+import { inReadScope, inScope, readScope } from "./config.js";
+import { lifecycleStates } from "./lifecycle.js";
 import { LIFECYCLE_KIND } from "./log.js";
 import { basename, parseNote } from "./note.js";
 import { SOURCE_SIDECAR_SUFFIX, sourceSidecars } from "./source.js";

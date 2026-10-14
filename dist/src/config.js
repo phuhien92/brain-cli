@@ -158,6 +158,25 @@ export function readScope(cfg) {
 export function inScope(path, scope) {
     return scope === null || scope.some((prefix) => path.startsWith(prefix));
 }
+export function inReadScope(store, cfg, path, scope = readScope(cfg)) {
+    if (scope === null)
+        return true;
+    if (!inScope(path, scope))
+        return false;
+    const lifecyclePrefix = `${cfg.logDir}/lifecycle/`;
+    let target = path;
+    const seen = new Set();
+    while (target.startsWith(lifecyclePrefix)) {
+        if (seen.has(target))
+            return false;
+        seen.add(target);
+        const next = store.get(target)?.frontmatter.target;
+        if (typeof next !== "string")
+            return false;
+        target = next;
+    }
+    return inScope(target, scope);
+}
 function extensionIntegration(manifest) {
     return {
         name: manifest.name,

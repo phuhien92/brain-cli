@@ -7,8 +7,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readScope, type Config } from "./config.js";
-import { inReadScope, lifecycleStates } from "./lifecycle.js";
+import { inReadScope, readScope, type Config } from "./config.js";
+import { lifecycleStates } from "./lifecycle.js";
 import { listEntries } from "./log.js";
 import type { Store } from "./store.js";
 

@@ -6,7 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
-import { ConfigError, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
+import { ConfigError, inReadScope, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
 import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
 import {
   createDraft,
@@ -25,7 +25,7 @@ import {
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
-import { CATEGORIES, inReadScope, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
+import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";

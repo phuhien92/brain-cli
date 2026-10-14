@@ -9,7 +9,6 @@
 // Events rather than frontmatter edits keep brain's "create, never edit" rule:
 // two machines reviewing notes never edit the same file, and every change
 // leaves an audit trail.
-import { inScope, readScope } from "./config.js";
 import { addEntry, LIFECYCLE_KIND, RETIRE_ACTION } from "./log.js";
 export const CATEGORIES = ["memory", "identity", "preference", "principle", "research", "current-state", "news"];
 // Days until a time-bound note should be re-confirmed. null = enduring.
@@ -22,17 +21,6 @@ export const DEFAULT_WINDOWS = {
     "current-state": 30,
     news: 14,
 };
-export function inReadScope(store, cfg, path, scope = readScope(cfg)) {
-    if (scope === null)
-        return true;
-    if (!inScope(path, scope))
-        return false;
-    const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
-    if (!path.startsWith(lifecyclePrefix))
-        return true;
-    const target = store.get(path)?.frontmatter.target;
-    return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
-}
 export function today() {
     const fixed = process.env.BRAIN_TODAY; // tests and reproducible reports
     if (fixed && isDate(fixed))

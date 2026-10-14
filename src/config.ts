@@ -24,6 +24,7 @@ import { homedir, hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { ExtensionError, enabledExtensionNames, installedManifest, type ExtensionManifest } from "./extensions.js";
 import { userConfigFile } from "./paths.js";
+import type { Store } from "./store.js";
 
 export { userConfigFile };
 
@@ -200,6 +201,22 @@ export function readScope(cfg: Config): string[] | null {
 
 export function inScope(path: string, scope: string[] | null): boolean {
   return scope === null || scope.some((prefix) => path.startsWith(prefix));
+}
+
+export function inReadScope(store: Store, cfg: Config, path: string, scope = readScope(cfg)): boolean {
+  if (scope === null) return true;
+  if (!inScope(path, scope)) return false;
+  const lifecyclePrefix = `${cfg.logDir}/lifecycle/`;
+  let target = path;
+  const seen = new Set<string>();
+  while (target.startsWith(lifecyclePrefix)) {
+    if (seen.has(target)) return false;
+    seen.add(target);
+    const next = store.get(target)?.frontmatter.target;
+    if (typeof next !== "string") return false;
+    target = next;
+  }
+  return inScope(target, scope);
 }
 
 function extensionIntegration(manifest: ExtensionManifest): Integration {

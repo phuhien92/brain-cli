@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { slug } from "./config.js";
+import { inReadScope, slug } from "./config.js";
 import { parseNote } from "./note.js";
 export const RETIRE_ACTION = "retire";
 export const LIFECYCLE_KIND = "lifecycle";
@@ -161,7 +161,7 @@ export function renderView(entries, header) {
 // brain last wrote it, refuse: those edits are not in any entry yet, and
 // overwriting them would lose them. `force` is for after they are captured.
 export function exportView(store, cfg, target, force = false) {
-    const entries = listEntries(store, cfg, { kind: target.kind });
+    const entries = listEntries(store, cfg, { kind: target.kind }).filter((entry) => inReadScope(store, cfg, entry.path));
     const content = renderView(entries, target.header);
     const base = { kind: target.kind, path: target.path, entries: entries.length };
     const key = `export:${target.path}`;
@@ -251,7 +251,7 @@ export function parseImport(markdown) {
 export function importFile(store, cfg, kind, file) {
     const source = readFileSync(file, "utf8");
     const entryKind = slug(kind);
-    const activeEntries = listEntries(store, cfg, { kind: entryKind });
+    const activeEntries = listEntries(store, cfg, { kind: entryKind }).filter((entry) => inReadScope(store, cfg, entry.path));
     const items = parseImport(source);
     // Only an entry brain exported to this file can have been removed from it; an
     // active entry the file never held is not evidence of anything.
