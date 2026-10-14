@@ -39,6 +39,8 @@ class BenchError extends Error {
   }
 }
 
+class ObsidianOutputError extends Error {}
+
 function envelope(ok, value) {
   process.stdout.write(JSON.stringify(ok
     ? { schema: SCHEMA, command: COMMAND, ok: true, data: value }
@@ -178,7 +180,7 @@ function score(rank, cost, ms) {
 
 // Method 1: what an agent does without an index. grep the most specific word
 // (longest first), narrow the file list with the next word while that leaves
-// matches, then read the files in the order grep listed them. The agent is
+// matches, then sort and read the file paths. The agent is
 // assumed to recognise the answer the moment it reads it, so reading stops at
 // the expected note: a generous lower bound on grep's cost.
 function grepMethod(vault, question, expect, questionsFile) {
@@ -226,17 +228,18 @@ function grepMethod(vault, question, expect, questionsFile) {
 }
 
 function parseObsidianList(stdout) {
-  const text = stdout.trim();
-  if (!text) return [];
+  let value;
   try {
-    const value = JSON.parse(text);
-    const list = Array.isArray(value) ? value : value?.results ?? value?.files ?? [];
-    return list
-      .map((item) => (typeof item === "string" ? item : item?.path ?? item?.file ?? ""))
-      .filter((p) => typeof p === "string" && p);
+    value = JSON.parse(stdout);
   } catch {
-    return text.split("\n").map((l) => l.trim()).filter(Boolean);
+    throw new ObsidianOutputError("the Obsidian CLI returned invalid search JSON");
   }
+  if (!Array.isArray(value) || value.some((path) =>
+    typeof path !== "string" || !path || /^[/\\]/.test(path) || isAbsolute(path) || path.replace(/\\/g, "/").split("/").includes("..")
+  )) {
+    throw new ObsidianOutputError("the Obsidian CLI returned invalid search JSON");
+  }
+  return value;
 }
 
 // Method 2: the Obsidian CLI (Obsidian 1.12+, with the app running). Its search
@@ -250,7 +253,7 @@ function obsidianMethod(bin, vault, question, expect, questionsFile) {
   if (r.error || r.code !== 0) throw new Error(`obsidian search failed${r.stderr ? `: ${r.stderr.trim()}` : ""}`);
   cost.calls++;
   cost.bytes += Buffer.byteLength(r.stdout);
-  const list = parseObsidianList(r.stdout).map((p) => toPosix(p).replace(/^\.?\/+/, "")).filter((p) => p !== questionsFile);
+  const list = parseObsidianList(r.stdout).map((p) => p.replace(/\\/g, "/").replace(/^\.\//, "")).filter((p) => p !== questionsFile);
   if (list.length) {
     const read = run(bin, [target, "read", `path=${list[0]}`], vault);
     if (read.error || read.code !== 0) throw new Error(`obsidian read failed${read.stderr ? `: ${read.stderr.trim()}` : ""}`);
@@ -424,6 +427,10 @@ function countNotes(vault) {
   const enablementDirectory = extensionDirectory(vault);
   const visit = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
+      if (/^\..+\.md\.icloud$/i.test(entry.name) && entry.isFile()) {
+        n++;
+        continue;
+      }
       if (entry.name.startsWith(".")) continue;
       if (entry.isDirectory()) {
         if (!SKIP_DIRS.includes(entry.name)) visit(join(d, entry.name));
@@ -459,8 +466,8 @@ function main() {
     methods[name] = { available: false, skipped: reason };
     process.stderr.write(`brain bench: skipping ${name}: ${reason}\n`);
   };
-  if (onPath("grep")) methods.grep = { available: true };
-  else skip("grep", "grep was not found on PATH");
+  if (!onPath("grep")) throw new BenchError("not_found", "grep was not found on PATH", 3);
+  methods.grep = { available: true };
   let obsidian = null;
   obsidian = onPath("obsidian");
   if (!obsidian) skip("obsidian", "the Obsidian CLI (obsidian) was not found on PATH");
@@ -484,7 +491,14 @@ function main() {
       row[name] = score(rank, cost, elapsed(start));
     };
     measure("grep", () => grepMethod(vault, q.question, q.expect, inVault));
-    measure("obsidian", () => obsidianMethod(obsidian, vault, q.question, q.expect, inVault));
+    try {
+      measure("obsidian", () => obsidianMethod(obsidian, vault, q.question, q.expect, inVault));
+    } catch (err) {
+      if (!(err instanceof ObsidianOutputError)) throw err;
+      for (const previous of rows) delete previous.obsidian;
+      skip("obsidian", err.message);
+      obsidian = null;
+    }
     measure("brain", () => brainMethod(launcher, vault, q.question, q.expect));
     rows.push(row);
   }

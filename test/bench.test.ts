@@ -1,7 +1,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -178,6 +178,30 @@ process.exit(1);
   assert.deepEqual(calls.find((c) => c[1] === "read"), ["vault=vault", "read", "path=Projects/Garden Plan.md"]);
 });
 
+test("malformed Obsidian JSON skips that method for the whole run", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const fake = join(f.bin, "obsidian");
+  writeFileSync(
+    fake,
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+if (args[0] === "version") { console.log("1.12.7"); process.exit(0); }
+if (args[1] === "search") { console.log(JSON.stringify({ results: ["MEMORY.md"] })); process.exit(0); }
+process.exit(1);
+`,
+  );
+  chmodSync(fake, 0o755);
+  const r = standalone(f, ["questions.jsonl", "--json"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.match(r.stderr, /skipping obsidian: .*invalid search JSON/);
+  assert.equal(r.body.data.methods.obsidian.available, false);
+  assert.match(r.body.data.methods.obsidian.skipped, /invalid search JSON/);
+  assert.equal("totals" in r.body.data.methods.obsidian, false);
+  assert.ok(r.body.data.results.every((row: Record<string, unknown>) => !("obsidian" in row)));
+  assert.equal(r.body.data.methods.grep.totals.questions, 14);
+  assert.equal(r.body.data.methods.brain.totals.questions, 14);
+});
+
 test("brain bench counts stable payloads across mtimes and lifecycle dates", (t) => {
   const f = fixture(t);
   const question = join(f.root, "q.jsonl");
@@ -269,10 +293,24 @@ test("brain bench note count matches indexed notes", (t) => {
   mkdirSync(join(f.vault, "sources"));
   writeFileSync(join(f.vault, "sources", "paper.md"), "# Immutable original\n");
   writeFileSync(join(f.vault, "sources", "paper.md.source.md"), "# Searchable source metadata\n");
+  writeFileSync(join(f.vault, "Offline.md"), "# Offline note\n");
   writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "next dental cleaning", expect: "People/Dr Patel.md" }) + "\n");
-  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
-  assert.equal(r.code, 0, JSON.stringify(r.body));
-  assert.equal(r.body.data.vaultNotes, 19, "18 demo notes plus the source sidecar");
+  const indexed = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(indexed.code, 0, JSON.stringify(indexed.body));
+  assert.equal(indexed.body.data.vaultNotes, 20, "18 demo notes, the source sidecar, and the live note");
+  renameSync(join(f.vault, "Offline.md"), join(f.vault, ".Offline.md.icloud"));
+  const evicted = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(evicted.code, 0, JSON.stringify(evicted.body));
+  assert.equal(evicted.body.data.vaultNotes, 20, "the iCloud placeholder remains one logical note");
+});
+
+test("brain bench fails when grep is unavailable", (t) => {
+  const f = fixture(t);
+  const r = standalone(f, ["questions.jsonl", "--json"], { ...f.env, PATH: f.bin });
+  assert.equal(r.code, 3);
+  assert.equal(r.body.ok, false);
+  assert.equal(r.body.error.code, "not_found");
+  assert.match(r.body.error.message, /grep was not found/);
 });
 
 test("brain bench requires one expected note", (t) => {

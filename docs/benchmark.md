@@ -60,8 +60,8 @@ Each method models what an agent does, the same way for every question.
    or more. Start with the longest. `grep -rilF --include=*.md` it over the vault
    (dot-folders and `node_modules` skipped, like brain). While more than five files match,
    narrow the list with the next word (`xargs grep -il`), skipping a word that would leave
-   nothing. At most four words. Then read the files in the order grep listed them, at most
-   five. The agent is assumed to recognise the answer the moment it reads it, so reading
+   nothing. At most four words. Sort each resulting file list by path, then read at most
+   five files in that order. The agent is assumed to recognise the answer the moment it reads it, so reading
    stops at the expected note. That is generous to grep: a real agent cannot know when to
    stop. Calls: every grep round and every file read. Tokens: grep's output plus every file read.
 2. **Obsidian CLI** (1.12+, with the app running). `obsidian vault=<name> search
@@ -76,7 +76,7 @@ Each method models what an agent does, the same way for every question.
    `data.mtime`, and lifecycle `overdue` flags in `data.lifecycle` or search results. Those
    values depend on the machine or date, not on the question.
 
-Found is the expected note's position in the list the method ranked: grep's file order,
+Found is the expected note's position in the list the method ranked: grep's sorted path order,
 Obsidian's results, brain's results.
 
 ## Rules
