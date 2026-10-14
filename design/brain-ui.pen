@@ -13284,7 +13284,7 @@
               "y": 50,
               "name": "UI lockup helper",
               "fill": "$muted",
-              "content": "40px full icon + text label for sidebar and compact headers; use the 16px micro-glyph for tabs.",
+              "content": "40px full icon + text label for sidebar and compact headers; scale the same canonical mark to 16px for tabs.",
               "fontFamily": "$font-ui",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13682,7 +13682,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 610,
-              "content": "• Pair the icon with the brain-cli text label in UI chrome.\n• Use the full graph at 32px and above.\n• Use the bracket + focus-node micro-glyph at 16px.",
+              "content": "• Pair the icon with the brain-cli text label in UI chrome.\n• Use the canonical linked-note graph at every size.\n• Scale the same mark to 16px without changing its geometry.",
               "fontFamily": "$font-ui",
               "fontSize": "$font-body",
               "fontWeight": "normal"
@@ -14351,7 +14351,7 @@
               "id": "YZhQc",
               "x": 136,
               "y": 358,
-              "name": "A · Linked Vault 16 pixel micro",
+              "name": "A · Linked Vault 16 pixel",
               "width": 16,
               "height": 16,
               "fill": "$brandBackground",
@@ -14363,8 +14363,12 @@
                   "id": "y8tBDr",
                   "x": 0,
                   "y": 0,
-                  "name": "A · Linked Vault 16 pixel micro · Wiki-link brackets",
-                  "geometry": "M43 31h-14v66h14m42-66h14v66h-14",
+                  "name": "A · Linked Vault 16 pixel · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
                     0,
@@ -14375,19 +14379,123 @@
                   "width": 16,
                   "height": 16,
                   "stroke": "$brandOnBackground",
-                  "strokeWidth": 1.2,
+                  "strokeWidth": 0.752,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
                 {
+                  "type": "path",
+                  "id": "a16Gph",
+                  "x": 0,
+                  "y": 0,
+                  "name": "A · Linked Vault 16 pixel · Linked-note graph",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.752,
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "ellipse",
+                  "id": "a16N01",
+                  "x": 5.375,
+                  "y": 5.125,
+                  "name": "A · Linked Vault 16 pixel · Note node 1",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.75,
+                  "height": 1.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "a16N02",
+                  "x": 8.75,
+                  "y": 4.625,
+                  "name": "A · Linked Vault 16 pixel · Note node 2",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.5,
+                  "height": 1.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "a16N03",
+                  "x": 6.375,
+                  "y": 8.75,
+                  "name": "A · Linked Vault 16 pixel · Note node 3",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.625,
+                  "height": 1.625,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
                   "type": "ellipse",
                   "id": "uvtEM",
-                  "x": 6.56,
-                  "y": 6.56,
-                  "name": "A · Linked Vault 16 pixel micro · Focus node",
+                  "x": 9.125,
+                  "y": 7.75,
+                  "name": "A · Linked Vault 16 pixel · Note node 4",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
                   "fill": "$brandOnBackground",
-                  "width": 2.88,
-                  "height": 2.88
+                  "width": 2,
+                  "height": 2,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "a16N05",
+                  "x": 7.625,
+                  "y": 10.625,
+                  "name": "A · Linked Vault 16 pixel · Note node 5",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.25,
+                  "height": 1.25,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
                 }
               ]
             },
@@ -15698,7 +15806,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Recommended 16 · Wiki-link brackets",
-                  "geometry": "M43 31h-14v66h14m42-66h14v66h-14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
                     0,
@@ -15709,19 +15821,123 @@
                   "width": 16,
                   "height": 16,
                   "stroke": "$brandOnBackground",
-                  "strokeWidth": 1.2,
+                  "strokeWidth": 0.752,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
                 {
+                  "type": "path",
+                  "id": "r16Gph",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Recommended 16 · Linked-note graph",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                  "viewBox": [
+                    0,
+                    0,
+                    128,
+                    128
+                  ],
+                  "fill": "#00000000",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.752,
+                  "strokeLinecap": "round"
+                },
+                {
+                  "type": "ellipse",
+                  "id": "r16N01",
+                  "x": 5.375,
+                  "y": 5.125,
+                  "name": "Recommended 16 · Note node 1",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.75,
+                  "height": 1.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "r16N02",
+                  "x": 8.75,
+                  "y": 4.625,
+                  "name": "Recommended 16 · Note node 2",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.5,
+                  "height": 1.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "r16N03",
+                  "x": 6.375,
+                  "y": 8.75,
+                  "name": "Recommended 16 · Note node 3",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.625,
+                  "height": 1.625,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
                   "type": "ellipse",
                   "id": "hTepk",
-                  "x": 6.56,
-                  "y": 6.56,
-                  "name": "Recommended 16 · Focus node",
+                  "x": 9.125,
+                  "y": 7.75,
+                  "name": "Recommended 16 · Note node 4",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
                   "fill": "$brandOnBackground",
-                  "width": 2.88,
-                  "height": 2.88
+                  "width": 2,
+                  "height": 2,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
+                },
+                {
+                  "type": "ellipse",
+                  "id": "r16N05",
+                  "x": 7.625,
+                  "y": 10.625,
+                  "name": "Recommended 16 · Note node 5",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 1.25,
+                  "height": 1.25,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.3125
                 }
               ]
             },
@@ -15734,7 +15950,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 280,
-              "content": "64 / 32 use the linked-note graph.\n16 uses a bracket + focus-node micro-glyph.",
+              "content": "64 / 32 / 16 use the canonical linked-note graph.",
               "lineHeight": 1.5,
               "fontFamily": "$fontUi",
               "fontSize": 13,
@@ -16095,7 +16311,11 @@
                       "x": 0,
                       "y": 0,
                       "name": "Line mark sample · Wiki-link brackets",
-                      "geometry": "M43 31h-14v66h14m42-66h14v66h-14",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "wiki-link-brackets"
+                      },
+                      "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                       "viewBox": [
                         0,
                         0,
@@ -16106,19 +16326,123 @@
                       "width": 40,
                       "height": 40,
                       "stroke": "$ink",
-                      "strokeWidth": 3,
+                      "strokeWidth": 1.88,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
                     {
+                      "type": "path",
+                      "id": "lineGp",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Line mark sample · Linked-note graph",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "linked-note-graph"
+                      },
+                      "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                      "viewBox": [
+                        0,
+                        0,
+                        128,
+                        128
+                      ],
+                      "fill": "#00000000",
+                      "width": 40,
+                      "height": 40,
+                      "stroke": "$ink",
+                      "strokeWidth": 1.88,
+                      "strokeLinecap": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "lineN1",
+                      "x": 13.4375,
+                      "y": 12.8125,
+                      "name": "Line mark sample · Note node 1",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 1,
+                        "state": "paper"
+                      },
+                      "fill": "$surface",
+                      "width": 4.375,
+                      "height": 4.375,
+                      "stroke": "$ink",
+                      "strokeWidth": 0.78125
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "lineN2",
+                      "x": 21.875,
+                      "y": 11.5625,
+                      "name": "Line mark sample · Note node 2",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 2,
+                        "state": "paper"
+                      },
+                      "fill": "$surface",
+                      "width": 3.75,
+                      "height": 3.75,
+                      "stroke": "$ink",
+                      "strokeWidth": 0.78125
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "lineN3",
+                      "x": 15.9375,
+                      "y": 21.875,
+                      "name": "Line mark sample · Note node 3",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 3,
+                        "state": "paper"
+                      },
+                      "fill": "$surface",
+                      "width": 4.0625,
+                      "height": 4.0625,
+                      "stroke": "$ink",
+                      "strokeWidth": 0.78125
+                    },
+                    {
                       "type": "ellipse",
                       "id": "LcLd8",
-                      "x": 16.4,
-                      "y": 16.4,
-                      "name": "Line mark sample · Focus node",
+                      "x": 22.8125,
+                      "y": 19.375,
+                      "name": "Line mark sample · Note node 4",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 4,
+                        "state": "focus"
+                      },
                       "fill": "$ink",
-                      "width": 7.199999999999999,
-                      "height": 7.199999999999999
+                      "width": 5,
+                      "height": 5,
+                      "stroke": "$ink",
+                      "strokeWidth": 0.78125
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "lineN5",
+                      "x": 19.0625,
+                      "y": 26.5625,
+                      "name": "Line mark sample · Note node 5",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 5,
+                        "state": "paper"
+                      },
+                      "fill": "$surface",
+                      "width": 3.125,
+                      "height": 3.125,
+                      "stroke": "$ink",
+                      "strokeWidth": 0.78125
                     }
                   ]
                 },
@@ -17667,7 +17991,11 @@
                           "x": 0,
                           "y": 0,
                           "name": "Tab icon · Brackets",
-                          "geometry": "M43 31h-14v66h14m42-66h14v66h-14",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "wiki-link-brackets"
+                          },
+                          "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                           "viewBox": [
                             0,
                             0,
@@ -17678,19 +18006,123 @@
                           "width": 16,
                           "height": 16,
                           "stroke": "$brandOnBackground",
-                          "strokeWidth": 1.2,
+                          "strokeWidth": 0.752,
                           "strokeLinejoin": "round",
                           "strokeLinecap": "round"
                         },
                         {
+                          "type": "path",
+                          "id": "tabGph",
+                          "x": 0,
+                          "y": 0,
+                          "name": "Tab icon · Graph",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "linked-note-graph"
+                          },
+                          "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
+                          "viewBox": [
+                            0,
+                            0,
+                            128,
+                            128
+                          ],
+                          "fill": "#00000000",
+                          "width": 16,
+                          "height": 16,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.752,
+                          "strokeLinecap": "round"
+                        },
+                        {
+                          "type": "ellipse",
+                          "id": "tabN01",
+                          "x": 5.375,
+                          "y": 5.125,
+                          "name": "Tab icon · Note 1",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "note-node",
+                            "index": 1,
+                            "state": "paper"
+                          },
+                          "fill": "$brandPaper",
+                          "width": 1.75,
+                          "height": 1.75,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.3125
+                        },
+                        {
+                          "type": "ellipse",
+                          "id": "tabN02",
+                          "x": 8.75,
+                          "y": 4.625,
+                          "name": "Tab icon · Note 2",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "note-node",
+                            "index": 2,
+                            "state": "paper"
+                          },
+                          "fill": "$brandPaper",
+                          "width": 1.5,
+                          "height": 1.5,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.3125
+                        },
+                        {
+                          "type": "ellipse",
+                          "id": "tabN03",
+                          "x": 6.375,
+                          "y": 8.75,
+                          "name": "Tab icon · Note 3",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "note-node",
+                            "index": 3,
+                            "state": "paper"
+                          },
+                          "fill": "$brandPaper",
+                          "width": 1.625,
+                          "height": 1.625,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.3125
+                        },
+                        {
                           "type": "ellipse",
                           "id": "aSXNN",
-                          "x": 6.56,
-                          "y": 6.56,
-                          "name": "Tab icon · Focus",
+                          "x": 9.125,
+                          "y": 7.75,
+                          "name": "Tab icon · Note 4",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "note-node",
+                            "index": 4,
+                            "state": "focus"
+                          },
                           "fill": "$brandOnBackground",
-                          "width": 2.88,
-                          "height": 2.88
+                          "width": 2,
+                          "height": 2,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.3125
+                        },
+                        {
+                          "type": "ellipse",
+                          "id": "tabN05",
+                          "x": 7.625,
+                          "y": 10.625,
+                          "name": "Tab icon · Note 5",
+                          "metadata": {
+                            "type": "brain.logo-part",
+                            "role": "note-node",
+                            "index": 5,
+                            "state": "paper"
+                          },
+                          "fill": "$brandPaper",
+                          "width": 1.25,
+                          "height": 1.25,
+                          "stroke": "$brandOnBackground",
+                          "strokeWidth": 0.3125
                         }
                       ]
                     },
@@ -19137,7 +19569,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 370,
-              "content": "16 px browser tab · micro-glyph\n32 px sidebar brand · full mark + text label\n32 px compact header · full mark + text label",
+              "content": "16 px browser tab · canonical mark\n32 px sidebar brand · full mark + text label\n32 px compact header · full mark + text label",
               "lineHeight": 1.6,
               "fontFamily": "$fontMono",
               "fontSize": 13,
@@ -20106,7 +20538,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 290,
-              "content": "• pair app marks with a text label in UI chrome\n• use the 16 px micro-glyph in tabs and tiny avatars\n• preserve one icon-width of clear space in banners\n• use the exact tagline on documentation surfaces",
+              "content": "• pair app marks with a text label in UI chrome\n• scale the canonical mark to 16 px in tabs and tiny avatars\n• preserve one icon-width of clear space in banners\n• use the exact tagline on documentation surfaces",
               "lineHeight": 1.55,
               "fontFamily": "$fontUi",
               "fontSize": 13,

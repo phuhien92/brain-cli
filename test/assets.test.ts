@@ -46,6 +46,8 @@ type PenNode = {
   type: string;
   name?: string;
   content?: string;
+  x?: number;
+  y?: number;
   width?: number;
   height?: number;
   fill?: string;
@@ -192,6 +194,34 @@ function penByMetadataType(type: string): PenNode {
   return match;
 }
 
+function assertCanonicalPenMark(mark: PenNode): void {
+  assert.ok(mark.width);
+  assert.equal(mark.height, mark.width);
+  const parts = (mark.children ?? []).filter((node) => node.metadata?.type === "brain.logo-part");
+  const brackets = parts.filter((node) => node.metadata?.role === "wiki-link-brackets");
+  const graphs = parts.filter((node) => node.metadata?.role === "linked-note-graph");
+  const nodes = parts
+    .filter((node) => node.metadata?.role === "note-node")
+    .sort((first, second) => Number(first.metadata?.index) - Number(second.metadata?.index));
+  assert.equal(brackets.length, 1, `${mark.name} must have one bracket path`);
+  assert.equal(graphs.length, 1, `${mark.name} must have one graph path`);
+  assert.equal(nodes.length, tokenDocument.brand.logo.nodes.length, `${mark.name} must have canonical nodes`);
+  assert.deepEqual(normalizeLinePath(brackets[0]?.geometry ?? ""), normalizeLinePath(tokenDocument.brand.logo.bracketPath));
+  assert.deepEqual(normalizeLinePath(graphs[0]?.geometry ?? ""), normalizeLinePath(tokenDocument.brand.logo.graphPath));
+
+  const scale = mark.width / tokenDocument.brand.logo.viewBox[2]!;
+  tokenDocument.brand.logo.nodes.forEach((expected, index) => {
+    const node = nodes[index];
+    assert.ok(node);
+    assert.equal(node.metadata?.index, index + 1);
+    assert.equal(node.metadata?.state, expected.role);
+    assert.ok(Math.abs((node.x ?? Number.NaN) - (expected.cx - expected.r) * scale) < 1e-9);
+    assert.ok(Math.abs((node.y ?? Number.NaN) - (expected.cy - expected.r) * scale) < 1e-9);
+    assert.ok(Math.abs((node.width ?? Number.NaN) - expected.r * 2 * scale) < 1e-9);
+    assert.ok(Math.abs((node.height ?? Number.NaN) - expected.r * 2 * scale) < 1e-9);
+  });
+}
+
 function relativeLuminance(hex: string): number {
   const channels = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255);
   const linear = channels.map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4);
@@ -309,6 +339,12 @@ test("canonical Pen source matches the implemented asset contract", () => {
   assert.ok(penGraphPath);
   assert.deepEqual(normalizeLinePath(penBracketPath), normalizeLinePath(tokenDocument.brand.logo.bracketPath));
   assert.deepEqual(normalizeLinePath(penGraphPath), normalizeLinePath(tokenDocument.brand.logo.graphPath));
+
+  const logoCopies = penDescendants(penDocument.children).filter((node) =>
+    node.children?.some((child) => child.metadata?.type === "brain.logo-part"),
+  );
+  assert.equal(logoCopies.length, 18);
+  logoCopies.forEach(assertCanonicalPenMark);
 
   const bannerSource = penByMetadataType("brain.banner.v1");
   assert.equal(bannerSource.metadata?.state, "implemented");

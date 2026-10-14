@@ -24,8 +24,8 @@ The outlined display wordmark preserves the intended Manrope / IBM Plex Mono pai
 
 ## Icon use
 
-- Use the full graph at 32 px and above, paired with a visible `brain-cli` or navigation label.
-- Use the bracket-plus-focus-node micro-glyph at 16 px for browser tabs and tiny avatars.
+- Use the canonical linked-note graph at every size, paired with a visible `brain-cli` or navigation label.
+- At 16 px, scale the same mark for browser tabs and tiny avatars without changing its geometry.
 - Use one identity mark per structural chrome region. Do not repeat it in cards, status pills or list rows.
 - The approved desktop sidebar, browser-tab and compact phone-header placements are on board 17 in the Pen file.
 
