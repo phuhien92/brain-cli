@@ -381,6 +381,7 @@ test("brand contract names one shared accessible green gradient", () => {
   assert.equal(accent, "#FBBF24");
   assert.equal(signal, resolveToken("color.action"));
   assert.notEqual(signal, end);
+  assert.ok(contrastRatio(signal, onLight) >= 4.5);
   assert.ok(contrastRatio(onDark, start) >= 4.5);
   assert.ok(contrastRatio(onDark, end) >= 4.5);
   assert.ok(contrastRatio(accent, start) >= 4.5);
@@ -507,6 +508,20 @@ test("canonical Pen source matches the implemented asset contract", () => {
   assertPenGradient(bannerSource.fill);
   assert.equal(bannerSource.metadata?.wordmarkRendering, tokenDocument.brand.banner.wordmarkRendering);
   assert.equal(penDescendants(bannerSource.children ?? []).filter((node) => node.metadata?.type === "brain.outlined-wordmark").length, 2);
+
+  const signal = resolveToken("brand.signal");
+  const penBannerNodes = penDescendants(bannerSource.children ?? []);
+  const penSignalDot = penBannerNodes.find((node) => node.name === "A terminal dot one");
+  const penSignalStatus = penBannerNodes.find((node) => node.name === "A terminal status");
+  assert.equal(penSignalDot?.fill, "$brandSignal");
+  assert.equal(penSignalStatus?.fill, "$brandSignal");
+
+  const svgProductProof = svgById(banner, "product-proof");
+  const svgSignalDot = svgProductProof.children.find((node) => node.tag === "circle");
+  const svgTerminalText = svgProductProof.children.find((node) => node.tag === "g");
+  const svgSignalStatus = svgTerminalText?.children.at(-1);
+  assert.equal(svgSignalDot?.attributes.fill, signal);
+  assert.equal(svgSignalStatus?.attributes.fill, signal);
 
   const lifecycle = penByMetadataType("brain.brand-lifecycle.v1");
   assert.equal(lifecycle.metadata?.state, tokenDocument.brand.lifecycle);
