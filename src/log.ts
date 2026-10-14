@@ -356,8 +356,8 @@ export function importFile(
   const exportedGroups = renderedEntryGroups(activeEntries)
     .map((group) => ({ representative: group[0]!, entries: group.filter((entry) => exported.has(entry.path)) }))
     .filter((group) => group.entries.length);
-  const importedRendered = new Set(items.map(renderKey));
-  const missing = exportedGroups.filter((group) => !importedRendered.has(renderKey(group.representative)));
+  const imported = new Set(items.map(importKey));
+  const missing = exportedGroups.filter((group) => !imported.has(importKey(group.representative)));
   // A missing entry whose title is still in the file was reworded, not removed.
   // Its new text is not added: `log replace` records it and retires the old one.
   const exportedByTitle = new Map<string, (typeof exportedGroups)>();

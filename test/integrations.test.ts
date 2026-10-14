@@ -80,8 +80,12 @@ test("search and get see only the acting integration's folders", () => {
 test("an integration writes only its kinds and reads its own log", () => {
   assert.equal(brain(["log", "add", "learning", "Crew lesson"], { BRAIN_AS: "firstmate" }).code, 0);
   const disposable = brain(["log", "add", "learning", "Retire through the integration"], { BRAIN_AS: "firstmate" });
-  const privateRetirement = brain(["log", "retire", disposable.body.data.path, "--reason", "private crew reason"], { BRAIN_AS: "firstmate" });
+  const privateRetirement = brain(["log", "retire", disposable.body.data.path, "--reason", "private crew reason [[secret-target]]"], { BRAIN_AS: "firstmate" });
   assert.equal(privateRetirement.code, 0);
+  assert.equal(
+    brain(["lifecycle", "set", privateRetirement.body.data.event, "--category", "news", "--as-of", "2026-01-01"], { BRAIN_AS: "firstmate" }).code,
+    0,
+  );
   const replaceable = brain(["log", "add", "learning", "Replace through the integration"], { BRAIN_AS: "firstmate" });
   assert.equal(brain(["log", "replace", replaceable.body.data.path, "--text", "Replacement through the integration"], { BRAIN_AS: "firstmate" }).code, 0);
   const denied = brain(["log", "add", "interview", "Not mine"], { BRAIN_AS: "firstmate" });
@@ -100,6 +104,14 @@ test("an integration writes only its kinds and reads its own log", () => {
   const coachView = brain(["view", "lifecycle"], { BRAIN_AS: "interview-coach" });
   assert.match(coachView.body.data.markdown, /coach reason/);
   assert.doesNotMatch(coachView.body.data.markdown, /private crew reason/);
+  const coachContext = brain(["context"], { BRAIN_AS: "interview-coach", BRAIN_TODAY: "2026-10-13" });
+  assert.doesNotMatch(coachContext.body.data.context, /Retire through the integration|past their review date/);
+  const coachLint = brain(["lint"], { BRAIN_AS: "interview-coach", BRAIN_TODAY: "2026-10-13" });
+  assert.ok(coachLint.body.data.findings.every((finding: { path: string; message: string }) =>
+    finding.path !== privateRetirement.body.data.event && !finding.message.includes("secret-target"),
+  ));
+  const coachLifecycle = brain(["lifecycle", "status"], { BRAIN_AS: "interview-coach", BRAIN_TODAY: "2026-10-13" });
+  assert.ok(coachLifecycle.body.data.notes.every((note: { path: string }) => note.path !== privateRetirement.body.data.event));
 
   const fmLog = brain(["log", "--kind", "learning"], { BRAIN_AS: "firstmate" });
   assert.deepEqual(fmLog.body.data.entries.map((e: { title: string }) => e.title), ["Replacement through the integration", "Crew lesson"]);

@@ -25,7 +25,7 @@ import {
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
-import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
+import { CATEGORIES, inReadScope, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
@@ -822,7 +822,7 @@ async function run(argv: string[]): Promise<number> {
         if (sub === "status") {
           if (rest.length) throw new CliError("usage", "usage: brain lifecycle status [--due]", 2);
           const list = [...states.values()]
-            .filter((st) => inScope(st.path, scope))
+            .filter((st) => inReadScope(store!, cfg, st.path, scope))
             .filter((st) => !flags.due || st.overdue)
             .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.path.localeCompare(b.path));
           print(out, "lifecycle.status", { today: today(), notes: list }, { vault, index }, () =>
@@ -1468,15 +1468,6 @@ function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number):
 
 function runExports(store: Store, cfg: Config, force: boolean): ExportResult[] {
   return cfg.exports.map((t) => exportView(store, cfg, t, force));
-}
-
-function inReadScope(store: Store, cfg: Config, path: string, scope: string[] | null): boolean {
-  if (scope === null) return true;
-  if (!inScope(path, scope)) return false;
-  const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
-  if (!path.startsWith(lifecyclePrefix)) return true;
-  const target = store.get(path)?.frontmatter.target;
-  return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
 }
 
 function resolveLogEntry(store: Store, cfg: Config, ref: string, scope: string[] | null): Entry {

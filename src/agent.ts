@@ -7,8 +7,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inScope, readScope, type Config } from "./config.js";
-import { lifecycleStates } from "./lifecycle.js";
+import { readScope, type Config } from "./config.js";
+import { inReadScope, lifecycleStates } from "./lifecycle.js";
 import { listEntries } from "./log.js";
 import type { Store } from "./store.js";
 
@@ -26,7 +26,7 @@ export function context(store: Store, cfg: Config, limit = 5): string {
   const seen = new Set<string>();
   const scope = readScope(cfg);
   const entries = listEntries(store, cfg, { limit: limit * 3 })
-    .filter((e) => inScope(e.path, scope))
+    .filter((e) => inReadScope(store, cfg, e.path, scope))
     .filter((e) => {
       const key = e.kind + "\n" + e.title.toLowerCase().replace(/\s+/g, " ").trim();
       if (seen.has(key)) return false;
@@ -44,7 +44,7 @@ export function context(store: Store, cfg: Config, limit = 5): string {
     "and read the top results with `brain get <path> --json`; rephrase and search again before concluding something is not recorded.",
     'Record durable lessons with `brain log add learning "<one line>"`. See the `brain` skill for details.',
   ];
-  const overdue = [...lifecycleStates(store, cfg).values()].filter((st) => st.overdue && inScope(st.path, scope));
+  const overdue = [...lifecycleStates(store, cfg).values()].filter((st) => st.overdue && inReadScope(store, cfg, st.path, scope));
   if (overdue.length) {
     lines.push(
       `${overdue.length} note(s) are past their review date (\`brain lifecycle status --due\`): treat facts from them as possibly stale and say so.`,

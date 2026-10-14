@@ -11,7 +11,7 @@ import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, rec
 import { createDraft, diagnostics, getDraft, issueUrl, KINDS, lastError, listDrafts, markSubmitted, postWithGh, redactor, repo, saveLastError, } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import { context, HARNESSES, install } from "./agent.js";
-import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows } from "./lifecycle.js";
+import { CATEGORIES, inReadScope, isDate, lifecycleStates, recordLifecycle, today, windows } from "./lifecycle.js";
 import { lint } from "./lint.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView } from "./log.js";
 import { OfflineNoteError, Store } from "./store.js";
@@ -757,7 +757,7 @@ async function run(argv) {
                     if (rest.length)
                         throw new CliError("usage", "usage: brain lifecycle status [--due]", 2);
                     const list = [...states.values()]
-                        .filter((st) => inScope(st.path, scope))
+                        .filter((st) => inReadScope(store, cfg, st.path, scope))
                         .filter((st) => !flags.due || st.overdue)
                         .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.path.localeCompare(b.path));
                     print(out, "lifecycle.status", { today: today(), notes: list }, { vault, index }, () => list.length
@@ -1359,17 +1359,6 @@ function doctor(vault, cfg, index, notes) {
 }
 function runExports(store, cfg, force) {
     return cfg.exports.map((t) => exportView(store, cfg, t, force));
-}
-function inReadScope(store, cfg, path, scope) {
-    if (scope === null)
-        return true;
-    if (!inScope(path, scope))
-        return false;
-    const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
-    if (!path.startsWith(lifecyclePrefix))
-        return true;
-    const target = store.get(path)?.frontmatter.target;
-    return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
 }
 function resolveLogEntry(store, cfg, ref, scope) {
     const entries = new Map(listEntries(store, cfg, { includeRetired: true })

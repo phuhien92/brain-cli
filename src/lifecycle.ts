@@ -10,7 +10,7 @@
 // two machines reviewing notes never edit the same file, and every change
 // leaves an audit trail.
 
-import type { Config } from "./config.js";
+import { inScope, readScope, type Config } from "./config.js";
 import { addEntry, LIFECYCLE_KIND, RETIRE_ACTION } from "./log.js";
 import type { Store } from "./store.js";
 
@@ -38,6 +38,15 @@ export interface LifecycleState {
   due: string | null; // next review date; null if enduring or no date to count from
   overdue: boolean;
   problems: string[]; // e.g. an unknown category, a time-bound note with no date
+}
+
+export function inReadScope(store: Store, cfg: Config, path: string, scope = readScope(cfg)): boolean {
+  if (scope === null) return true;
+  if (!inScope(path, scope)) return false;
+  const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
+  if (!path.startsWith(lifecyclePrefix)) return true;
+  const target = store.get(path)?.frontmatter.target;
+  return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
 }
 
 export function today(): string {
