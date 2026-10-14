@@ -40,6 +40,7 @@ export interface RetirementCandidate {
   path: string;
   title: string;
   body: string;
+  reason?: "ambiguous-title";
 }
 
 // A previously exported entry whose title is still in the file with a new body.
@@ -349,19 +350,33 @@ export function importFile(
     .filter((entry) => exported.has(entry.path) && !imported.has(importKey(entry)));
   // A missing entry whose title is still in the file was reworded, not removed.
   // Its new text is not added: `log replace` records it and retires the old one.
-  const newByTitle = new Map<string, (typeof items)[number]>();
+  const exportedByTitle = new Map<string, Entry[]>();
+  for (const entry of activeEntries) {
+    if (!exported.has(entry.path)) continue;
+    const key = titleKey(entry);
+    exportedByTitle.set(key, [...(exportedByTitle.get(key) ?? []), entry]);
+  }
+  const newByTitle = new Map<string, (typeof items)>();
   for (const item of items) {
-    if (!active.has(importKey(item)) && !newByTitle.has(titleKey(item))) newByTitle.set(titleKey(item), item);
+    if (active.has(importKey(item))) continue;
+    const key = titleKey(item);
+    newByTitle.set(key, [...(newByTitle.get(key) ?? []), item]);
   }
   const retirementCandidates: RetirementCandidate[] = [];
   const replacementCandidates: ReplacementCandidate[] = [];
   const reworded = new Set<(typeof items)[number]>();
   for (const { path, title, body } of missing) {
-    const item = newByTitle.get(titleKey({ title }));
-    if (!item) {
+    const key = titleKey({ title });
+    const newItems = newByTitle.get(key) ?? [];
+    if (!newItems.length) {
       retirementCandidates.push({ path, title, body });
       continue;
     }
+    if ((exportedByTitle.get(key) ?? []).length !== 1 || newItems.length !== 1) {
+      retirementCandidates.push({ path, title, body, reason: "ambiguous-title" });
+      continue;
+    }
+    const item = newItems[0]!;
     reworded.add(item);
     replacementCandidates.push({ path, title, body, replacement: { title: item.title, body: item.body } });
   }

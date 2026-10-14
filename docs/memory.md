@@ -38,13 +38,15 @@ source ID deliberately produces a sync conflict. See [Command extensions](extens
   recorded is skipped, so importing on a second machine adds only what is new there. Title
   plus body is an entry's identity. Entries brain exported to that file and later removed
   from it are listed as retirement candidates; an exported entry whose title remains with a
-  new body is a replacement candidate, not imported until `log replace` records it. Entries
-  the file never held are never proposed, and import never retires anything automatically.
+  new body is a replacement candidate, not imported until `log replace` records it. Duplicate
+  titles are not guessed: ambiguous old entries are retirement candidates and new entries are
+  imported normally. Entries the file never held are never proposed, and import never retires
+  anything automatically.
 - **`brain log retire <entry-id> [--reason …]`** records an immutable lifecycle event;
   views and exports omit the entry while its original file remains untouched.
   **`brain log replace <entry-id> --text <title> [--body <text|->]`** adds the corrected
-  entry and retires the old one; without `--body`, any lines after the first line of
-  `--text` become the new body.
+  entry and retires the old one. `--text` is always the title; omit `--body` for an empty
+  body, or use `--body -` to read the body from stdin.
   Concurrent retirements create separate event files and do not conflict.
 
 Configuration is split by what may travel: `brain.json` in the vault (the same on every

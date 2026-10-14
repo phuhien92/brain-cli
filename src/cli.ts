@@ -95,7 +95,7 @@ COMMANDS
   log retire <entry-id>       Retire an entry with an immutable lifecycle event
       --reason <text>         Optional reason for the retirement
   log replace <entry-id>      Retire an entry and add its replacement in one command
-      --text <text>           Replacement title (without --body: first line is title, rest body)
+      --text <text>           Replacement title
       --body <text|->         Replacement body (- reads stdin)
   view <kind>                 Print every active <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
@@ -701,7 +701,8 @@ async function run(argv: string[]): Promise<number> {
               lines.push(
                 `${result.retirementCandidates.length} entries brain exported to this file are no longer in it; review them before deciding whether to retire:`,
                 ...result.retirementCandidates.map((candidate) =>
-                  `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`,
+                  `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}` +
+                  (candidate.reason ? `; reason: ${JSON.stringify(candidate.reason)}` : ""),
                 ),
               );
             }
@@ -738,17 +739,11 @@ async function run(argv: string[]): Promise<number> {
           }
           const text = flags.text?.trim();
           if (!text) throw new CliError("usage", "replace needs --text <title>", 2);
-          let title = text;
-          let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
-          if (body === undefined) {
-            const [first = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
-            title = first;
-            body = bodyLines.join("\n");
-          }
+          const body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
           const replacement = addEntry(vault, cfg, {
             kind: target.kind,
-            title,
-            body: String(body).trim(),
+            title: text,
+            body: body === undefined ? undefined : String(body).trim(),
             tags: target.tags,
           });
           const event = recordRetirement(vault, cfg, target.path, {

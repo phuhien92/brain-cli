@@ -101,7 +101,7 @@ test("log retire and replace append lifecycle events while views omit retired en
 
   const old = brain(["log", "add", "learning", "Needs rewording", "--body", "Preserved body", "--tag", "ops"]);
   const oldPath = old.body.data.path as string;
-  const replaced = brain(["log", "replace", oldPath, "--text", "Clear wording\nCorrected body"]);
+  const replaced = brain(["log", "replace", oldPath, "--text", "Clear wording", "--body", "Corrected body"]);
   assert.equal(replaced.code, 0);
   assert.equal(replaced.body.data.target, oldPath);
   assert.match(replaced.body.data.replacement, /^log\/learning\//);
@@ -131,6 +131,16 @@ test("replace completes with quoted log paths", () => {
   assert.equal(event.replacement, replaced.body.data.replacement);
 });
 
+test("replace treats multiline --text only as the title", () => {
+  const original = brain(["log", "add", "learning", "Original wording", "--body", "Stale body"]);
+  const replaced = brain(["log", "replace", original.body.data.path, "--text", "Replacement wording\nSecond title line"]);
+  assert.equal(replaced.code, 0);
+  const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
+  assert.deepEqual(active.map((entry: { title: string; body: string }) => [entry.title, entry.body]), [
+    ["Replacement wording Second title line", ""],
+  ]);
+});
+
 // Configure learnings.md as this machine's learning export and write it once.
 function exportLearnings(): string {
   const target = join(vault, "..", "learnings.md");
@@ -138,6 +148,37 @@ function exportLearnings(): string {
   assert.equal(brain(["export"]).code, 0);
   return target;
 }
+
+function prepareAmbiguousImport(): { target: string; oldPaths: [string, string] } {
+  const first = brain(["log", "add", "learning", "Shared title", "--body", "old one"]);
+  const second = brain(["log", "add", "learning", "Shared title", "--body", "old two"]);
+  const target = exportLearnings();
+  writeFileSync(target, "- Shared title\n  new one\n- Shared title\n  new two\n");
+  return { target, oldPaths: [first.body.data.path, second.body.data.path] };
+}
+
+test("ambiguous same-title edits stay unpaired in JSON output", () => {
+  const { target, oldPaths } = prepareAmbiguousImport();
+  const result = brain(["log", "import", "learning", target]);
+  assert.equal(result.code, 0);
+  assert.deepEqual(result.body.data.replacementCandidates, []);
+  const expected = [
+    { path: oldPaths[1], title: "Shared title", body: "old two", reason: "ambiguous-title" },
+    { path: oldPaths[0], title: "Shared title", body: "old one", reason: "ambiguous-title" },
+  ];
+  assert.deepEqual(
+    result.body.data.retirementCandidates.sort((a: { path: string }, b: { path: string }) => a.path.localeCompare(b.path)),
+    expected.sort((a, b) => a.path.localeCompare(b.path)),
+  );
+  assert.equal(result.body.data.added.length, 2);
+});
+
+test("ambiguous same-title edits are marked in human output", () => {
+  const { target } = prepareAmbiguousImport();
+  const result = brainText(["log", "import", "learning", target]);
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout.match(/reason: "ambiguous-title"/g)?.length, 2);
+});
 
 test("import does not claim an absent active entry was removed", () => {
   brain(["log", "add", "learning", "Never exported"]);
