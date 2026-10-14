@@ -145,6 +145,8 @@ test("import proposes retirement only for entries this target exported that were
 test("import reports a same-title body change to an exported entry as a replacement candidate", () => {
   const target = join(root, "learnings.md");
   const c = cfg("mini", [{ kind: "learning", path: target }]);
+  const retired = addEntry(vault, c, { kind: "learning", title: "Deploy safely", body: "new detail" });
+  recordRetirement(vault, c, retired);
   const old = addEntry(vault, c, { kind: "learning", title: "Deploy safely", body: "old detail" });
   const store = Store.open(vault);
   store.refresh();

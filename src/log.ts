@@ -335,21 +335,23 @@ export function importFile(
   const source = readFileSync(file, "utf8");
   const entryKind = slug(kind);
   const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
+  const activeEntries = listEntries(store, cfg, { kind: entryKind });
   // A retired entry remains recorded: importing a stale generated file must
   // not silently recreate it as a new active entry.
   const existing = new Set(allEntries.map(importKey));
+  const active = new Set(activeEntries.map(importKey));
   const items = parseImport(source);
   const imported = new Set(items.map(importKey));
   // Only an entry brain exported to this file can have been removed from it; an
   // active entry the file never held is not evidence of anything.
   const exported = exportedPaths(store, file);
-  const missing = listEntries(store, cfg, { kind: entryKind })
+  const missing = activeEntries
     .filter((entry) => exported.has(entry.path) && !imported.has(importKey(entry)));
   // A missing entry whose title is still in the file was reworded, not removed.
   // Its new text is not added: `log replace` records it and retires the old one.
   const newByTitle = new Map<string, (typeof items)[number]>();
   for (const item of items) {
-    if (!existing.has(importKey(item)) && !newByTitle.has(titleKey(item))) newByTitle.set(titleKey(item), item);
+    if (!active.has(importKey(item)) && !newByTitle.has(titleKey(item))) newByTitle.set(titleKey(item), item);
   }
   const retirementCandidates: RetirementCandidate[] = [];
   const replacementCandidates: ReplacementCandidate[] = [];
