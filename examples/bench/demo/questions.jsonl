@@ -1,0 +1,14 @@
+{"id":"insurance","question":"what did I decide about health insurance after leaving my job","expect":"Decisions/Health insurance after leaving job.md"}
+{"id":"sourdough","question":"how often should I feed the sourdough starter","expect":"Recipes/Sourdough starter.md"}
+{"id":"countertop","question":"which countertop did we pick for the kitchen","expect":"Projects/Kitchen Renovation.md"}
+{"id":"dentist","question":"when is my next dental cleaning","expect":"People/Dr Patel.md"}
+{"id":"car","question":"should I lease or buy the next car","expect":"Decisions/Car lease or buy.md"}
+{"id":"emergency-fund","question":"how big should the emergency fund be","expect":"Finance/Budget 2026.md"}
+{"id":"rail-pass","question":"did we buy a rail pass for Japan","expect":"Travel/Japan trip 2026.md"}
+{"id":"maya","question":"how does Maya prefer to stay in touch","expect":"People/Maya Chen.md"}
+{"id":"frontend","question":"what should I study for frontend interviews","expect":"Work/Interview prep - frontend.md"}
+{"id":"long-run","question":"how long is the Sunday long run","expect":"Health/Running plan.md"}
+{"id":"router","question":"where is the router admin login kept","expect":"Home/Wifi and router.md"}
+{"id":"beach","question":"what do I pack for a beach trip","expect":"Travel/Packing list.md"}
+{"id":"dal","question":"how do I cook dal on a weeknight","expect":"Recipes/Weeknight dal.md"}
+{"id":"tax-forms","question":"which tax forms do I need to collect","expect":"Finance/Tax documents.md"}

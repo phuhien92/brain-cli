@@ -35,6 +35,7 @@ Measured on Linux (Node 22), every command including Node start-up (~0.07 s):
 | 20,000 notes (synthetic, 83 MB) | 4.6 s | 0.32 s | 0.42 s | 0.49 s |
 
 `brain index --verify` (hash every note, below) took 0.85 s on the 20,000-note vault.
+Timings for a real vault's notes copied up to 20,000 are in [the benchmark](benchmark.md#scale-what-happens-at-thousands-of-notes).
 
 For personal vaults — hundreds to a few thousand notes — the check is noise. At tens of
 thousands it is a third of a second per command: acceptable for an agent, noticeable if it
