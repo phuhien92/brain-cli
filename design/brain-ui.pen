@@ -14919,7 +14919,7 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 5.452,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -14940,7 +14940,7 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandSignal",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 5.452,
                   "strokeLinecap": "round"
                 },
@@ -14950,7 +14950,7 @@
                   "x": 34.4375,
                   "y": 32.625,
                   "name": "C · Local Index mark · Index node 1",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 12.6875,
                   "height": 12.6875
                 },
@@ -14960,7 +14960,7 @@
                   "x": 51.65625,
                   "y": 51.65625,
                   "name": "C · Local Index mark · Index node 2",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 12.6875,
                   "height": 12.6875
                 },
@@ -14970,7 +14970,7 @@
                   "x": 68.875,
                   "y": 32.625,
                   "name": "C · Local Index mark · Index node 3",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 12.6875,
                   "height": 12.6875
                 },
@@ -14980,7 +14980,7 @@
                   "x": 68.875,
                   "y": 69.78125,
                   "name": "C · Local Index mark · Index node 4",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 12.6875,
                   "height": 12.6875
                 }
@@ -15093,7 +15093,7 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 2.2560000000000002,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15114,7 +15114,7 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandSignal",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 2.2560000000000002,
                   "strokeLinecap": "round"
                 },
@@ -15124,7 +15124,7 @@
                   "x": 14.25,
                   "y": 13.5,
                   "name": "C · Local Index 48 pixel · Index node 1",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 5.25,
                   "height": 5.25
                 },
@@ -15134,7 +15134,7 @@
                   "x": 21.375,
                   "y": 21.375,
                   "name": "C · Local Index 48 pixel · Index node 2",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 5.25,
                   "height": 5.25
                 },
@@ -15144,7 +15144,7 @@
                   "x": 28.5,
                   "y": 13.5,
                   "name": "C · Local Index 48 pixel · Index node 3",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 5.25,
                   "height": 5.25
                 },
@@ -15154,7 +15154,7 @@
                   "x": 28.5,
                   "y": 28.875,
                   "name": "C · Local Index 48 pixel · Index node 4",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 5.25,
                   "height": 5.25
                 }
@@ -15188,7 +15188,7 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.504,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15209,7 +15209,7 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSignal",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.504,
                   "strokeLinecap": "round"
                 },
@@ -15219,7 +15219,7 @@
                   "x": 9.5,
                   "y": 9,
                   "name": "C · Local Index 32 pixel · Index node 1",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 3.5,
                   "height": 3.5
                 },
@@ -15229,7 +15229,7 @@
                   "x": 14.25,
                   "y": 14.25,
                   "name": "C · Local Index 32 pixel · Index node 2",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 3.5,
                   "height": 3.5
                 },
@@ -15239,7 +15239,7 @@
                   "x": 19,
                   "y": 9,
                   "name": "C · Local Index 32 pixel · Index node 3",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 3.5,
                   "height": 3.5
                 },
@@ -15249,7 +15249,7 @@
                   "x": 19,
                   "y": 19.25,
                   "name": "C · Local Index 32 pixel · Index node 4",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "width": 3.5,
                   "height": 3.5
                 }
@@ -15283,7 +15283,7 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.2,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15294,7 +15294,7 @@
                   "x": 6.56,
                   "y": 6.56,
                   "name": "C · Local Index 16 pixel micro · Focus node",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 2.88,
                   "height": 2.88
                 }
@@ -18197,7 +18197,7 @@
                       "x": 22,
                       "y": 20,
                       "name": "Freshness label",
-                      "fill": "$brandSignal",
+                      "fill": "$brandOnBackground",
                       "content": "FRESH ON EVERY READ",
                       "lineHeight": 1.35,
                       "fontFamily": "$fontUi",
@@ -18210,7 +18210,7 @@
                       "x": 22,
                       "y": 48,
                       "name": "Freshness value",
-                      "fill": "$surface",
+                      "fill": "$brandOnBackground",
                       "content": "138 notes",
                       "lineHeight": 1.35,
                       "fontFamily": "$fontUi",
@@ -18223,7 +18223,7 @@
                       "x": 22,
                       "y": 94,
                       "name": "Freshness detail",
-                      "fill": "$brandSoft",
+                      "fill": "$brandOnBackground",
                       "textGrowth": "fixed-width",
                       "width": 500,
                       "content": "Checked 4s ago · disposable index · no daemon",
@@ -18850,7 +18850,7 @@
                   "x": 18,
                   "y": 18,
                   "name": "Phone freshness label",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "content": "YOUR VAULT",
                   "lineHeight": 1.35,
                   "fontFamily": "$fontUi",
@@ -18863,7 +18863,7 @@
                   "x": 18,
                   "y": 48,
                   "name": "Phone freshness value",
-                  "fill": "$surface",
+                  "fill": "$brandOnBackground",
                   "content": "138 notes",
                   "lineHeight": 1.35,
                   "fontFamily": "$fontUi",
@@ -18876,7 +18876,7 @@
                   "x": 18,
                   "y": 92,
                   "name": "Phone freshness detail",
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "content": "Checked 4s ago",
                   "lineHeight": 1.35,
                   "fontFamily": "$fontUi",
@@ -19612,7 +19612,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "light banner ground",
+              "content": "green banner ground · brand.background",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
