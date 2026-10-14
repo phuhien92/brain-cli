@@ -12,8 +12,8 @@ brain bench questions.jsonl --vault /tmp/brain-demo
 ```
 
 The extension reads the whole vault and writes nothing. `demo/` is a small public vault with
-`demo/questions.jsonl`; CI runs it on every push. To benchmark a vault without enabling the
-extension in it, run the script directly:
+`demo/questions.jsonl`. To benchmark a vault without enabling the extension in it, run the
+script directly:
 
 ```sh
 node examples/bench/bin/brain-bench /outside/the/vault/questions.jsonl --vault ~/vault

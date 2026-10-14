@@ -40,6 +40,9 @@ Each line of the question file is one question and the note that answers it:
 an absolute path from anywhere, and `-` reads stdin. `--quiet` and `-q` suppress the successful
 human-readable table; diagnostics still go to stderr.
 
+The benchmark requires `grep` on `PATH`. Run it without `BRAIN_AS` or `brain --as`: grep and
+the Obsidian CLI read the vault directly, so they cannot enforce an integration's note scope.
+
 Installing enables the extension by writing a note under the vault's log folder. To
 benchmark a vault without writing anything into it, run the script directly; it uses the
 `brain` in the same checkout or package:
@@ -60,15 +63,17 @@ Each method models what an agent does, the same way for every question.
    or more, falling back to the original words when none are that long. Start with the longest.
    `grep -rilF --include=*.md` it over the vault
    (dot-folders and `node_modules` skipped, like brain). While more than five files match,
-   narrow the list with the next word (`xargs grep -il`), skipping a word that would leave
-   nothing. At most four words. Sort each resulting file list by path, then read at most
-   five files in that order. The agent is assumed to recognise the answer the moment it reads it, so reading
-   stops at the expected note. That is generous to grep: a real agent cannot know when to
-   stop. Calls: every grep round and every file read. Tokens: grep's output plus every file read.
+   narrow the list with the next word (`grep -il` over the current files), skipping a word
+   that would leave nothing. At most four words. Sort each resulting file list by path, then
+   read at most five files in that order. The agent is assumed to recognise the answer the
+   moment it reads it, so reading stops at the expected note. That is generous to grep: a
+   real agent cannot know when to stop. Calls: every grep round and every file read. Tokens:
+   grep's output plus every file read.
 2. **Obsidian CLI** (1.12+, with the app running). `obsidian vault=<name> search
    query=<words joined by OR> limit=5 format=json`, then `obsidian read` on the top result.
    Obsidian's search ANDs words, so the bench ORs them, the way brain treats a question.
-   When `obsidian` is not on `PATH`, or does not answer, the method is skipped and says so on stderr.
+   When `obsidian` is not on `PATH`, does not answer its startup probe, or returns malformed
+   search JSON, the method is skipped and says so on stderr.
 3. **brain**, as the [skill](../skills/brain/SKILL.md) teaches: `brain search "<question>"
    --json --limit 5`, then `brain get <top hit> --meta --json` for its headings, then
    `brain get <top hit> --section <heading> --json` for the heading sharing the most words
@@ -89,8 +94,8 @@ Obsidian's results, brain's results.
 - **A question set built from a private vault stays private.** Publish only aggregate
   numbers, as below. The public demo vault and its questions are in
   [`examples/bench/demo/`](../examples/bench/demo/) for anyone to rerun.
-- **Deterministic.** No model, no network. CI runs `brain bench` against the demo vault on
-  every push and checks that two runs give identical counts.
+- **Deterministic.** No model, no network. CI runs `brain bench` against the demo vault and
+  checks that two runs give identical counts.
 
 ## Results
 
