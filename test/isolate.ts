@@ -5,3 +5,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 process.env.BRAIN_STATE_DIR = mkdtempSync(join(tmpdir(), "brain-state-"));
+// …and no test run ever asks the real GitHub for a newer release; the update
+// tests turn the check back on against a local fake server.
+process.env.BRAIN_NO_UPDATE_CHECK = "1";

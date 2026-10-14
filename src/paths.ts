@@ -31,7 +31,7 @@ export function vaultStateDir(vault: string, root = stateRoot()): string {
   return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
 }
 
-export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "extensions", "state", "index", "telemetry-queue"] as const;
+export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "extensions", "state", "index", "telemetry-queue", "update-check"] as const;
 export type PathName = (typeof PATH_NAMES)[number];
 
 
@@ -47,6 +47,7 @@ export function brainPaths(vault: string, logDir: string): Record<PathName, stri
     state,
     index: join(state, "index.db"),
     "telemetry-queue": join(stateRoot(), "telemetry-queue.jsonl"),
+    "update-check": join(stateRoot(), "update-check.json"),
   };
 }
 

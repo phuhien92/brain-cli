@@ -24,6 +24,7 @@ import {
   type Kind,
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
+import * as update from "./update.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
@@ -46,7 +47,7 @@ import {
   type ExtensionManifest,
 } from "./extensions.js";
 
-export const VERSION = "0.10.0";
+export const VERSION = "0.11.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -60,7 +61,7 @@ COMMANDS
                               telemetry, shell profile — each a choice; nothing is written
                               until you confirm. Non-interactive: --yes with --vault,
                               --machine, --sync auto|git|none, --agents claude,pi,agents,
-                              --telemetry yes|no, --profile
+                              --telemetry yes|no, --update-check yes|no, --profile
 
   index [--rebuild|--verify]  Bring the index up to date (every command does this first);
                               --verify re-reads and hashes every note instead of trusting
@@ -143,6 +144,9 @@ COMMANDS
   telemetry [status|show|enable|disable|reset]
                               Anonymous usage data — off unless you opt in (brain asks once,
                               in a terminal); show prints exactly what is queued
+  update [--check]            Is a newer brain released? Prints the install command.
+                              --check asks GitHub now; otherwise brain checks once a day in
+                              the background (off: BRAIN_NO_UPDATE_CHECK=1). Never self-updates
 
   ext install <path|git-url>  Review permissions, then install on this machine and enable
                               for this vault (interactive terminal only)
@@ -195,7 +199,7 @@ interface Out {
 
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "ext", "help"];
+const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "update", "ext", "help"];
 const BUILT_INS = new Set(COMMANDS);
 const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle"]);
 const EXTENSION_TIMEOUT_MS = 30_000;
@@ -257,12 +261,23 @@ export async function main(argv: string[]): Promise<number> {
     }
   }
   const exit = await run(argv);
-  // Managing telemetry is not usage of brain; it is never itself recorded.
-  if (!tCommand.startsWith("telemetry")) {
+  const settings = userSettings();
+  const line = update.notice({
+    version: VERSION,
+    configCheck: settings.updateCheck,
+    json,
+    quiet: argv.includes("--quiet") || argv.includes("-q"),
+    command: tCommand,
+  });
+  if (line) process.stderr.write(`\n${line}\n`);
+  update.maybeCheck(settings.updateCheck, BIN);
+  // Managing telemetry is not usage of brain, and neither is brain's own
+  // background work; neither is ever recorded.
+  if (!tCommand.startsWith("telemetry") && !process.env.BRAIN_BACKGROUND) {
     telemetry.record(
       { command: tCommand, exit, error: tError, ms: Date.now() - started, json: argv.includes("--json"), version: VERSION },
       tContext,
-      userSettings().telemetry,
+      settings.telemetry,
       BIN,
     );
   }
@@ -331,6 +346,8 @@ async function run(argv: string[]): Promise<number> {
         telemetry: { type: "string" },
         profile: { type: "boolean", default: false },
         "user-approved": { type: "boolean", default: false },
+        check: { type: "boolean", default: false },
+        "update-check": { type: "string" },
       },
     });
   } catch (err) {
@@ -466,6 +483,33 @@ async function run(argv: string[]): Promise<number> {
       ctxStore?.close();
     }
     return 0;
+  }
+
+  if (command === "update") {
+    try {
+      if (args.length) throw new CliError("usage", "usage: brain update [--check]", 2);
+      const configCheck = userSettings().updateCheck;
+      let error: string | null = null;
+      if (flags.check) error = (await update.check(VERSION)).error;
+      const st = update.status(VERSION, configCheck);
+      print(out, command, { ...st, error }, null, () =>
+        [
+          st.available
+            ? `brain ${st.latest} is available (you have ${st.current}). Update with:\n  ${st.command}`
+            : st.latest
+              ? `brain ${st.current} is the latest release.`
+              : `brain ${st.current}. No release has been checked yet${flags.check ? "" : ": run brain update --check"}.`,
+          ...(error ? [`check failed: ${error}`] : []),
+          st.checkedAt ? `last checked ${st.checkedAt.slice(0, 10)}` : "",
+          st.enabled ? "" : `daily check off (${st.reason})`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+      return 0;
+    } catch (err) {
+      return fail(out, command, err);
+    }
   }
 
   if (command === "path") {
@@ -1235,6 +1279,8 @@ async function setupCommand(flags: Record<string, unknown>, out: Out): Promise<n
     for (const a of agents) if (!["claude", "pi", "agents"].includes(a)) throw new CliError("usage", `unknown agent harness '${a}'`, 2);
     const t = flags.telemetry as string | undefined;
     if (t !== undefined && !["yes", "no"].includes(t)) throw new CliError("usage", "--telemetry must be yes or no", 2);
+    const u = flags["update-check"] as string | undefined;
+    if (u !== undefined && !["yes", "no"].includes(u)) throw new CliError("usage", "--update-check must be yes or no", 2);
     const machine = slug((flags.machine as string | undefined) ?? String(readUserConfig().machine ?? "")) || slug(hostname().replace(/\.local$/i, ""));
     choices = {
       vault,
@@ -1242,6 +1288,7 @@ async function setupCommand(flags: Record<string, unknown>, out: Out): Promise<n
       sync: sync as SetupChoices["sync"],
       agents: agents as Harness[],
       telemetry: t === undefined ? null : t === "yes",
+      updateCheck: u === undefined ? null : u === "yes",
       profile: flags.profile === true,
     };
   }
@@ -1418,6 +1465,18 @@ function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number):
     check: "index",
     status: state.startsWith(vault + "/") ? "warn" : "ok",
     detail: `${state}${state.startsWith(vault + "/") ? " is inside the vault; set BRAIN_STATE_DIR outside it" : " (outside the vault, never synced)"}`,
+  });
+  const up = update.status(VERSION, userSettings().updateCheck);
+  checks.push({
+    check: "update",
+    status: up.available ? "warn" : "ok",
+    detail: up.available
+      ? `brain ${up.latest} is available (you have ${up.current}): ${up.command}`
+      : !up.enabled
+        ? `${up.current}; daily check off (${up.reason})`
+        : up.latest
+          ? `${up.current} is the latest release`
+          : `${up.current}; no release checked yet (brain update --check)`,
   });
   checks.push({
     check: "sync",

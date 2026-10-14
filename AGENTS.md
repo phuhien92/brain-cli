@@ -31,7 +31,8 @@ holds the rules an agent changing the code must not break.
    quotes every term.
 8. **Zero runtime dependencies.** `node:sqlite`, `node:util` `parseArgs` and a small
    frontmatter parser in `src/note.ts`. A dependency has to justify itself against
-   `npx brain-cli` staying instant and native-build-free.
+   installing from GitHub staying instant and native-build-free. (Never write `npx brain-cli`:
+   that npm name belongs to an unrelated project.)
 9. **Scopes hide, they do not reveal.** Under `BRAIN_AS`, an out-of-scope note is
    `not_found` (never "forbidden"), filtered inside the query so `limit` still counts. A
    scope is a guardrail for brain's output, not a sandbox; docs must never claim more.
@@ -48,8 +49,12 @@ holds the rules an agent changing the code must not break.
    CI or hooks — whose fields are
    exactly `Event` in `src/telemetry.ts` and docs/telemetry.md — adding a field means updating
    both and the test that searches events for private strings; and feedback, only as a
-   redacted draft a person submits, or posted with their permission. Never in the foreground
-   of a command, never on stdout, never able to fail a command.
+   redacted draft a person submits, or posted with their permission. One more core feature
+   contacts the network and sends nothing: the update check, once a day, asking GitHub for
+   the repository's version tags (on by default; off with `BRAIN_NO_UPDATE_CHECK=1` or
+   `"updates": { "check": false }`). None of these ever runs in the foreground of a command,
+   writes to stdout, or can fail a command; only `brain update --check`, which a person asked
+   for, waits on its request.
 
 ## Layout
 
@@ -64,6 +69,8 @@ holds the rules an agent changing the code must not break.
 - `src/lifecycle.ts` — categories, review windows, lifecycle events (`log/lifecycle/`) and
   each note's state (frontmatter, then events, latest wins).
 - `src/lint.ts` — read-only vault health rules.
+- `src/update.ts` — the daily background update check, the once-a-day stderr notice for a
+  person at a terminal, and `brain update`. Never shown with `--json`, `--quiet`, in CI or hooks.
 - `src/agent.ts` — `brain context` (the session primer) and `brain agent install` per harness.
 - `src/cli.ts` — argument parsing, vault discovery, output and exit codes.
 - `skills/brain/SKILL.md` — the skill every harness installs; its `description` decides
@@ -76,4 +83,14 @@ holds the rules an agent changing the code must not break.
 
 ## Checks
 
-`npm test` builds and runs everything. Run it before every commit.
+`npm test` builds and runs everything. Run it before every commit. `dist/src/` is committed
+(installs from GitHub need no compiler): stage it with your change, because
+`test/package.test.ts` compares what is staged with a fresh compile.
+
+## Releases
+
+Every merge to `main` that changes behaviour is a release: bump `version` in `package.json`
+and `VERSION` in `src/cli.ts` (minor for a feature, patch for a fix), add a `CHANGELOG.md`
+entry, and tag the merge `v<version>`. The update check announces the highest tag, so an
+untagged commit is never announced. `test/update.test.ts` fails if the two versions differ
+or the changelog has no entry for the current one.

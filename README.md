@@ -15,7 +15,8 @@ warning when a note has gone stale. From the shell, with a stable JSON contract.
 running and no API key. brain itself never sends your notes anywhere except through your
 configured sync; installed extensions are separately approved local programs and may use
 the network (declared hosts are shown during approval, not enforced). Anonymous usage data
-is off unless you say yes when brain asks, once ([telemetry](docs/telemetry.md)).
+is off unless you say yes when brain asks, once ([telemetry](docs/telemetry.md)); a daily
+check for a newer release sends nothing and can be turned off ([updates](docs/updates.md)).
 
 ```console
 $ brain search "deploy gotchas on the mac mini" --limit 3
@@ -54,6 +55,16 @@ brain setup        # pick your vault, machine name, sync, agents, telemetry — 
 
 Agents and scripts can do the same without questions:
 `brain setup --yes --vault ~/vault --agents claude,pi --telemetry no`.
+
+> **Install from GitHub, not by name.** `brain-cli` on npm is an unrelated project, so
+> `npm install -g brain-cli` and `npx brain-cli` install someone else's code.
+
+**Updating.** Run the same install command again; your vault and config are untouched.
+To pin a release, add its tag: `npm install -g github:phuhien92/brain-cli#v0.11.0`.
+brain checks GitHub once a day in the background and tells you in the terminal when a
+newer release is out; `brain update` shows the command, and `brain doctor` reports it to
+agents. What it asks and how to turn it off: [docs/updates.md](docs/updates.md). Every
+release is listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick start
 
@@ -95,6 +106,7 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [firstmate guide](docs/firstmate.md) | sharing firstmate's learnings across two machines |
 | [Feedback](docs/feedback.md) | bug reports and ideas from people and agents, redacted, posted only with permission |
 | [Telemetry](docs/telemetry.md) | opt-in anonymous usage data: what is collected, how the one-time question works |
+| [Updates](docs/updates.md) | how brain tells you a newer release is out, and the release process |
 | [Benchmark](docs/benchmark.md) | grep vs. the Obsidian CLI vs. brain on real questions, and timings at 20,000 notes |
 | [Extensions](docs/extensions.md) | install and build process-isolated commands; permissions and scopes |
 | [Extensions and UI design](docs/design/extensions.md) | proposed hooks and local web interface |

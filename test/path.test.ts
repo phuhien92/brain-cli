@@ -44,6 +44,7 @@ test("every name prints one bare absolute path, so $(brain path log) works", () 
     state: indexDir(vault, join(root, "state")),
     index: join(indexDir(vault, join(root, "state")), "index.db"),
     "telemetry-queue": join(root, "state", "telemetry-queue.jsonl"),
+    "update-check": join(root, "state", "update-check.json"),
   };
   assert.deepEqual(Object.keys(expected), [...PATH_NAMES]);
   for (const name of PATH_NAMES) {

@@ -25,7 +25,7 @@ export function vaultStateDir(vault, root = stateRoot()) {
     const id = createHash("sha256").update(vault).digest("hex").slice(0, 12);
     return join(root, `${name.replace(/[^A-Za-z0-9._-]+/g, "-")}-${id}`);
 }
-export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "extensions", "state", "index", "telemetry-queue"];
+export const PATH_NAMES = ["vault", "log", "sources", "config", "user-config", "extensions", "state", "index", "telemetry-queue", "update-check"];
 export function brainPaths(vault, logDir) {
     const state = vaultStateDir(vault);
     return {
@@ -38,6 +38,7 @@ export function brainPaths(vault, logDir) {
         state,
         index: join(state, "index.db"),
         "telemetry-queue": join(stateRoot(), "telemetry-queue.jsonl"),
+        "update-check": join(stateRoot(), "update-check.json"),
     };
 }
 export function describePaths(paths) {

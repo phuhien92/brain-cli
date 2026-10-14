@@ -17,6 +17,7 @@
 | `lint [--strict]` | vault health, read-only | [lifecycle.md](lifecycle.md#lint) |
 | `integrations`, `doctor` | who is connected; this machine's setup | [integrations.md](integrations.md) |
 | `path [<name>]` | where brain keeps things on this machine; reads only | [below](#where-things-are) |
+| `update [--check]` | is a newer brain released; the install command for it | [updates.md](updates.md) |
 | `context`, `agent install <harness>` | session primer; teach a harness about brain | [agents.md](agents.md) |
 | `ext install\|list\|remove` | manage per-machine command extensions and per-vault enablement | [extensions.md](extensions.md) |
 
@@ -77,6 +78,7 @@ overridden.
 | `state` | this vault's state directory, outside the vault and never synced |
 | `index` | the search index inside it |
 | `telemetry-queue` | anonymous usage events waiting to be sent, if you opted in |
+| `update-check` | the newest release brain has seen, and when it last checked ([updates.md](updates.md)) |
 
 ```sh
 cd "$(brain path log)"          # one name: the bare path, nothing else

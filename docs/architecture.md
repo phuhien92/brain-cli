@@ -118,13 +118,15 @@ sequenceDiagram
 | [`src/sync.ts`](../src/sync.ts) | Sync modes: git (commit log and ingested source pairs, pull --rebase, push), none, command |
 | [`src/agent.ts`](../src/agent.ts) | Session primer (`brain context`) and per-harness install |
 | [`src/telemetry.ts`](../src/telemetry.ts) | Anonymous usage events: fixed fields, local queue, daily background send |
+| [`src/update.ts`](../src/update.ts) | Daily background update check, the once-a-day terminal notice, `brain update` |
 | [`src/feedback.ts`](../src/feedback.ts) | Feedback drafts, redaction, issue links, permission-gated posting |
 | [`src/extensions.ts`](../src/extensions.ts) | Command-extension manifests, installation, enablement and launchers |
 | [`src/cli.ts`](../src/cli.ts) | Arguments, vault discovery, permission checks, output, exit codes |
 
 Zero runtime dependencies: `node:sqlite` (FTS5 with Porter stemming), `node:util`
 `parseArgs`, `node:crypto`. That is why `npm install -g` never compiles anything. brain's own
-HTTP use is limited to opted-in telemetry ([telemetry.md](telemetry.md)); Git-backed sync and Git
+HTTP use is limited to opted-in telemetry ([telemetry.md](telemetry.md)) and a daily update
+check that sends nothing ([updates.md](updates.md)), both in a detached background process; Git-backed sync and Git
 extension installation invoke Git, and installed extension processes may use their declared hosts.
 
 ## Guarantees and how they are held

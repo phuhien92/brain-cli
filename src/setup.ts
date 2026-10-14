@@ -20,6 +20,7 @@ export interface SetupChoices {
   sync: "auto" | "git" | "none";
   agents: Harness[];
   telemetry: boolean | null; // null = leave as is
+  updateCheck: boolean | null; // daily check for a newer brain; null = leave as is
   profile: boolean; // add `export BRAIN_VAULT=…` to the shell profile
 }
 
@@ -116,6 +117,7 @@ export function applySetup(c: SetupChoices, opts: { home?: string } = {}): Setup
   const configPath = writeUserConfig({ machine: c.machine, sync: c.sync, vault: c.vault });
   const installs = c.agents.map((h) => install(h, { home: opts.home }));
   if (c.telemetry !== null) telemetry.setEnabled(c.telemetry);
+  if (c.updateCheck !== null) writeUserConfig({ updates: { ...objectOr(readUserConfig().updates), check: c.updateCheck } });
   let profile: SetupResult["profile"] = null;
   if (c.profile) {
     const file = profileFile(opts.home);
@@ -215,13 +217,20 @@ export async function interactiveSetup(): Promise<SetupChoices | null> {
     );
     tel = await yesNo(rl, `   Share?${st.enabled ? " (currently on)" : ""}`, st.enabled);
 
-    // 6. shell profile
+    // 6. update check
+    process.stderr.write(
+      "\n6. Check GitHub once a day for a newer brain? It sends nothing but the request, and only\n" +
+        "   tells you in a terminal (docs/updates.md). Turn it off any time: BRAIN_NO_UPDATE_CHECK=1.\n",
+    );
+    const updateCheck = await yesNo(rl, "   Check?", objectOr(readUserConfig().updates).check !== false);
+
+    // 7. shell profile
     const pfile = profileFile();
-    process.stderr.write(`\n6. Let every shell (and the agents started from it) find this vault:\n   ${profileLine(vault, pfile)}\n`);
+    process.stderr.write(`\n7. Let every shell (and the agents started from it) find this vault:\n   ${profileLine(vault, pfile)}\n`);
     const profile = await yesNo(rl, `   Add that line to ${pfile.replace(homedir(), "~")}?`, false);
 
     // review
-    const choices: SetupChoices = { vault, machine, sync, agents, telemetry: tel, profile };
+    const choices: SetupChoices = { vault, machine, sync, agents, telemetry: tel, updateCheck, profile };
     process.stderr.write(
       [
         "",
@@ -231,6 +240,7 @@ export async function interactiveSetup(): Promise<SetupChoices | null> {
         `  sync       ${sync}`,
         `  agents     ${agents.length ? agents.join(", ") : "none"}`,
         `  telemetry  ${tel ? "on" : "off"}`,
+        `  updates    ${updateCheck ? "check daily" : "do not check"}`,
         `  profile    ${profile ? `add BRAIN_VAULT to ${pfile.replace(homedir(), "~")}` : "leave unchanged"}`,
         "",
       ].join("\n") + "\n",
@@ -239,4 +249,8 @@ export async function interactiveSetup(): Promise<SetupChoices | null> {
   } finally {
     rl.close();
   }
+}
+
+function objectOr(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }

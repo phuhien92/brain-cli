@@ -265,6 +265,7 @@ function folderPrefix(p: string): string {
 export interface UserSettings {
   telemetry: boolean | null; // null = default
   feedbackPost: "ask" | "allow"; // may agents post issues without being asked each time
+  updateCheck: boolean | null; // "updates": { "check": … }; null = default (on)
 }
 
 export function userSettings(): UserSettings {
@@ -279,6 +280,7 @@ export function userSettings(): UserSettings {
   return {
     telemetry: typeof cfg.telemetry === "boolean" ? cfg.telemetry : null,
     feedbackPost: post === "allow" ? "allow" : "ask",
+    updateCheck: typeof objectAt(cfg, "updates").check === "boolean" ? (objectAt(cfg, "updates").check as boolean) : null,
   };
 }
 

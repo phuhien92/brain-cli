@@ -232,6 +232,7 @@ export function userSettings() {
     return {
         telemetry: typeof cfg.telemetry === "boolean" ? cfg.telemetry : null,
         feedbackPost: post === "allow" ? "allow" : "ask",
+        updateCheck: typeof objectAt(cfg, "updates").check === "boolean" ? objectAt(cfg, "updates").check : null,
     };
 }
 export function readUserConfig() {
