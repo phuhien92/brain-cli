@@ -272,9 +272,9 @@ function exportedPaths(store: Store, path: string): Set<string> {
 // Split an existing memory file into entries: one per top-level list item
 // (with its indented continuation lines), one per free-standing paragraph.
 // Headings become tags. HTML comments — stow's tier markers and file
-// pointers — are dropped from titles. Entries whose title and body already
-// exist for this kind are skipped, so importing on a second machine does not
-// duplicate what the first already captured.
+// pointers — are dropped from titles. Matching title-and-body occurrences
+// already recorded for this kind are skipped, so surplus identical list items
+// remain separate entries without duplicating what another machine captured.
 export function parseImport(markdown: string): { title: string; body: string; tags: string[] }[] {
   const items: { title: string; body: string; tags: string[] }[] = [];
   let section: string | null = null;
@@ -329,8 +329,11 @@ export function importFile(
   const activeEntries = listEntries(store, cfg, { kind: entryKind });
   // A retired entry remains recorded: importing a stale generated file must
   // not silently recreate it as a new active entry.
-  const existing = new Set(allEntries.map(importKey));
-  const active = new Set(activeEntries.map(importKey));
+  const existingCounts = new Map<string, number>();
+  for (const entry of allEntries) {
+    const key = importKey(entry);
+    existingCounts.set(key, (existingCounts.get(key) ?? 0) + 1);
+  }
   const items = parseImport(source);
   // Only an entry brain exported to this file can have been removed from it; an
   // active entry the file never held is not evidence of anything.
@@ -358,8 +361,18 @@ export function importFile(
     exportedByTitle.set(key, [...(exportedByTitle.get(key) ?? []), entry]);
   }
   const newByTitle = new Map<string, (typeof items)>();
+  const activeCounts = new Map<string, number>();
+  for (const entry of activeEntries) {
+    const key = importKey(entry);
+    activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
+  }
   for (const item of items) {
-    if (active.has(importKey(item))) continue;
+    const content = importKey(item);
+    const count = activeCounts.get(content) ?? 0;
+    if (count) {
+      activeCounts.set(content, count - 1);
+      continue;
+    }
     const key = titleKey(item);
     newByTitle.set(key, [...(newByTitle.get(key) ?? []), item]);
   }
@@ -394,11 +407,12 @@ export function importFile(
   items.forEach((item, i) => {
     if (reworded.has(item)) return;
     const key = importKey(item);
-    if (existing.has(key)) {
+    const count = existingCounts.get(key) ?? 0;
+    if (count) {
+      existingCounts.set(key, count - 1);
       skipped++;
       return;
     }
-    existing.add(key);
     added.push(addEntry(store.vault, cfg, { kind, ...item, created: new Date(base + i) }));
   });
   // What was just imported is now captured, so exporting over this file is no

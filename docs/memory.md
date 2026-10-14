@@ -36,9 +36,9 @@ source ID deliberately produces a sync conflict. See [Command extensions](extens
   wrote it, it refuses, because those edits are not in any entry yet. Capture them with
   `brain log import`, then `brain export --force`.
 - **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
-  top-level list item, dropping HTML-comment markers from titles. Title-and-body text already
-  recorded is skipped, so importing on a second machine adds only what is new there. Title
-  plus body is an entry's identity. Entries brain exported to that file and later removed
+  top-level list item, dropping HTML-comment markers from titles. Matching title-and-body
+  occurrences already recorded are skipped, while surplus identical list items become
+  separate entries. Title plus body is an entry's identity. Entries brain exported to that file and later removed
   from it are listed as retirement candidates; an exported entry whose title remains with a
   new body is a replacement candidate, not imported until `log replace` records it. Duplicate
   titles are not guessed: ambiguous old entries are retirement candidates and new entries are

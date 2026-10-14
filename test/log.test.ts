@@ -147,6 +147,27 @@ test("identical exported bullets retain independent lifecycle provenance", () =>
   store.close();
 });
 
+test("import preserves a surplus identical bullet on the next export", () => {
+  const target = join(root, "learnings.md");
+  const c = cfg("mini", [{ kind: "learning", path: target }]);
+  addEntry(vault, c, { kind: "learning", title: "Foo", body: "Body" });
+  const store = Store.open(vault);
+  store.refresh();
+
+  assert.equal(exportView(store, c, c.exports[0]!).status, "written");
+  writeFileSync(target, readFileSync(target, "utf8") + "- Foo\n  Body\n");
+  const imported = importFile(store, c, "learning", target);
+  assert.equal(imported.skipped, 1);
+  assert.equal(imported.added.length, 1);
+  assert.deepEqual([imported.retirementCandidates, imported.replacementCandidates], [[], []]);
+
+  store.refresh();
+  assert.equal(exportView(store, c, c.exports[0]!).status, "written");
+  assert.equal(readFileSync(target, "utf8").match(/^- Foo$/gm)?.length, 2);
+  assert.equal(listEntries(store, c, { kind: "learning" }).length, 2);
+  store.close();
+});
+
 test("import proposes retirement only for entries this target exported that were later removed", () => {
   const target = join(root, "learnings.md");
   const c = cfg("mini", [{ kind: "learning", path: target }]);
