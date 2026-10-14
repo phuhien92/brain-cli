@@ -140,6 +140,11 @@ test("the questions file is never an answer, and a markdown one inside the vault
   assert.equal(refused.body.ok, false);
   assert.equal(refused.body.error.code, "usage");
 
+  writeFileSync(join(f.vault, "..questions.md"), JSON.stringify({ question: "x", expect: "MEMORY.md" }) + "\n");
+  const dotdotRefused = standalone(f, ["..questions.md", "--json"]);
+  assert.equal(dotdotRefused.code, 2);
+  assert.equal(dotdotRefused.body.error.code, "usage");
+
   const missing = standalone(f, ["nope.jsonl", "--json"]);
   assert.equal(missing.code, 3);
   assert.equal(missing.body.error.code, "not_found");
@@ -158,13 +163,34 @@ test("grep skips every dot-directory", { skip: process.platform === "win32" }, (
 
 test("brain bench rejects missing vault option values", (t) => {
   const f = fixture(t);
-  for (const args of [["questions.jsonl", "--vault"], ["questions.jsonl", "--vault="]]) {
+  for (const args of [
+    ["questions.jsonl", "--vault"],
+    ["questions.jsonl", "--vault="],
+    ["questions.jsonl", "--vault", "--json"],
+    ["questions.jsonl", "--vault", "-q"],
+    ["questions.jsonl", "--vault", "--help"],
+    ["questions.jsonl", "--vault", "--vault"],
+    ["questions.jsonl", "--vault=-q"],
+  ]) {
     const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: f.root, env: f.env, encoding: "utf8" });
     assert.equal(r.status, 2, r.stdout + r.stderr);
     const body = JSON.parse(r.stdout);
     assert.equal(body.ok, false);
     assert.equal(body.error.code, "usage");
   }
+});
+
+test("grep runs for questions containing only short words", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "AI?", expect: "MEMORY.md" }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.ok(r.body.data.results[0].grep.calls >= 1);
+
+  writeFileSync(join(f.root, "punctuation.jsonl"), JSON.stringify({ question: "???", expect: "MEMORY.md" }) + "\n");
+  const refused = standalone(f, [join(f.root, "punctuation.jsonl"), "--json"]);
+  assert.equal(refused.code, 2);
+  assert.equal(refused.body.error.code, "bad_questions");
 });
 
 test("the Obsidian CLI method searches with OR-ed words and reads the top result", { skip: process.platform === "win32" }, (t) => {

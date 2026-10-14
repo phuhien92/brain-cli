@@ -90,11 +90,11 @@ function parseArgs(argv) {
     else if (arg === "--quiet" || arg === "-q") options.quiet = true;
     else if (arg === "--vault") {
       const vault = argv[++i];
-      if (!vault) throw new BenchError("usage", "--vault needs a value", 2);
+      if (!vault || vault.startsWith("-")) throw new BenchError("usage", "--vault needs a value", 2);
       options.vault = vault;
     } else if (arg.startsWith("--vault=")) {
       const vault = arg.slice("--vault=".length);
-      if (!vault) throw new BenchError("usage", "--vault needs a value", 2);
+      if (!vault || vault.startsWith("-")) throw new BenchError("usage", "--vault needs a value", 2);
       options.vault = vault;
     } else if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg.startsWith("-") && arg !== "-") throw new BenchError("usage", `unknown option ${arg}`, 2);
@@ -122,7 +122,7 @@ function readQuestions(file, vault) {
     if (!existsSync(path) || !statSync(path).isFile()) throw new BenchError("not_found", `no questions file at ${path}`, 3);
     const real = realpathSync(path);
     const rel = relative(vault, real);
-    if (rel && !rel.startsWith("..") && !isAbsolute(rel)) inVault = toPosix(rel);
+    if (rel && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) inVault = toPosix(rel);
     if (inVault && /\.md$/i.test(inVault)) {
       throw new BenchError("usage", "a markdown questions file inside the vault would be indexed; use .jsonl", 2);
     }
@@ -137,7 +137,7 @@ function readQuestions(file, vault) {
     } catch {
       throw new BenchError("bad_questions", `line ${i + 1} is not JSON`, 2);
     }
-    if (typeof q?.question !== "string" || !q.question.trim() || typeof q?.expect !== "string" || !q.expect.trim()) {
+    if (typeof q?.question !== "string" || !q.question.trim() || !words(q.question).length || typeof q?.expect !== "string" || !q.expect.trim()) {
       throw new BenchError("bad_questions", `line ${i + 1} needs "question" and "expect"`, 2);
     }
     questions.push({
@@ -190,8 +190,9 @@ function score(rank, cost, ms) {
 // assumed to recognise the answer the moment it reads it, so reading stops at
 // the expected note: a generous lower bound on grep's cost.
 function grepMethod(vault, question, expect, questionsFile) {
-  const terms = keywords(question)
-    .filter((w) => w.length >= 3)
+  const questionTerms = keywords(question);
+  const longTerms = questionTerms.filter((w) => w.length >= 3);
+  const terms = (longTerms.length ? longTerms : questionTerms)
     .map((w, i) => ({ w, i }))
     .sort((a, b) => b.w.length - a.w.length || a.i - b.i)
     .slice(0, GREP_TERMS)

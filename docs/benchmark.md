@@ -48,16 +48,17 @@ benchmark a vault without writing anything into it, run the script directly; it 
 node examples/bench/bin/brain-bench /path/outside/the/vault/questions.jsonl --vault ~/vault
 ```
 
-A command extension is stopped after 30 seconds. A run makes three `brain` calls per question,
-so `brain bench` suits a few dozen questions. Run larger sets with the script directly, which has
-no time limit.
+A command extension is stopped after 30 seconds. A run makes one `brain` call when search has no
+hit and three when it has a top hit, so `brain bench` suits a few dozen questions. Run larger sets
+with the script directly, which has no time limit.
 
 ## The three methods
 
 Each method models what an agent does, the same way for every question.
 
 1. **grep.** Take the question's words without stop words, and keep those of three letters
-   or more. Start with the longest. `grep -rilF --include=*.md` it over the vault
+   or more, falling back to the original words when none are that long. Start with the longest.
+   `grep -rilF --include=*.md` it over the vault
    (dot-folders and `node_modules` skipped, like brain). While more than five files match,
    narrow the list with the next word (`xargs grep -il`), skipping a word that would leave
    nothing. At most four words. Sort each resulting file list by path, then read at most
@@ -71,7 +72,8 @@ Each method models what an agent does, the same way for every question.
 3. **brain**, as the [skill](../skills/brain/SKILL.md) teaches: `brain search "<question>"
    --json --limit 5`, then `brain get <top hit> --meta --json` for its headings, then
    `brain get <top hit> --section <heading> --json` for the heading sharing the most words
-   with the question (the whole note when none does). Always three calls. Tokens count the
+   with the question (the whole note when none does). One call when search has no hit; three
+   when it has a top hit. Tokens count the
    whole JSON envelope except its top-level `vault` path and `index` timings, the note's
    `data.mtime`, and lifecycle `overdue` flags in `data.lifecycle` or search results. Those
    values depend on the machine or date, not on the question.
