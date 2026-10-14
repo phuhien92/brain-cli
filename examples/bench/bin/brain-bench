@@ -10,7 +10,7 @@
 // benchmarks a vault without enabling the extension in it.
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,7 +29,7 @@ const GREP_TERMS = 4;
 const STOP = new Set(
   "a an and are as at be but by for from has have how i in is it its me my of on or our so that the their this to was what when where which who why will with you your about can could did do does should would".split(" "),
 );
-const SKIP_DIRS = [".git", ".obsidian", ".trash", "node_modules"];
+const SKIP_DIRS = [".*", "node_modules"];
 
 class BenchError extends Error {
   constructor(code, message, exit = 1) {
@@ -88,9 +88,15 @@ function parseArgs(argv) {
     const arg = argv[i];
     if (arg === "--json") options.json = true;
     else if (arg === "--quiet" || arg === "-q") options.quiet = true;
-    else if (arg === "--vault") options.vault = argv[++i];
-    else if (arg.startsWith("--vault=")) options.vault = arg.slice("--vault=".length);
-    else if (arg === "-h" || arg === "--help") options.help = true;
+    else if (arg === "--vault") {
+      const vault = argv[++i];
+      if (!vault) throw new BenchError("usage", "--vault needs a value", 2);
+      options.vault = vault;
+    } else if (arg.startsWith("--vault=")) {
+      const vault = arg.slice("--vault=".length);
+      if (!vault) throw new BenchError("usage", "--vault needs a value", 2);
+      options.vault = vault;
+    } else if (arg === "-h" || arg === "--help") options.help = true;
     else if (arg.startsWith("-") && arg !== "-") throw new BenchError("usage", `unknown option ${arg}`, 2);
     else if (options.file === null) options.file = arg;
     else throw new BenchError("usage", "brain bench takes one questions file", 2);
@@ -195,12 +201,12 @@ function grepMethod(vault, question, expect, questionsFile) {
   for (const term of terms) {
     let found;
     if (candidates === null) {
-      const args = ["-rilF", "--include=*.md", ...SKIP_DIRS.map((d) => `--exclude-dir=${d}`), "-e", term, "."];
+      const args = ["-rilF", "--include=*.md", ...SKIP_DIRS.map((d) => `--exclude-dir=${d}`), "-e", term, vault];
       const r = run("grep", args, vault);
       requireGrep(r, "search");
       cost.calls++;
-      cost.bytes += Buffer.byteLength(r.stdout);
-      found = r.stdout.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, ""));
+      found = r.stdout.split("\n").filter(Boolean).map((p) => toPosix(relative(vault, p)));
+      cost.bytes += Buffer.byteLength(found.map((p) => `./${p}`).join("\n") + (found.length ? "\n" : ""));
     } else {
       // One `xargs grep -il` round, chunked only to stay under argument limits.
       found = [];
@@ -373,7 +379,7 @@ function summarize(rows, method) {
 }
 
 function table(data) {
-  const lines = [`brain bench: ${data.questions} questions, ${data.vaultNotes} notes`];
+  const lines = [`brain bench: ${data.questions} questions`];
   lines.push("method     top1   top5   tokens    calls   ms");
   for (const [name, m] of Object.entries(data.methods)) {
     if (!m.available) {
@@ -386,78 +392,6 @@ function table(data) {
     );
   }
   return lines.join("\n") + "\n";
-}
-
-function frontmatterString(text, key) {
-  const block = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)?.[1];
-  if (block === undefined) return null;
-  const line = block.split(/\r?\n/).find((candidate) => candidate.startsWith(`${key}:`));
-  if (!line) return null;
-  let value = line.slice(key.length + 1).trim();
-  if (/^".*"$/.test(value)) {
-    try {
-      return JSON.parse(value);
-    } catch {
-      return value.slice(1, -1);
-    }
-  }
-  if (/^'.*'$/.test(value)) return value.slice(1, -1);
-  return value.replace(/\s+#.*$/, "");
-}
-
-function extensionDirectory(vault) {
-  const configPath = join(vault, "brain.json");
-  const config = existsSync(configPath) ? JSON.parse(readFileSync(configPath, "utf8")) : {};
-  const logDir = String(config?.log?.dir ?? "log").replace(/\\/g, "/").replace(/^\.?\/+|\/+$/g, "");
-  return `${logDir}/extensions`;
-}
-
-function extensionMarkerName(path, directory) {
-  if (!path.startsWith(`${directory}/`)) return false;
-  const file = path.slice(directory.length + 1);
-  if (file.includes("/") || !file.endsWith(".md")) return false;
-  const name = file.slice(0, -3);
-  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return false;
-  return name;
-}
-
-function isExtensionMarker(vault, path, directory, offline) {
-  const name = extensionMarkerName(path, directory);
-  if (!name) return false;
-  if (offline) return true;
-  const text = readFileSync(join(vault, ...path.split("/")), "utf8");
-  return frontmatterString(text, "kind") === "extension" && frontmatterString(text, "extension") === name;
-}
-
-function isCountedNote(vault, path, enablementDirectory, offline = false) {
-  const full = join(vault, ...path.split("/"));
-  if (path.startsWith("sources/") && existsSync(full + ".source.md")) return false;
-  return !isExtensionMarker(vault, path, enablementDirectory, offline);
-}
-
-function countNotes(vault) {
-  let n = 0;
-  const enablementDirectory = extensionDirectory(vault);
-  const visit = (d) => {
-    for (const entry of readdirSync(d, { withFileTypes: true })) {
-      const placeholder = /^\.(.+\.md)\.icloud$/i.exec(entry.name);
-      if (placeholder && entry.isFile()) {
-        const path = toPosix(relative(vault, join(d, placeholder[1])));
-        if (isCountedNote(vault, path, enablementDirectory, true)) n++;
-        continue;
-      }
-      if (entry.name.startsWith(".")) continue;
-      if (entry.isDirectory()) {
-        if (!SKIP_DIRS.includes(entry.name)) visit(join(d, entry.name));
-      } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
-        const full = join(d, entry.name);
-        const path = toPosix(relative(vault, full));
-        if (isCountedNote(vault, path, enablementDirectory)) n++;
-      }
-    }
-  };
-  visit(vault);
-  return n;
 }
 
 function main() {
@@ -522,7 +456,6 @@ function main() {
   const ordered = Object.fromEntries(METHODS.filter((m) => methods[m]).map((m) => [m, methods[m]]));
   const data = {
     questions: questions.length,
-    vaultNotes: countNotes(vault),
     top: TOP,
     bytesPerToken: BYTES_PER_TOKEN,
     methods: ordered,

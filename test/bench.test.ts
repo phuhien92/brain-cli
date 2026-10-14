@@ -1,7 +1,7 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -105,7 +105,7 @@ test("brain bench runs the demo questions as an installed extension, determinist
   assert.equal(first.body.ok, true);
   const data = first.body.data;
   assert.equal(data.questions, 14);
-  assert.equal(data.vaultNotes, 18);
+  assert.equal("vaultNotes" in data, false);
   assert.deepEqual(Object.keys(data.methods), ["grep", "obsidian", "brain"]);
   assert.equal(data.methods.obsidian.available, false, "no Obsidian CLI is installed");
   assert.match(first.stderr, /skipping obsidian/, "a missing method is skipped loudly");
@@ -119,7 +119,6 @@ test("brain bench runs the demo questions as an installed extension, determinist
 
   const standaloneRun = standalone(f, ["questions.jsonl", "--json"]);
   assert.equal(standaloneRun.code, 0);
-  assert.equal(standaloneRun.body.data.vaultNotes, 18);
   assert.deepEqual(withoutTimings(standaloneRun.body.data), withoutTimings(data), "the extension and the bare script agree");
 });
 
@@ -144,6 +143,28 @@ test("the questions file is never an answer, and a markdown one inside the vault
   const missing = standalone(f, ["nope.jsonl", "--json"]);
   assert.equal(missing.code, 3);
   assert.equal(missing.body.error.code, "not_found");
+});
+
+test("grep skips every dot-directory", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.vault, ".archive"));
+  writeFileSync(join(f.vault, ".archive", "answer.md"), "# Hidden\nzebracorn quokkafish\n");
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "zebracorn quokkafish", expect: "MEMORY.md" }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.equal(r.body.data.results[0].grep.rank, null);
+  assert.equal(r.body.data.results[0].grep.calls, 2);
+});
+
+test("brain bench rejects missing vault option values", (t) => {
+  const f = fixture(t);
+  for (const args of [["questions.jsonl", "--vault"], ["questions.jsonl", "--vault="]]) {
+    const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: f.root, env: f.env, encoding: "utf8" });
+    assert.equal(r.status, 2, r.stdout + r.stderr);
+    const body = JSON.parse(r.stdout);
+    assert.equal(body.ok, false);
+    assert.equal(body.error.code, "usage");
+  }
 });
 
 test("the Obsidian CLI method searches with OR-ed words and reads the top result", { skip: process.platform === "win32" }, (t) => {
@@ -283,27 +304,6 @@ else console.log(JSON.stringify({ ...common, data: { path: "Target.md", frontmat
   const content = { schema: "brain.v1", command: "get", ok: true, data: { path: "Target.md", frontmatter: user, headings: [], lifecycle: { due: "2026-10-01" }, content: "body" } };
   const expected = Math.ceil(Buffer.byteLength(JSON.stringify(search) + JSON.stringify(get) + JSON.stringify(content)) / 4);
   assert.equal(r.body.data.results[0].brain.tokens, expected);
-});
-
-test("brain bench note count matches indexed notes", (t) => {
-  const f = fixture(t);
-  writeFileSync(join(f.vault, "brain.json"), JSON.stringify({ log: { dir: "memory" } }));
-  mkdirSync(join(f.vault, "memory", "extensions"), { recursive: true });
-  writeFileSync(join(f.vault, "memory", "extensions", "sample.md"), "---\nkind: extension\nextension: sample\n---\n# sample\n");
-  mkdirSync(join(f.vault, "sources"));
-  writeFileSync(join(f.vault, "sources", "paper.md"), "# Immutable original\n");
-  writeFileSync(join(f.vault, "sources", "paper.md.source.md"), "# Searchable source metadata\n");
-  writeFileSync(join(f.vault, "Offline.md"), "# Offline note\n");
-  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "next dental cleaning", expect: "People/Dr Patel.md" }) + "\n");
-  const indexed = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
-  assert.equal(indexed.code, 0, JSON.stringify(indexed.body));
-  assert.equal(indexed.body.data.vaultNotes, 20, "18 demo notes, the source sidecar, and the live note");
-  renameSync(join(f.vault, "Offline.md"), join(f.vault, ".Offline.md.icloud"));
-  renameSync(join(f.vault, "sources", "paper.md"), join(f.vault, "sources", ".paper.md.icloud"));
-  renameSync(join(f.vault, "memory", "extensions", "sample.md"), join(f.vault, "memory", "extensions", ".sample.md.icloud"));
-  const evicted = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
-  assert.equal(evicted.code, 0, JSON.stringify(evicted.body));
-  assert.equal(evicted.body.data.vaultNotes, 20, "only the ordinary iCloud placeholder remains one logical note");
 });
 
 test("brain bench fails when grep is unavailable", (t) => {

@@ -94,7 +94,7 @@ Obsidian's results, brain's results.
 
 ### Demo vault (public)
 
-18 short notes and 14 questions ([`examples/bench/demo/`](../examples/bench/demo/)).
+14 questions against the public demo vault ([`examples/bench/demo/`](../examples/bench/demo/)).
 The Obsidian CLI was not installed.
 
 | Method | Top 1 | Top 5 | Tokens read | Calls |
