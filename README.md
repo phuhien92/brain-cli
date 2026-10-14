@@ -95,6 +95,7 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [firstmate guide](docs/firstmate.md) | sharing firstmate's learnings across two machines |
 | [Feedback](docs/feedback.md) | bug reports and ideas from people and agents, redacted, posted only with permission |
 | [Telemetry](docs/telemetry.md) | opt-in anonymous usage data: what is collected, how the one-time question works |
+| [Benchmark](docs/benchmark.md) | grep vs. the Obsidian CLI vs. brain on real questions, and timings at 20,000 notes |
 | [Extensions](docs/extensions.md) | install and build process-isolated commands; permissions and scopes |
 | [Extensions and UI design](docs/design/extensions.md) | proposed hooks and local web interface |
 
@@ -106,9 +107,9 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
    [firstmate](https://github.com/kunchenguid/firstmate). ✅
 3. **Integrations and scopes** — named integrations with read folders and write kinds,
    `BRAIN_AS`, pluggable sync, `brain doctor`. ✅
-4. **Lifecycle and lint** — review windows by category, archive, and `brain lint`. ✅
-   Still to come in this step: the published benchmark of grep vs. the Obsidian CLI vs.
-   `brain` on real questions, measuring tokens read and whether the right note came back.
+4. **Lifecycle and lint** — review windows by category, archive, and `brain lint`, plus
+   [the benchmark](docs/benchmark.md) of grep vs. the Obsidian CLI vs. `brain` on real
+   questions (`brain bench`): whether the right note came back, tokens read, calls. ✅
 5. **Extensions** — anyone can add a command (`brain <name>`) in any language, as a
    separate process speaking the `--json` contract, with a manifest that declares what it
    reads, writes and contacts. Command extensions and the meetings reference are built;

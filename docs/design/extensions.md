@@ -44,7 +44,7 @@ The shipped install, manifest, launcher, scope and process contracts are documen
 [`docs/extensions.md`](../extensions.md).
 
 Good fits: importers (Granola, Notion, Readwise, Kindle highlights → log entries),
-reports, one-off migrations, a `brain bench` for the benchmark.
+reports, one-off migrations, and [`brain bench`](../../examples/bench/) for the [benchmark](../benchmark.md).
 
 ### Kind 2 — hooks: change what built-in commands do
 
@@ -108,7 +108,7 @@ Rules it must follow:
 
 ## Order of work
 
-1. **Lifecycle and lint** (roadmap step 4). Done; the benchmark remains future work.
+1. **Lifecycle and lint** (roadmap step 4). Done, with the [benchmark](../benchmark.md) as `brain bench`.
 2. **Extension commands** (kind 1) and the manifest, with `brain ext install/list/remove`.
    Done, designed against the meetings reference extension.
 3. **Hooks** (kind 2), one event at a time, starting with `context.build` and `log.added`.

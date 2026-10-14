@@ -1,0 +1,12 @@
+{
+  "name": "bench",
+  "version": "0.1.0",
+  "brain": ">=0.10 <1",
+  "description": "Benchmark grep, the Obsidian CLI and brain on questions with known answers",
+  "command": "bin/brain-bench",
+  "permissions": {
+    "read": ["*"],
+    "write": [],
+    "network": []
+  }
+}

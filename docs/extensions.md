@@ -142,3 +142,9 @@ It records one `meeting` entry per source ID with the title, date, attendees, so
 summary, action items, and a link back to the source. It never stores a transcript. IDs are
 stored only as hashes, making another import of the same window a no-op. Its automated tests use
 a local fake source server – the repository contains no live account or external credential.
+
+## Reference: bench
+
+[`examples/bench/`](../examples/bench/) is a read-only extension: it declares `read: ["*"]`
+and no writes, calls `brain search` and `brain get` through `BRAIN_BIN`, and runs grep and the
+Obsidian CLI as an agent would. See [the benchmark](benchmark.md).

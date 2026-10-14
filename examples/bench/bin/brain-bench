@@ -1,0 +1,478 @@
+#!/usr/bin/env node
+
+// `brain bench <questions.jsonl>`: run every question three ways — an agent's
+// grep loop, the Obsidian CLI, and brain — and count what each one found, how
+// many tokens it put in front of the agent and how many commands it took.
+// No model is involved, so the same vault and questions give the same counts.
+//
+// As an extension, brain provides BRAIN_VAULT and BRAIN_BIN. The same file also
+// runs on its own (`node bin/brain-bench questions.jsonl --vault <dir>`), which
+// benchmarks a vault without enabling the extension in it.
+
+import { spawnSync } from "node:child_process";
+import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { basename, delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const SCHEMA = "brain.v1";
+const COMMAND = "bench";
+const METHODS = ["grep", "obsidian", "brain"];
+// Results an agent looks at: "found" means the expected note ranked in the top 5.
+const TOP = 5;
+// Approximate tokens: about four bytes of English text per token.
+const BYTES_PER_TOKEN = 4;
+// The grep agent stops narrowing once this few files are left, then reads at
+// most this many of them.
+const READ_LIMIT = 5;
+const GREP_TERMS = 4;
+// brain's stop words, plus question words an agent would not search for.
+const STOP = new Set(
+  "a an and are as at be but by for from has have how i in is it its me my of on or our so that the their this to was what when where which who why will with you your about can could did do does should would".split(" "),
+);
+const SKIP_DIRS = [".*", "node_modules"];
+
+class BenchError extends Error {
+  constructor(code, message, exit = 1) {
+    super(message);
+    this.code = code;
+    this.exit = exit;
+  }
+}
+
+class ObsidianOutputError extends Error {}
+
+function envelope(ok, value) {
+  process.stdout.write(JSON.stringify(ok
+    ? { schema: SCHEMA, command: COMMAND, ok: true, data: value }
+    : { schema: SCHEMA, command: COMMAND, ok: false, error: value }) + "\n");
+}
+
+function tokens(bytes) {
+  return Math.ceil(bytes / BYTES_PER_TOKEN);
+}
+
+function words(text) {
+  return (text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []);
+}
+
+function keywords(question) {
+  const all = words(question);
+  const content = all.filter((w) => !STOP.has(w));
+  return [...new Set(content.length ? content : all)];
+}
+
+function toPosix(path) {
+  return path.split(sep).join("/");
+}
+
+function normalizeExpect(value) {
+  const clean = toPosix(String(value)).replace(/^\.?\/+/, "");
+  return /\.md$/i.test(clean) ? clean : `${clean}.md`;
+}
+
+function invocationArgs() {
+  const argv = process.argv.slice(2);
+  if (argv.length || process.env.BRAIN_EXTENSION_ARGS_JSON === undefined) return argv;
+  try {
+    const args = JSON.parse(process.env.BRAIN_EXTENSION_ARGS_JSON);
+    if (!Array.isArray(args) || args.some((arg) => typeof arg !== "string")) throw new Error();
+    return args;
+  } catch {
+    throw new BenchError("usage", "BRAIN_EXTENSION_ARGS_JSON was not a string list", 2);
+  }
+}
+
+function parseArgs(argv) {
+  const options = { json: false, quiet: false, file: null, vault: null };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--json") options.json = true;
+    else if (arg === "--quiet" || arg === "-q") options.quiet = true;
+    else if (arg === "--vault") {
+      const vault = argv[++i];
+      if (!vault || vault.startsWith("-")) throw new BenchError("usage", "--vault needs a value", 2);
+      options.vault = vault;
+    } else if (arg.startsWith("--vault=")) {
+      const vault = arg.slice("--vault=".length);
+      if (!vault || vault.startsWith("-")) throw new BenchError("usage", "--vault needs a value", 2);
+      options.vault = vault;
+    } else if (arg === "-h" || arg === "--help") options.help = true;
+    else if (arg.startsWith("-") && arg !== "-") throw new BenchError("usage", `unknown option ${arg}`, 2);
+    else if (options.file === null) options.file = arg;
+    else throw new BenchError("usage", "brain bench takes one questions file", 2);
+  }
+  return options;
+}
+
+const USAGE = `usage: brain bench <questions.jsonl|-> [--json] [--quiet|-q]
+
+Each line of the questions file is {"id": "...", "question": "...", "expect": "path/to/note.md"}.
+A relative path is read from the vault root; "-" reads stdin. --quiet suppresses the successful
+human-readable table. Counts are deterministic; timings are not.`;
+
+// Questions live outside the index: brain indexes only .md files and grep is
+// told to skip the questions file, so neither method can find the answer key.
+function readQuestions(file, vault) {
+  let text;
+  let inVault = null;
+  if (file === "-") {
+    text = readFileSync(0, "utf8");
+  } else {
+    const path = isAbsolute(file) ? file : resolve(vault, file);
+    if (!existsSync(path) || !statSync(path).isFile()) throw new BenchError("not_found", `no questions file at ${path}`, 3);
+    const real = realpathSync(path);
+    const rel = relative(vault, real);
+    if (rel && rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel)) inVault = toPosix(rel);
+    if (inVault && /\.md$/i.test(inVault)) {
+      throw new BenchError("usage", "a markdown questions file inside the vault would be indexed; use .jsonl", 2);
+    }
+    text = readFileSync(real, "utf8");
+  }
+  const questions = [];
+  text.split(/\r?\n/).forEach((line, i) => {
+    if (!line.trim()) return;
+    let q;
+    try {
+      q = JSON.parse(line);
+    } catch {
+      throw new BenchError("bad_questions", `line ${i + 1} is not JSON`, 2);
+    }
+    if (typeof q?.question !== "string" || !q.question.trim() || !words(q.question).length || typeof q?.expect !== "string" || !q.expect.trim()) {
+      throw new BenchError("bad_questions", `line ${i + 1} needs "question" and "expect"`, 2);
+    }
+    questions.push({
+      id: typeof q.id === "string" && q.id ? q.id : `q${questions.length + 1}`,
+      question: q.question.trim(),
+      expect: normalizeExpect(q.expect),
+    });
+  });
+  if (!questions.length) throw new BenchError("bad_questions", "the questions file has no questions", 2);
+  return { questions, inVault };
+}
+
+function onPath(name) {
+  const exts = process.platform === "win32" ? (process.env.PATHEXT ?? ".EXE;.CMD").split(";") : [""];
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (!dir) continue;
+    for (const ext of exts) {
+      const candidate = join(dir, name + ext);
+      try {
+        if (statSync(candidate).isFile()) return candidate;
+      } catch {}
+    }
+  }
+  return null;
+}
+
+function run(file, args, cwd, input) {
+  const result = spawnSync(file, args, { cwd, encoding: "utf8", input, maxBuffer: 256 * 1024 * 1024 });
+  return { code: result.status, stdout: result.stdout ?? "", stderr: result.stderr ?? "", error: result.error };
+}
+
+function requireGrep(result, operation) {
+  if (result.error || (result.code !== 0 && result.code !== 1)) {
+    throw new Error(`grep ${operation} failed${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
+  }
+}
+
+function rankOf(paths, expect) {
+  const i = paths.findIndex((p) => p === expect);
+  return i === -1 ? null : i + 1;
+}
+
+function score(rank, cost, ms) {
+  return { rank, top1: rank === 1, top5: rank !== null && rank <= TOP, tokens: tokens(cost.bytes), calls: cost.calls, ms };
+}
+
+// Method 1: what an agent does without an index. grep the most specific word
+// (longest first), narrow the file list with the next word while that leaves
+// matches, then sort and read the file paths. The agent is
+// assumed to recognise the answer the moment it reads it, so reading stops at
+// the expected note: a generous lower bound on grep's cost.
+function grepMethod(vault, question, expect, questionsFile) {
+  const questionTerms = keywords(question);
+  const longTerms = questionTerms.filter((w) => w.length >= 3);
+  const terms = (longTerms.length ? longTerms : questionTerms)
+    .map((w, i) => ({ w, i }))
+    .sort((a, b) => b.w.length - a.w.length || a.i - b.i)
+    .slice(0, GREP_TERMS)
+    .map((t) => t.w);
+  const cost = { bytes: 0, calls: 0 };
+  let candidates = null;
+  for (const term of terms) {
+    let found;
+    if (candidates === null) {
+      const args = ["-rilF", "--include=*.md", ...SKIP_DIRS.map((d) => `--exclude-dir=${d}`), "-e", term, vault];
+      const r = run("grep", args, vault);
+      requireGrep(r, "search");
+      cost.calls++;
+      const output = r.stdout.replace(/\r\n/g, "\n");
+      found = output.split("\n").filter(Boolean).map((p) => toPosix(relative(vault, p)));
+      cost.bytes += Buffer.byteLength(found.map((p) => `./${p}`).join("\n") + (found.length ? "\n" : ""));
+    } else {
+      // One `xargs grep -il` round, chunked only to stay under argument limits.
+      found = [];
+      cost.calls++;
+      for (let i = 0; i < candidates.length; i += 500) {
+        const chunk = candidates.slice(i, i + 500).map((p) => `./${p}`);
+        const r = run("grep", ["-ilF", "-e", term, "--", ...chunk], vault);
+        requireGrep(r, "narrowing");
+        const output = r.stdout.replace(/\r\n/g, "\n");
+        cost.bytes += Buffer.byteLength(output);
+        found.push(...output.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, "")));
+      }
+    }
+    found = found.map(toPosix).filter((p) => p !== questionsFile).sort();
+    if (!found.length) continue;
+    candidates = found;
+    if (candidates.length <= READ_LIMIT) break;
+  }
+  const list = candidates ?? [];
+  for (const path of list.slice(0, READ_LIMIT)) {
+    cost.calls++;
+    cost.bytes += statSync(join(vault, ...path.split("/"))).size;
+    if (path === expect) break;
+  }
+  return { rank: rankOf(list, expect), cost };
+}
+
+function parseObsidianList(stdout) {
+  let value;
+  try {
+    value = JSON.parse(stdout);
+  } catch {
+    throw new ObsidianOutputError("the Obsidian CLI returned invalid search JSON");
+  }
+  if (!Array.isArray(value) || value.some((path) =>
+    typeof path !== "string" || !path || /^[/\\]/.test(path) || isAbsolute(path) || path.replace(/\\/g, "/").split("/").includes("..")
+  )) {
+    throw new ObsidianOutputError("the Obsidian CLI returned invalid search JSON");
+  }
+  return value;
+}
+
+// Method 2: the Obsidian CLI (Obsidian 1.12+, with the app running). Its search
+// ANDs words, so the question's words are OR-ed the way brain does it; then the
+// agent reads the top result.
+function obsidianMethod(bin, vault, question, expect, questionsFile) {
+  const cost = { bytes: 0, calls: 0 };
+  const target = `vault=${basename(vault)}`;
+  const query = keywords(question).join(" OR ");
+  const r = run(bin, [target, "search", `query=${query}`, `limit=${TOP}`, "format=json"], vault);
+  if (r.error || r.code !== 0) throw new Error(`obsidian search failed${r.stderr ? `: ${r.stderr.trim()}` : ""}`);
+  cost.calls++;
+  cost.bytes += Buffer.byteLength(r.stdout);
+  const list = parseObsidianList(r.stdout).map((p) => p.replace(/\\/g, "/").replace(/^\.\//, "")).filter((p) => p !== questionsFile);
+  if (list.length) {
+    const read = run(bin, [target, "read", `path=${list[0]}`], vault);
+    if (read.error || read.code !== 0) throw new Error(`obsidian read failed${read.stderr ? `: ${read.stderr.trim()}` : ""}`);
+    cost.calls++;
+    cost.bytes += Buffer.byteLength(read.stdout);
+  }
+  return { rank: rankOf(list, expect), cost };
+}
+
+function brainLauncher() {
+  if (process.env.BRAIN_BIN) {
+    let prefix;
+    try {
+      prefix = JSON.parse(process.env.BRAIN_BIN_ARGS_JSON ?? "[]");
+      if (!Array.isArray(prefix) || prefix.some((a) => typeof a !== "string")) throw new Error();
+    } catch {
+      throw new BenchError("usage", "BRAIN_BIN_ARGS_JSON was not a string list", 2);
+    }
+    return { file: process.env.BRAIN_BIN, prefix };
+  }
+  // Standalone inside a checkout or the npm package: use the brain next to this file.
+  const bundled = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "bin", "brain.js");
+  if (existsSync(bundled)) return { file: process.execPath, prefix: ["--no-warnings=ExperimentalWarning", bundled] };
+  const installed = onPath("brain");
+  if (!installed) throw new BenchError("not_found", "brain was not found; set BRAIN_BIN", 3);
+  return { file: installed, prefix: [] };
+}
+
+function brainCall(launcher, vault, args) {
+  const result = spawnSync(launcher.file, [...launcher.prefix, ...args, "--json"], {
+    env: { ...process.env, BRAIN_VAULT: vault },
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  let body = null;
+  try {
+    body = JSON.parse(result.stdout);
+  } catch {}
+  if (result.error || result.status !== 0 || !body || body.schema !== SCHEMA) {
+    throw new Error(`brain ${args[0]} did not return JSON${result.stderr ? `: ${result.stderr.trim()}` : ""}`);
+  }
+  if (!body.ok) throw new Error(`brain ${args[0]} failed: ${body.error?.message ?? "unknown error"}`);
+  const stableBody = { ...body };
+  delete stableBody.vault;
+  delete stableBody.index;
+  if (body.data && typeof body.data === "object" && !Array.isArray(body.data)) {
+    stableBody.data = { ...body.data };
+    delete stableBody.data.mtime;
+    if (body.data.lifecycle && typeof body.data.lifecycle === "object" && !Array.isArray(body.data.lifecycle)) {
+      stableBody.data.lifecycle = { ...body.data.lifecycle };
+      delete stableBody.data.lifecycle.overdue;
+    }
+    if (Array.isArray(body.data.results)) {
+      stableBody.data.results = body.data.results.map((item) => {
+        if (!item || typeof item !== "object" || Array.isArray(item) || !item.lifecycle || typeof item.lifecycle !== "object" || Array.isArray(item.lifecycle)) return item;
+        const copy = { ...item, lifecycle: { ...item.lifecycle } };
+        delete copy.lifecycle.overdue;
+        return copy;
+      });
+    }
+  }
+  const stable = JSON.stringify(stableBody);
+  return { body, bytes: Buffer.byteLength(stable) };
+}
+
+// The heading an agent would open: the one sharing the most words with the question.
+function bestHeading(headings, question) {
+  const wanted = new Set(keywords(question));
+  let best = null;
+  let bestScore = 0;
+  for (const heading of headings) {
+    const overlap = new Set(words(heading).filter((w) => wanted.has(w))).size;
+    if (overlap > bestScore) {
+      best = heading;
+      bestScore = overlap;
+    }
+  }
+  return best;
+}
+
+// Method 3: brain as the skill teaches it. Search with the question, list the
+// top hit's headings, then read only the matching section (or the whole note
+// when no heading matches).
+function brainMethod(launcher, vault, question, expect) {
+  const cost = { bytes: 0, calls: 0 };
+  const call = (args) => {
+    const r = brainCall(launcher, vault, args);
+    cost.calls++;
+    cost.bytes += r.bytes;
+    return r.body;
+  };
+  const search = call(["search", question, "--limit", String(TOP)]);
+  const list = search.data.results.map((r) => r.path);
+  if (list.length) {
+    const meta = call(["get", list[0], "--meta"]);
+    const heading = bestHeading(meta.data.headings ?? [], question);
+    call(heading ? ["get", list[0], "--section", heading] : ["get", list[0]]);
+  }
+  return { rank: rankOf(list, expect), cost };
+}
+
+function elapsed(start) {
+  return Math.round(Number(process.hrtime.bigint() - start) / 1e5) / 10;
+}
+
+function summarize(rows, method) {
+  const scored = rows.map((r) => r[method]).filter(Boolean);
+  const sum = (key) => scored.reduce((n, s) => n + s[key], 0);
+  return {
+    questions: scored.length,
+    top1: scored.filter((s) => s.top1).length,
+    top5: scored.filter((s) => s.top5).length,
+    tokens: sum("tokens"),
+    calls: sum("calls"),
+    ms: Math.round(sum("ms") * 10) / 10,
+  };
+}
+
+function table(data) {
+  const lines = [`brain bench: ${data.questions} questions`];
+  lines.push("method     top1   top5   tokens    calls   ms");
+  for (const [name, m] of Object.entries(data.methods)) {
+    if (!m.available) {
+      lines.push(`${name.padEnd(10)} skipped: ${m.skipped}`);
+      continue;
+    }
+    const t = m.totals;
+    lines.push(
+      `${name.padEnd(10)} ${`${t.top1}/${t.questions}`.padEnd(6)} ${`${t.top5}/${t.questions}`.padEnd(6)} ${String(t.tokens).padEnd(9)} ${String(t.calls).padEnd(7)} ${Math.round(t.ms)}`,
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+
+function main() {
+  const options = parseArgs(invocationArgs());
+  if (options.help) {
+    process.stderr.write(USAGE + "\n");
+    envelope(true, { usage: USAGE });
+    return 0;
+  }
+  if (!options.file) throw new BenchError("usage", USAGE, 2);
+  const vaultArg = options.vault ?? process.env.BRAIN_VAULT ?? process.cwd();
+  if (!existsSync(vaultArg) || !statSync(vaultArg).isDirectory()) throw new BenchError("not_found", `no vault at ${vaultArg}`, 3);
+  const vault = realpathSync(vaultArg);
+  const scoped = process.env.BRAIN_EXTENSION_PARENT_AS || (!process.env.BRAIN_EXTENSION_SCOPE && process.env.BRAIN_AS);
+  if (scoped) throw new BenchError("usage", "brain bench cannot run with BRAIN_AS or --as because direct methods cannot enforce note scopes", 2);
+  const { questions, inVault } = readQuestions(options.file, vault);
+
+  const methods = {};
+  const skip = (name, reason) => {
+    methods[name] = { available: false, skipped: reason };
+    process.stderr.write(`brain bench: skipping ${name}: ${reason}\n`);
+  };
+  if (!onPath("grep")) throw new BenchError("not_found", "grep was not found on PATH", 3);
+  methods.grep = { available: true };
+  let obsidian = null;
+  obsidian = onPath("obsidian");
+  if (!obsidian) skip("obsidian", "the Obsidian CLI (obsidian) was not found on PATH");
+  else {
+    const probe = run(obsidian, ["version"], vault);
+    if (probe.error || probe.code !== 0) {
+      skip("obsidian", "the Obsidian CLI did not answer; is the Obsidian app running?");
+      obsidian = null;
+    } else methods.obsidian = { available: true };
+  }
+  const launcher = brainLauncher();
+  methods.brain = { available: true };
+
+  const rows = [];
+  for (const q of questions) {
+    const row = { id: q.id, question: q.question, expect: q.expect };
+    const measure = (name, fn) => {
+      if (!methods[name]?.available) return;
+      const start = process.hrtime.bigint();
+      const { rank, cost } = fn();
+      row[name] = score(rank, cost, elapsed(start));
+    };
+    measure("grep", () => grepMethod(vault, q.question, q.expect, inVault));
+    try {
+      measure("obsidian", () => obsidianMethod(obsidian, vault, q.question, q.expect, inVault));
+    } catch (err) {
+      if (!(err instanceof ObsidianOutputError)) throw err;
+      for (const previous of rows) delete previous.obsidian;
+      skip("obsidian", err.message);
+      obsidian = null;
+    }
+    measure("brain", () => brainMethod(launcher, vault, q.question, q.expect));
+    rows.push(row);
+  }
+  for (const [name, m] of Object.entries(methods)) {
+    if (m.available) m.totals = summarize(rows, name);
+  }
+  const ordered = Object.fromEntries(METHODS.filter((m) => methods[m]).map((m) => [m, methods[m]]));
+  const data = {
+    questions: questions.length,
+    top: TOP,
+    bytesPerToken: BYTES_PER_TOKEN,
+    methods: ordered,
+    results: rows,
+  };
+  if (!options.json && !options.quiet) process.stderr.write(table(data));
+  envelope(true, data);
+  return 0;
+}
+
+try {
+  process.exitCode = main();
+} catch (err) {
+  const code = err instanceof BenchError ? err.code : "bench_failed";
+  envelope(false, { code, message: err.message });
+  process.exitCode = err instanceof BenchError ? err.exit : 1;
+}
