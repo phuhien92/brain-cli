@@ -6,8 +6,8 @@
 
 Direction **A · Linked Vault** is implemented:
 
-- both the app-icon tile and banner field use the same diagonal `brand.gradient`, from `brand.backgroundStart` → `color.successInk` (`#075E46`) to `brand.backgroundEnd` → `color.action` (`#21C995`);
-- banner copy uses `brand.onDark` → `color.canvas` (`#F4F8F6`) on the dark side of the gradient;
+- both the app-icon tile and banner field use the same diagonal `brand.gradient`, from `brand.backgroundStart` → `color.successInk` (`#075E46`) to `brand.backgroundEnd` → `color.brandGreenMid` (`#108160`);
+- banner copy uses `brand.onDark` → `color.canvas` (`#F4F8F6`) across the gradient;
 - brackets and graph edges use a `brand.markHalo` paper stroke beneath a `brand.onLight` → `color.actionText` (`#052F3E`) core, preserving their edge across both gradient ends;
 - paper nodes use `brand.paper` with an `onLight` outline, while the focus node uses the intentional `brand.accent` amber (`#FBBF24`) with the same dark outline;
 - the wordmark uses Manrope 750 for `brain` and IBM Plex Mono SemiBold for `-cli`;
@@ -36,7 +36,7 @@ Use the full 4:1 banner at 640 px wide or larger. Below that, use the icon and w
 
 ## Accessibility and fallback
 
-No single foreground color passes on both ends of this gradient, so roles are placed deliberately: `brand.onDark` against `brand.backgroundStart` is 7.26:1, and `brand.onLight` against `brand.backgroundEnd` is 6.65:1. The logo combines a paper halo with a dark core; one of those edges remains visible throughout the transition. The amber focus node is 4.66:1 against the dark start and receives a dark outline on the bright end, where its fill alone is 1.28:1. Paper nodes use the same dark outline. The one-color fallback keeps the canonical bracket-and-graph silhouette in one ink plus paper.
+`brand.onDark` passes across the full gradient: 7.26:1 against `brand.backgroundStart` and 4.53:1 against `brand.backgroundEnd`. The logo combines that paper halo with a dark core so its geometry remains distinct throughout the transition. The amber focus node is 4.66:1 against the dark start and 3.50:1 at its actual gradient position, with a dark outline preserving its shape. Paper nodes use the same dark outline. The one-color fallback keeps the canonical bracket-and-graph silhouette in one ink plus paper.
 
 ## Maintaining the source
 

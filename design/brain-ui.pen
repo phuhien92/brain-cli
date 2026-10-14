@@ -13730,7 +13730,7 @@
               "y": 221,
               "name": "Brand token Deep",
               "fill": "$muted",
-              "content": "Gradient #075E46 → #21C995",
+              "content": "Gradient #075E46 → #108160",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -17199,7 +17199,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Gradient · #075E46 → #21C995",
+              "content": "Gradient · #075E46 → #108160",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20962,7 +20962,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "successInk → action",
+              "content": "successInk → brandGreenMid",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -20977,7 +20977,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#075E46 → #21C995",
+              "content": "#075E46 → #108160",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -22034,6 +22034,10 @@
       "type": "color",
       "value": "#052F3E"
     },
+    "brandGreenMid": {
+      "type": "color",
+      "value": "#108160"
+    },
     "logo-bg-1": {
       "type": "color",
       "value": "$action"
@@ -22100,7 +22104,7 @@
     },
     "brandBackgroundEnd": {
       "type": "color",
-      "value": "$action"
+      "value": "$brandGreenMid"
     },
     "brandBackground": {
       "type": "color",

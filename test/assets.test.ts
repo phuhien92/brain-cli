@@ -291,6 +291,22 @@ function contrastRatio(first: string, second: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+function interpolateHex(first: string, second: string, position: number): string {
+  const channels = (hex: string): number[] => [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16));
+  const start = channels(first);
+  const end = channels(second);
+  return `#${start.map((channel, index) =>
+    Math.round(channel + ((end[index] ?? channel) - channel) * position).toString(16).padStart(2, "0"),
+  ).join("")}`;
+}
+
+function bannerGradientColorAt(x: number, y: number): string {
+  const start = String(resolveToken(tokenDocument.brand.backgroundGradient.startToken));
+  const end = String(resolveToken(tokenDocument.brand.backgroundGradient.endToken));
+  const position = (x / tokenDocument.brand.banner.width + y / tokenDocument.brand.banner.height) / 2;
+  return interpolateHex(start, end, position);
+}
+
 const logo = parseSvg(readFileSync(join(ROOT, "assets/logo.svg"), "utf8"));
 const banner = parseSvg(readFileSync(join(ROOT, "assets/banner.svg"), "utf8"));
 
@@ -343,7 +359,7 @@ function assertCanonicalMark(mark: SvgElement): void {
   });
 }
 
-test("brand contract names one shared green gradient and endpoint-specific foregrounds", () => {
+test("brand contract names one shared accessible green gradient", () => {
   assert.equal(tokenDocument.format, "brain.design-tokens.v1");
   assert.equal(tokenDocument.source, "design/brain-ui.pen");
   assert.equal(tokenDocument.brand.contract, "brain.brand.v1");
@@ -358,15 +374,42 @@ test("brand contract names one shared green gradient and endpoint-specific foreg
   const accent = String(resolveToken(tokenDocument.brand.logo.accentToken));
   assert.equal(gradient.role, "brand.gradient");
   assert.equal(start, "#075E46");
-  assert.equal(end, "#21C995");
+  assert.equal(end, "#108160");
   assert.equal(onDark, "#F4F8F6");
   assert.equal(onLight, "#052F3E");
   assert.equal(accent, "#FBBF24");
   assert.ok(contrastRatio(onDark, start) >= 4.5);
-  assert.ok(contrastRatio(onLight, end) >= 4.5);
+  assert.ok(contrastRatio(onDark, end) >= 4.5);
   assert.ok(contrastRatio(accent, start) >= 4.5);
   assert.ok(contrastRatio(accent, end) < 3);
-  assert.ok(contrastRatio(onLight, end) >= 4.5, "dark accent outline must carry the bright-end edge");
+  const focusNode = tokenDocument.brand.logo.nodes.find((node) => node.role === "focus");
+  assert.ok(focusNode);
+  const focusPosition = (focusNode.cx / 128 + focusNode.cy / 128) / 2;
+  assert.ok(contrastRatio(accent, interpolateHex(start, end, focusPosition)) >= 3);
+});
+
+test("banner light copy passes contrast at its rendered gradient positions", () => {
+  const onDark = String(resolveToken(tokenDocument.brand.foregroundDarkToken));
+  const wordmark = svgById(banner, "wordmark");
+  const positioning = svgById(banner, "positioning");
+  const samples = [
+    ...wordmark.children.map((path) => {
+      const match = /^translate\(([-\d.]+) ([-\d.]+)\)$/.exec(path.attributes.transform ?? "");
+      assert.ok(match);
+      return { x: Number(match[1]), y: Number(match[2]), threshold: 3 };
+    }),
+    ...positioning.children.map((text) => ({
+      x: Number(text.attributes.x),
+      y: Number(text.attributes.y),
+      threshold: Number(text.attributes["font-size"]) >= 24 ? 3 : 4.5,
+    })),
+  ];
+  for (const sample of samples) {
+    assert.ok(
+      contrastRatio(onDark, bannerGradientColorAt(sample.x, sample.y)) >= sample.threshold,
+      `light foreground fails at (${sample.x}, ${sample.y})`,
+    );
+  }
 });
 
 test("logo and banner share the canonical gradient and Linked Vault geometry", () => {
