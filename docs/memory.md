@@ -11,7 +11,7 @@ brain log add learning "pnpm cache breaks after macOS updates" --body "Run pnpm 
 # → log/learning/2026-10-13-mac-mini-pnpm-cache-breaks-after-macos-updates.md
 brain log 5                      # recent active entries, any kind
 brain log retire log/learning/<entry-id>.md --reason "obsolete"
-brain log replace log/learning/<entry-id>.md --text "corrected wording"
+brain log replace log/learning/<entry-id>.md --text "corrected title" --body "corrected detail"
 brain view learning              # every active learning, oldest first, as one markdown list
 brain sync                       # commit new entries, pull --rebase, push, re-export
 ```
@@ -35,13 +35,16 @@ source ID deliberately produces a sync conflict. See [Command extensions](extens
   `brain log import`, then `brain export --force`.
 - **`brain log import <kind> <file>`** turns an existing memory file into entries, one per
   top-level list item, dropping HTML-comment markers from titles. Title-and-body text already
-  recorded is skipped, so importing on a second machine adds only what is new there. A body
-  change adds the new text and lists the old entry as a retirement candidate. Import never
-  retires entries automatically.
+  recorded is skipped, so importing on a second machine adds only what is new there. Title
+  plus body is an entry's identity. Entries brain exported to that file and later removed
+  from it are listed as retirement candidates; an exported entry whose title remains with a
+  new body is a replacement candidate, not imported until `log replace` records it. Entries
+  the file never held are never proposed, and import never retires anything automatically.
 - **`brain log retire <entry-id> [--reason …]`** records an immutable lifecycle event;
   views and exports omit the entry while its original file remains untouched.
-  **`brain log replace <entry-id> --text …`** adds corrected text and retires the old entry;
-  the first line of `--text` is the new title and any remaining lines are its new body.
+  **`brain log replace <entry-id> --text <title> [--body <text|->]`** adds the corrected
+  entry and retires the old one; without `--body`, any lines after the first line of
+  `--text` become the new body.
   Concurrent retirements create separate event files and do not conflict.
 
 Configuration is split by what may travel: `brain.json` in the vault (the same on every

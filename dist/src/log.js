@@ -179,6 +179,7 @@ export function exportView(store, cfg, target, force = false) {
     const current = existsSync(target.path) ? readFileSync(target.path, "utf8") : null;
     if (current === content) {
         store.setMeta(key, sha(content));
+        recordExported(store, target.path, entries);
         return { ...base, status: "unchanged" };
     }
     const lastWritten = store.getMeta(key);
@@ -189,7 +190,22 @@ export function exportView(store, cfg, target, force = false) {
     writeFileSync(tmp, content);
     renameSync(tmp, target.path); // atomic: a reader never sees half a file
     store.setMeta(key, sha(content));
+    recordExported(store, target.path, entries);
     return { ...base, status: "written" };
+}
+// Which entries brain last wrote to a path. Like the export hash, it lives only
+// in the index: losing it means import proposes no retirements, never a wrong one.
+function recordExported(store, path, entries) {
+    store.setMeta(`export-entries:${path}`, JSON.stringify(entries.map((e) => e.path)));
+}
+function exportedPaths(store, path) {
+    try {
+        const paths = JSON.parse(store.getMeta(`export-entries:${path}`) ?? "[]");
+        return new Set(Array.isArray(paths) ? paths.filter((p) => typeof p === "string") : []);
+    }
+    catch {
+        return new Set();
+    }
 }
 // Split an existing memory file into entries: one per top-level list item
 // (with its indented continuation lines), one per free-standing paragraph.
@@ -247,21 +263,43 @@ export function importFile(store, cfg, kind, file) {
     const source = readFileSync(file, "utf8");
     const entryKind = slug(kind);
     const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
-    const activeEntries = listEntries(store, cfg, { kind: entryKind });
     // A retired entry remains recorded: importing a stale generated file must
     // not silently recreate it as a new active entry.
     const existing = new Set(allEntries.map(importKey));
+    const items = parseImport(source);
+    const imported = new Set(items.map(importKey));
+    // Only an entry brain exported to this file can have been removed from it; an
+    // active entry the file never held is not evidence of anything.
+    const exported = exportedPaths(store, file);
+    const missing = listEntries(store, cfg, { kind: entryKind })
+        .filter((entry) => exported.has(entry.path) && !imported.has(importKey(entry)));
+    // A missing entry whose title is still in the file was reworded, not removed.
+    // Its new text is not added: `log replace` records it and retires the old one.
+    const newByTitle = new Map();
+    for (const item of items) {
+        if (!existing.has(importKey(item)) && !newByTitle.has(titleKey(item)))
+            newByTitle.set(titleKey(item), item);
+    }
+    const retirementCandidates = [];
+    const replacementCandidates = [];
+    const reworded = new Set();
+    for (const { path, title, body } of missing) {
+        const item = newByTitle.get(titleKey({ title }));
+        if (!item) {
+            retirementCandidates.push({ path, title, body });
+            continue;
+        }
+        reworded.add(item);
+        replacementCandidates.push({ path, title, body, replacement: { title: item.title, body: item.body } });
+    }
     const added = [];
     let skipped = 0;
     // A millisecond apart and ending now, so the view (oldest first) keeps the
     // file's original order and nothing imported sorts after a later entry.
-    const items = parseImport(source);
-    const imported = new Set(items.map(importKey));
-    const retirementCandidates = activeEntries
-        .filter((entry) => !imported.has(importKey(entry)))
-        .map(({ path, title, body }) => ({ path, title, body }));
     const base = Date.now() - items.length;
     items.forEach((item, i) => {
+        if (reworded.has(item))
+            return;
         const key = importKey(item);
         if (existing.has(key)) {
             skipped++;
@@ -271,9 +309,10 @@ export function importFile(store, cfg, kind, file) {
         added.push(addEntry(store.vault, cfg, { kind, ...item, created: new Date(base + i) }));
     });
     // What was just imported is now captured, so exporting over this file is no
-    // longer a loss.
-    store.setMeta(`export:${file}`, sha(source));
-    return { added, skipped, retirementCandidates };
+    // longer a loss — unless a rewording still waits for `log replace`.
+    if (!replacementCandidates.length)
+        store.setMeta(`export:${file}`, sha(source));
+    return { added, skipped, retirementCandidates, replacementCandidates };
 }
 function stripComments(s) {
     return s.replace(/<!--[\s\S]*?-->/g, "").replace(/[ \t]+$/gm, "");
@@ -284,8 +323,12 @@ function norm(s) {
 function renderKey(entry) {
     return `${norm(entry.title)}\n${norm(entry.body)}`;
 }
+function titleKey(entry) {
+    return entry.title.replace(/\s+/g, " ").trim();
+}
+// Title plus body is an entry's content identity.
 function importKey(entry) {
-    const title = entry.title.replace(/\s+/g, " ").trim();
+    const title = titleKey(entry);
     const body = entry.body.replace(/\r\n/g, "\n").replace(/[ \t]+$/gm, "").trim();
     return `${title}\n${body}`;
 }

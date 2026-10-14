@@ -7,9 +7,9 @@ holds the rules an agent changing the code must not break.
 
 1. **The vault is the source of truth; the index is a cache.** The index (`$BRAIN_STATE_DIR/<vault>-<id>/index.db`, never inside the vault) can be
    deleted at any time and must rebuild to the same state. Never store anything in the
-   index that cannot be re-derived from the markdown — with one exception, the hash of
-   what was last exported to each path, whose loss only makes `export` refuse until
-   `--force`, never overwrite.
+   index that cannot be re-derived from the markdown — with one exception, the hash and
+   entry list of what was last exported to each path, whose loss only makes `export` refuse
+   until `--force`, never overwrite, and `import` propose no retirements.
 2. **Create, never edit.** The only writes into the vault are new files under the log
    folder (`log add`, `log import`, `log retire`, `log replace`, `lifecycle …`) and immutable originals plus metadata
    sidecars under `sources/` (`ingest`), opened with the `wx` flag so an existing file can

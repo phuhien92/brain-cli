@@ -89,12 +89,14 @@ COMMANDS
       --tag <tag>             Tag the entry (repeatable)
   log [n] [--kind <kind>]     Show the n most recent entries (default 10)
   log import <kind> <file>    Turn an existing memory file into entries, one per list item;
-                              text already recorded is skipped; missing entries are listed
-                              as retirement candidates but never retired automatically
+                              text already recorded is skipped; entries brain exported there
+                              and now missing are listed as retirement candidates, same-title
+                              body changes as replacement candidates; nothing is retired
   log retire <entry-id>       Retire an entry with an immutable lifecycle event
       --reason <text>         Optional reason for the retirement
   log replace <entry-id>      Retire an entry and add its replacement in one command
-      --text <text>           Complete replacement: first line is title, remainder is body
+      --text <text>           Replacement title (without --body: first line is title, rest body)
+      --body <text|->         Replacement body (- reads stdin)
   view <kind>                 Print every active <kind> entry as one markdown list, oldest first
   export [--force]            Write each configured view to its path as a regular file;
                               refuses (exit 5) if the file was edited since brain wrote it
@@ -694,23 +696,37 @@ async function run(argv: string[]): Promise<number> {
             const summary =
               `imported ${result.added.length} ${slug(kind)} entries from ${abs}` +
               (result.skipped ? ` (${result.skipped} already recorded)` : "");
-            if (!result.retirementCandidates.length) return summary;
-            return [
-              summary,
-              `${result.retirementCandidates.length} active logged entries are not present in this file; review them before deciding whether to retire:`,
-              ...result.retirementCandidates.map((candidate) =>
-                `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`,
-              ),
-            ].join("\n");
+            const lines = [summary];
+            if (result.retirementCandidates.length) {
+              lines.push(
+                `${result.retirementCandidates.length} entries brain exported to this file are no longer in it; review them before deciding whether to retire:`,
+                ...result.retirementCandidates.map((candidate) =>
+                  `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}`,
+                ),
+              );
+            }
+            if (result.replacementCandidates.length) {
+              lines.push(
+                `${result.replacementCandidates.length} entries brain exported to this file have a new body there; not imported until replaced (brain log replace <path> --text <title> --body <body>):`,
+                ...result.replacementCandidates.map((candidate) =>
+                  `  path: ${JSON.stringify(candidate.path)}; title: ${JSON.stringify(candidate.title)}; body: ${JSON.stringify(candidate.body)}; new body: ${JSON.stringify(candidate.replacement.body)}`,
+                ),
+              );
+            }
+            return lines.join("\n");
           });
           return 0;
         }
         if (sub === "retire" || sub === "replace") {
           if (rest.length !== 1) {
-            throw new CliError("usage", `usage: brain log ${sub} <entry-id>${sub === "replace" ? " --text <text>" : " [--reason <text>]"}`, 2);
+            throw new CliError("usage", `usage: brain log ${sub} <entry-id>${sub === "replace" ? " --text <title> [--body <text|->]" : " [--reason <text>]"}`, 2);
           }
           const target = resolveLogEntry(store, cfg, rest[0]!, scope);
-          if (cfg.as) permit(cfg.as.write.includes(target.kind), `${sub} '${target.kind}' entries`);
+          if (cfg.as) {
+            permit(cfg.as.write.includes(target.kind), `${sub} '${target.kind}' entries`);
+            // The retirement is a lifecycle event, so it needs that write kind too.
+            permit(cfg.as.write.includes(LIFECYCLE_KIND), `${sub} entries (add "${LIFECYCLE_KIND}" to its write kinds)`);
+          }
           if (sub === "retire") {
             const reason = flags.reason?.trim().replace(/\s+/g, " ") || undefined;
             const event = recordRetirement(vault, cfg, target.path, { reason });
@@ -721,12 +737,18 @@ async function run(argv: string[]): Promise<number> {
             return 0;
           }
           const text = flags.text?.trim();
-          if (!text) throw new CliError("usage", "replace needs --text <text>", 2);
-          const [title = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
+          if (!text) throw new CliError("usage", "replace needs --text <title>", 2);
+          let title = text;
+          let body = flags.body === "-" ? readFileSync(0, "utf8") : flags.body;
+          if (body === undefined) {
+            const [first = "", ...bodyLines] = text.replace(/\r\n/g, "\n").split("\n");
+            title = first;
+            body = bodyLines.join("\n");
+          }
           const replacement = addEntry(vault, cfg, {
             kind: target.kind,
             title,
-            body: bodyLines.join("\n").trim(),
+            body: String(body).trim(),
             tags: target.tags,
           });
           const event = recordRetirement(vault, cfg, target.path, {
@@ -741,7 +763,7 @@ async function run(argv: string[]): Promise<number> {
         }
         const n = sub === undefined ? 10 : Number(sub);
         if (!Number.isInteger(n) || n < 1 || rest.length) {
-          throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <text>", 2);
+          throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <title> [--body <text>]", 2);
         }
         const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
           .filter((e) => inScope(e.path, scope))

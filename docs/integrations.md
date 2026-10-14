@@ -31,8 +31,8 @@ This file travels with the vault, so every machine sees the same declarations.
 - **`read`** — vault folders it may search and open. `["*"]` means the whole vault. It can
   always read the log entries of the kinds it writes, so `read` can be empty.
 - **`write`** — log kinds it may add, import, retire, or replace. Retiring and replacing
-  are authorized by the target entry's kind; the lifecycle event they create does not
-  require a separate `"lifecycle"` permission. Direct `brain lifecycle …` commands do.
+  need both the target entry's kind and `"lifecycle"`, because they record a lifecycle
+  event. Direct `brain lifecycle …` commands need `"lifecycle"` too.
   Each kind is its own folder under `log/`, so integrations never write the same files.
 - **`views`** — kinds it needs as a single generated file (for tools that read one
   `learnings.md`), with an optional header line.

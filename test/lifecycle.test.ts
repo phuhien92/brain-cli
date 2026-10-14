@@ -131,6 +131,14 @@ test("replace completes with quoted log paths", () => {
   assert.equal(event.replacement, replaced.body.data.replacement);
 });
 
+// Configure learnings.md as this machine's learning export and write it once.
+function exportLearnings(): string {
+  const target = join(vault, "..", "learnings.md");
+  writeFileSync(join(vault, "..", "none.json"), JSON.stringify({ exports: [{ kind: "learning", path: target }] }));
+  assert.equal(brain(["export"]).code, 0);
+  return target;
+}
+
 test("import does not claim an absent active entry was removed", () => {
   brain(["log", "add", "learning", "Never exported"]);
   const imported = join(vault, "learnings.md");
@@ -138,50 +146,60 @@ test("import does not claim an absent active entry was removed", () => {
 
   const result = brainText(["log", "import", "learning", imported]);
   assert.equal(result.status, 0);
-  assert.match(result.stdout, /active logged entries are not present in this file/);
-  assert.match(result.stdout, /path: "log\/learning\//);
-  assert.doesNotMatch(result.stdout, /brain log retire|--reason|removed from imported file/);
+  assert.doesNotMatch(result.stdout, /retire|replace|Never exported/);
 });
 
-test("import captures a body-only rewording and offers the old entry for retirement", () => {
-  const old = brain(["log", "add", "learning", "Deploy safely", "--body", "old detail"]);
-  const imported = join(vault, "learnings.md");
-  writeFileSync(imported, "- Deploy safely\n  new detail\n");
+test("import offers a body-only rewording of an exported entry for replacement, and replace takes --body", () => {
+  const old = brain(["log", "add", "learning", "Deploy safely", "--body", "old detail", "--tag", "ops"]);
+  const oldPath = old.body.data.path as string;
+  const original = readFileSync(join(vault, oldPath), "utf8");
+  const target = exportLearnings();
+  writeFileSync(target, readFileSync(target, "utf8").replace("old detail", "new detail\n  second line"));
 
-  const result = brain(["log", "import", "learning", imported]);
+  const result = brain(["log", "import", "learning", target]);
   assert.equal(result.code, 0);
-  assert.equal(result.body.data.added.length, 1);
-  assert.deepEqual(result.body.data.retirementCandidates, [{ path: old.body.data.path, title: "Deploy safely", body: "old detail" }]);
-  assert.match(brain(["view", "learning"]).body.data.markdown, /old detail[\s\S]*new detail/);
+  assert.deepEqual(result.body.data.added, []);
+  assert.deepEqual(result.body.data.retirementCandidates, []);
+  assert.deepEqual(result.body.data.replacementCandidates, [
+    { path: oldPath, title: "Deploy safely", body: "old detail", replacement: { title: "Deploy safely", body: "new detail\nsecond line" } },
+  ]);
+  assert.match(brainText(["log", "import", "learning", target]).stdout, /new body there[\s\S]*"new detail\\nsecond line"/);
+  assert.equal(brain(["export"]).code, 5, "export keeps refusing while the rewording is pending");
 
-  assert.equal(brain(["log", "retire", old.body.data.path]).code, 0);
-  const view = brain(["view", "learning"]).body.data.markdown;
+  const replaced = brain(["log", "replace", oldPath, "--text", "Deploy safely", "--body", "new detail\nsecond line"]);
+  assert.equal(replaced.code, 0);
+  assert.equal(readFileSync(join(vault, oldPath), "utf8"), original, "replace never edits the old entry");
+  const after = brain(["log", "import", "learning", target]);
+  assert.deepEqual([after.body.data.added, after.body.data.skipped], [[], 1]);
+  assert.deepEqual([after.body.data.retirementCandidates, after.body.data.replacementCandidates], [[], []]);
+  assert.equal(brain(["export"]).code, 0);
+  const view = brain(["view", "learning"]).body.data.markdown as string;
+  assert.match(view, /- Deploy safely\n {2}new detail\n {2}second line\n$/);
   assert.doesNotMatch(view, /old detail/);
-  assert.match(view, /new detail/);
+  const active = brain(["log", "10", "--kind", "learning"]).body.data.entries;
+  assert.deepEqual(active.map((entry: { tags: string[] }) => entry.tags), [["ops"]]);
 });
 
-test("import captures case-only title and body corrections", () => {
+test("import of case-only corrections: a changed body is a replacement, a changed title a retirement", () => {
   const oldBody = brain(["log", "add", "learning", "Body case", "--body", "run npm"]);
   const oldTitle = brain(["log", "add", "learning", "title case", "--body", "same detail"]);
   brain(["log", "add", "learning", "No change", "--body", "stable detail"]);
-  const imported = join(vault, "learnings.md");
-  writeFileSync(imported, ["- Body case", "  Run npm", "- Title Case", "  same detail", "- No change", "  stable detail", ""].join("\n"));
+  const target = exportLearnings();
+  writeFileSync(target, ["- Body case", "  Run npm", "- Title Case", "  same detail", "- No change", "  stable detail", ""].join("\n"));
 
-  const result = brain(["log", "import", "learning", imported]);
+  const result = brain(["log", "import", "learning", target]);
   assert.equal(result.code, 0);
-  assert.equal(result.body.data.added.length, 2);
+  assert.equal(result.body.data.added.length, 1);
   assert.equal(result.body.data.skipped, 1);
-  assert.deepEqual(
-    result.body.data.retirementCandidates.map((candidate: { path: string }) => candidate.path).sort(),
-    [oldBody.body.data.path, oldTitle.body.data.path].sort(),
-  );
+  assert.deepEqual(result.body.data.retirementCandidates.map((c: { path: string }) => c.path), [oldTitle.body.data.path]);
+  assert.deepEqual(result.body.data.replacementCandidates.map((c: { path: string }) => c.path), [oldBody.body.data.path]);
 
-  for (const candidate of result.body.data.retirementCandidates) {
-    assert.equal(brain(["log", "retire", candidate.path]).code, 0);
-  }
+  assert.equal(brain(["log", "retire", oldTitle.body.data.path]).code, 0);
+  assert.equal(brain(["log", "replace", oldBody.body.data.path, "--text", "Body case", "--body", "Run npm"]).code, 0);
   const view = brain(["view", "learning"]).body.data.markdown;
   assert.match(view, /- Body case\n {2}Run npm/);
   assert.match(view, /- Title Case\n {2}same detail/);
+  assert.doesNotMatch(view, /run npm|title case/);
 });
 
 test("custom review windows from brain.json; the primer warns about overdue notes", () => {
@@ -195,4 +213,24 @@ test("an integration needs the lifecycle write kind to record changes", () => {
   write("brain.json", JSON.stringify({ integrations: { coach: { read: ["Finance/"], write: ["interview"] } } }));
   const r = brain(["lifecycle", "review", "Finance/kent"], { BRAIN_AS: "coach" });
   assert.equal(r.code, 6);
+});
+
+test("retire and replace need both the entry's kind and the lifecycle write kind", () => {
+  write("brain.json", JSON.stringify({
+    integrations: {
+      "kind-only": { read: [], write: ["interview"] },
+      "lifecycle-only": { read: ["log/"], write: ["lifecycle"] },
+      both: { read: [], write: ["interview", "lifecycle"] },
+    },
+  }));
+  const entry = brain(["log", "add", "interview", "Screen notes"]).body.data.path as string;
+  for (const as of ["kind-only", "lifecycle-only"]) {
+    const retire = brain(["log", "retire", entry], { BRAIN_AS: as });
+    assert.equal(retire.code, 6, `${as} cannot retire`);
+    assert.equal(retire.body.error.code, "not_permitted");
+    assert.equal(brain(["log", "replace", entry, "--text", "New notes"], { BRAIN_AS: as }).code, 6, `${as} cannot replace`);
+  }
+  assert.equal(readdirSync(join(vault, "log")).includes("lifecycle"), false, "a denied command writes nothing");
+  assert.deepEqual(brain(["log", "10"]).body.data.entries.map((e: { title: string }) => e.title), ["Screen notes"]);
+  assert.equal(brain(["log", "replace", entry, "--text", "New notes"], { BRAIN_AS: "both" }).code, 0);
 });

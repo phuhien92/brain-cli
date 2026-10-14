@@ -107,27 +107,60 @@ test("renderView is oldest first and shows a duplicate text once", () => {
   );
 });
 
-test("import lists missing active entries as retirement candidates without retiring them", () => {
+test("import proposes retirement only for entries this target exported that were later removed", () => {
   const target = join(root, "learnings.md");
-  const c = cfg();
+  const c = cfg("mini", [{ kind: "learning", path: target }]);
   const one = addEntry(vault, c, { kind: "learning", title: "One" });
   const two = addEntry(vault, c, { kind: "learning", title: "Two" });
   const store = Store.open(vault);
   store.refresh();
 
+  // Without a previous export, absence from the file proves nothing.
+  writeFileSync(target, "- One\n");
+  assert.deepEqual(importFile(store, c, "learning", target).retirementCandidates, []);
+
+  assert.equal(exportView(store, c, c.exports[0]!, true).status, "written");
+  const later = addEntry(vault, c, { kind: "learning", title: "Never exported here" });
+  store.refresh();
   writeFileSync(target, "- One\n");
   const result = importFile(store, c, "learning", target);
   assert.deepEqual(result.retirementCandidates, [{ path: two, title: "Two", body: "" }]);
+  assert.deepEqual(result.replacementCandidates, []);
   store.refresh();
-  assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path).sort(), [one, two].sort());
+  assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path).sort(), [one, two, later].sort());
 
   recordRetirement(vault, c, two, { reason: "removed during curation" });
   store.refresh();
-  assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path), [one]);
-  assert.deepEqual(listEntries(store, c, { kind: "learning", includeRetired: true }).map((entry) => entry.path).sort(), [one, two].sort());
+  assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path).sort(), [one, later].sort());
+  assert.equal(listEntries(store, c, { kind: "learning", includeRetired: true }).length, 3);
   assert.equal(importFile(store, c, "learning", target).retirementCandidates.length, 0, "retired entries are not candidates again");
   store.refresh();
-  assert.equal(listEntries(store, c, { kind: "learning", includeRetired: true }).length, 2, "a stale import does not recreate a retired title");
+  writeFileSync(target, "- One\n- Two\n");
+  importFile(store, c, "learning", target);
+  store.refresh();
+  assert.equal(listEntries(store, c, { kind: "learning", includeRetired: true }).length, 3, "a stale import does not recreate a retired entry");
+  store.close();
+});
+
+test("import reports a same-title body change to an exported entry as a replacement candidate", () => {
+  const target = join(root, "learnings.md");
+  const c = cfg("mini", [{ kind: "learning", path: target }]);
+  const old = addEntry(vault, c, { kind: "learning", title: "Deploy safely", body: "old detail" });
+  const store = Store.open(vault);
+  store.refresh();
+  assert.equal(exportView(store, c, c.exports[0]!).status, "written");
+
+  const edited = readFileSync(target, "utf8").replace("old detail", "new detail");
+  writeFileSync(target, edited);
+  const result = importFile(store, c, "learning", target);
+  assert.deepEqual(result.added, [], "the reworded text is not added beside the old entry");
+  assert.deepEqual(result.retirementCandidates, []);
+  assert.deepEqual(result.replacementCandidates, [
+    { path: old, title: "Deploy safely", body: "old detail", replacement: { title: "Deploy safely", body: "new detail" } },
+  ]);
+  store.refresh();
+  assert.equal(exportView(store, c, c.exports[0]!).status, "drift", "the pending rewording is not overwritten");
+  assert.equal(readFileSync(target, "utf8"), edited);
   store.close();
 });
 

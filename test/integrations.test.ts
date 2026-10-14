@@ -40,7 +40,7 @@ before(() => {
       sync: "none",
       integrations: {
         "interview-coach": { read: ["Career HQ"], write: ["interview"] },
-        firstmate: { read: ["firstmate/"], write: ["learning"], views: { learning: { header: "<!-- stow -->" } } },
+        firstmate: { read: ["firstmate/"], write: ["learning", "lifecycle"], views: { learning: { header: "<!-- stow -->" } } },
         everything: { read: ["*"], write: [] },
       },
     }),
@@ -90,7 +90,7 @@ test("an integration writes only its kinds and reads its own log", () => {
   assert.equal(interview.code, 0);
   assert.equal(brain(["log", "retire", interview.body.data.path], { BRAIN_AS: "firstmate" }).code, 3, "out-of-scope entries stay hidden");
 
-  const fmLog = brain(["log"], { BRAIN_AS: "firstmate" });
+  const fmLog = brain(["log", "--kind", "learning"], { BRAIN_AS: "firstmate" });
   assert.deepEqual(fmLog.body.data.entries.map((e: { title: string }) => e.title), ["Replacement through the integration", "Crew lesson"]);
   assert.equal(brain(["view", "interview"], { BRAIN_AS: "firstmate" }).code, 6);
 });
