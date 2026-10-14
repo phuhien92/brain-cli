@@ -32,6 +32,7 @@ export interface ExportTarget {
   kind: string;
   path: string; // absolute, ~ expanded
   header?: string;
+  owner?: string;
 }
 
 // How the vault's files reach other machines. brain never assumes one:
@@ -111,7 +112,7 @@ export function loadConfig(vault: string, opts: { as?: string } = {}): Config {
     for (const [kind, path] of Object.entries(viewPaths)) {
       if (typeof path !== "string") throw new ConfigError(`${userConfigPath}: integrations.${name}.views.${kind} must be a path`);
       const header = objectAt(viewSpecs, kind).header;
-      views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined });
+      views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined, owner: name });
     }
     integrations[name] = {
       name,
@@ -228,7 +229,7 @@ function extensionIntegration(manifest: ExtensionManifest): Integration {
   };
 }
 
-function integrationScope(integration: Integration, logDir: string): string[] | null {
+export function integrationScope(integration: Integration, logDir: string): string[] | null {
   if (integration.read === null) return null;
   return [...integration.read, ...integration.write.map((kind) => `${logDir}/${kind}/`)];
 }

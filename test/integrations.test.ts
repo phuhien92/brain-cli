@@ -111,8 +111,12 @@ test("an integration writes only its kinds and reads its own log", () => {
   const coachView = brain(["view", "lifecycle"], { BRAIN_AS: "interview-coach" });
   assert.match(coachView.body.data.markdown, /coach reason/);
   assert.doesNotMatch(coachView.body.data.markdown, /private crew reason/);
+  const firstmateExport = brain(["export"], { BRAIN_AS: "firstmate" });
+  assert.equal(firstmateExport.code, 0);
+  const firstmateView = readFileSync(join(root, "fm/data/learnings.md"), "utf8");
   const coachExport = brain(["export"], { BRAIN_AS: "interview-coach" });
   assert.equal(coachExport.code, 0);
+  assert.equal(readFileSync(join(root, "fm/data/learnings.md"), "utf8"), firstmateView);
   const exportedLifecycle = readFileSync(join(root, "coach/data/lifecycle.md"), "utf8");
   assert.match(exportedLifecycle, /coach reason/);
   assert.doesNotMatch(exportedLifecycle, /private crew reason|secret-target/);
@@ -147,6 +151,9 @@ test("sync mode none refreshes and exports without git; integration views export
   const learnings = readFileSync(join(root, "fm/data/learnings.md"), "utf8");
   assert.match(learnings, /^<!-- stow -->\n/);
   assert.match(learnings, /- Crew lesson\n/);
+  const lifecycle = readFileSync(join(root, "coach/data/lifecycle.md"), "utf8");
+  assert.match(lifecycle, /coach reason/);
+  assert.doesNotMatch(lifecycle, /private crew reason|secret-target/);
 });
 
 test("sync command mode runs the user's command in the vault", () => {

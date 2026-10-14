@@ -1467,7 +1467,8 @@ function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number):
 }
 
 function runExports(store: Store, cfg: Config, force: boolean): ExportResult[] {
-  return cfg.exports.map((t) => exportView(store, cfg, t, force));
+  const targets = cfg.as ? cfg.as.views : cfg.exports;
+  return targets.map((target) => exportView(store, cfg, target, force));
 }
 
 function resolveLogEntry(store: Store, cfg: Config, ref: string, scope: string[] | null): Entry {

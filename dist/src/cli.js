@@ -1358,7 +1358,8 @@ function doctor(vault, cfg, index, notes) {
     return checks;
 }
 function runExports(store, cfg, force) {
-    return cfg.exports.map((t) => exportView(store, cfg, t, force));
+    const targets = cfg.as ? cfg.as.views : cfg.exports;
+    return targets.map((target) => exportView(store, cfg, target, force));
 }
 function resolveLogEntry(store, cfg, ref, scope) {
     const entries = new Map(listEntries(store, cfg, { includeRetired: true })

@@ -9,7 +9,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { inReadScope, slug } from "./config.js";
+import { inReadScope, integrationScope, readScope, slug } from "./config.js";
 import { parseNote } from "./note.js";
 export const RETIRE_ACTION = "retire";
 export const LIFECYCLE_KIND = "lifecycle";
@@ -161,7 +161,8 @@ export function renderView(entries, header) {
 // brain last wrote it, refuse: those edits are not in any entry yet, and
 // overwriting them would lose them. `force` is for after they are captured.
 export function exportView(store, cfg, target, force = false) {
-    const entries = listEntries(store, cfg, { kind: target.kind }).filter((entry) => inReadScope(store, cfg, entry.path));
+    const scope = target.owner ? integrationScope(cfg.integrations[target.owner], cfg.logDir) : readScope(cfg);
+    const entries = listEntries(store, cfg, { kind: target.kind }).filter((entry) => inReadScope(store, cfg, entry.path, scope));
     const content = renderView(entries, target.header);
     const base = { kind: target.kind, path: target.path, entries: entries.length };
     const key = `export:${target.path}`;

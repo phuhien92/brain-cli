@@ -71,7 +71,7 @@ export function loadConfig(vault, opts = {}) {
             if (typeof path !== "string")
                 throw new ConfigError(`${userConfigPath}: integrations.${name}.views.${kind} must be a path`);
             const header = objectAt(viewSpecs, kind).header;
-            views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined });
+            views.push({ kind: slug(kind), path: expandHome(path), header: typeof header === "string" ? header : undefined, owner: name });
         }
         integrations[name] = {
             name,
@@ -185,7 +185,7 @@ function extensionIntegration(manifest) {
         views: [],
     };
 }
-function integrationScope(integration, logDir) {
+export function integrationScope(integration, logDir) {
     if (integration.read === null)
         return null;
     return [...integration.read, ...integration.write.map((kind) => `${logDir}/${kind}/`)];
