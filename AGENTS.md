@@ -87,6 +87,25 @@ holds the rules an agent changing the code must not break.
 (installs from GitHub need no compiler): stage it with your change, because
 `test/package.test.ts` compares what is staged with a fresh compile.
 
+## Design and brand assets
+
+A logo, banner or other visual change is judged by how it renders, not by whether a test
+passes. Before a PR that touches `assets/` (or any visual) is ready for review:
+
+1. **Render it and look.** The logo at 128, 64, 32 and 16 px, on a light and a dark
+   background; the banner at full width. 16 px is the favicon and tab size and where
+   outlines, halos and fine strokes turn to mud.
+2. **Compare it with what it replaces**, side by side in the same image.
+3. **Put that image in the PR description.** A reviewer approves the picture, not the
+   SVG source.
+4. **Check contrast on rendered pixels**, where the text or mark actually sits, never
+   only against a gradient's endpoints. A fix that passes a number by flattening the
+   gradient or outlining the mark is a regression if it looks worse at 16 px.
+
+Use only colors from the design tokens, and prefer removing an element to adding a stroke
+around it. Any headless browser can render the comparison, e.g.
+`chromium --headless --screenshot=compare.png --window-size=1280,1000 compare.html`.
+
 ## Releases
 
 Every merge to `main` that changes behaviour is a release: bump `version` in `package.json`
