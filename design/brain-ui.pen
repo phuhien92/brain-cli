@@ -13027,10 +13027,21 @@
               "x": 24,
               "y": 66,
               "name": "Approved Linked Vault icon",
+              "metadata": {
+                "type": "brain.logo.v1",
+                "contract": "brain.logo.v1",
+                "state": "implemented",
+                "asset": "assets/logo.svg",
+                "backgroundToken": "brand.background",
+                "foregroundToken": "brand.onBackground"
+              },
               "clip": true,
               "width": 128,
               "height": 128,
+              "fill": "$brandBackground",
               "cornerRadius": 28,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 2,
               "layout": "none",
               "children": [
                 {
@@ -13040,9 +13051,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Logo gradient tile",
-                  "fill": "$brandField",
+                  "fill": "$brandBackground",
                   "width": 128,
-                  "height": 128
+                  "height": 128,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2
                 },
                 {
                   "type": "path",
@@ -13050,7 +13063,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Wiki-link brackets",
-                  "geometry": "M30 30h-8v68h8m10-68h-8v68h8m58-68h8v68h-8m-10-68h8v68h-8",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
                     0,
@@ -13060,7 +13077,7 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$logo-bracket",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 6,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -13071,7 +13088,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Linked note graph",
-                  "geometry": "M52 48l24-4m-24 4l6 28m18-32l4 26m-22 6l22-6m-22 6l8 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -13081,59 +13102,100 @@
                   "fill": "#00000000",
                   "width": 128,
                   "height": 128,
-                  "stroke": "$logo-link",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 3.5,
+                  "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
                 {
                   "type": "ellipse",
                   "id": "wjyFw",
-                  "x": 45,
+                  "x": 43,
                   "y": 41,
                   "name": "Note node one",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 14,
-                  "height": 14
+                  "height": 14,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "AYKZT",
-                  "x": 70.5,
-                  "y": 38.5,
+                  "x": 70,
+                  "y": 37,
                   "name": "Note node two",
-                  "fill": "$surface",
-                  "width": 11,
-                  "height": 11
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 12,
+                  "height": 12,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "N6i8vH",
-                  "x": 52,
+                  "x": 51,
                   "y": 70,
                   "name": "Note node three",
-                  "fill": "$surface",
-                  "width": 12,
-                  "height": 12
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 13,
+                  "height": 13,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "X35hy",
-                  "x": 72.5,
-                  "y": 62.5,
+                  "x": 73,
+                  "y": 62,
                   "name": "Active note node",
-                  "fill": "$logo-highlight",
-                  "width": 15,
-                  "height": 15
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "GCrr5",
-                  "x": 61.5,
-                  "y": 85.5,
+                  "x": 61,
+                  "y": 85,
                   "name": "Note node five",
-                  "fill": "$surface",
-                  "width": 9,
-                  "height": 9
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 10,
+                  "height": 10,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 }
               ]
             },
@@ -13170,7 +13232,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 226,
-              "content": "Wiki-link brackets hold a graph of linked notes. Mint identifies the active connection without a separate identity palette.",
+              "content": "Wiki-link brackets hold a graph of linked notes. One green semantic background and dark on-background geometry replace the former identity palette.",
               "fontFamily": "$font-ui",
               "fontSize": "$font-body",
               "fontWeight": "normal"
@@ -13182,7 +13244,7 @@
               "y": 224,
               "name": "Source logo rule",
               "fill": "$brand",
-              "content": "Bright token aliases only",
+              "content": "Bright token aliases only · implemented",
               "fontFamily": "$font-ui",
               "fontSize": "$font-xs",
               "fontWeight": "600"
@@ -13237,7 +13299,10 @@
               "clip": true,
               "width": 40,
               "height": 40,
+              "fill": "$brandBackground",
               "cornerRadius": 8.75,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 0.75,
               "layout": "none",
               "children": [
                 {
@@ -13247,9 +13312,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Logo gradient tile",
-                  "fill": "$brandField",
+                  "fill": "$brandBackground",
                   "width": 40,
-                  "height": 40
+                  "height": 40,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.75
                 },
                 {
                   "type": "path",
@@ -13257,7 +13324,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Wiki-link brackets",
-                  "geometry": "M30 30h-8v68h8m10-68h-8v68h8m58-68h8v68h-8m-10-68h8v68h-8",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
+                  "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
                     0,
@@ -13267,7 +13338,7 @@
                   "fill": "#00000000",
                   "width": 40,
                   "height": 40,
-                  "stroke": "$logo-bracket",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -13278,7 +13349,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Linked note graph",
-                  "geometry": "M52 48l24-4m-24 4l6 28m18-32l4 26m-22 6l22-6m-22 6l8 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -13288,59 +13363,100 @@
                   "fill": "#00000000",
                   "width": 40,
                   "height": 40,
-                  "stroke": "$logo-link",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.09375,
+                  "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
                 {
                   "type": "ellipse",
                   "id": "zZJeu",
-                  "x": 14.0625,
+                  "x": 13.4375,
                   "y": 12.8125,
                   "name": "Note node one",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 4.375,
-                  "height": 4.375
+                  "height": 4.375,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.78125
                 },
                 {
                   "type": "ellipse",
                   "id": "yjGFB",
-                  "x": 22.03125,
-                  "y": 12.03125,
+                  "x": 21.875,
+                  "y": 11.5625,
                   "name": "Note node two",
-                  "fill": "$surface",
-                  "width": 3.4375,
-                  "height": 3.4375
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 3.75,
+                  "height": 3.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.78125
                 },
                 {
                   "type": "ellipse",
                   "id": "kpMQB",
-                  "x": 16.25,
+                  "x": 15.9375,
                   "y": 21.875,
                   "name": "Note node three",
-                  "fill": "$surface",
-                  "width": 3.75,
-                  "height": 3.75
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 4.0625,
+                  "height": 4.0625,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.78125
                 },
                 {
                   "type": "ellipse",
                   "id": "rGASs",
-                  "x": 22.65625,
-                  "y": 19.53125,
+                  "x": 22.8125,
+                  "y": 19.375,
                   "name": "Active note node",
-                  "fill": "$logo-highlight",
-                  "width": 4.6875,
-                  "height": 4.6875
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
+                  "width": 5,
+                  "height": 5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.78125
                 },
                 {
                   "type": "ellipse",
                   "id": "a76Yhm",
-                  "x": 19.21875,
-                  "y": 26.71875,
+                  "x": 19.0625,
+                  "y": 26.5625,
                   "name": "Note node five",
-                  "fill": "$surface",
-                  "width": 2.8125,
-                  "height": 2.8125
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 3.125,
+                  "height": 3.125,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.78125
                 }
               ]
             },
@@ -13409,7 +13525,7 @@
               "x": 24,
               "y": 214,
               "name": "Brand swatch Deep",
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "width": 28,
               "height": 28
             },
@@ -13420,7 +13536,7 @@
               "y": 221,
               "name": "Brand token Deep",
               "fill": "$muted",
-              "content": "Field #052F3E",
+              "content": "Background #21C995",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13432,7 +13548,7 @@
               "x": 182,
               "y": 214,
               "name": "Brand swatch Signal",
-              "fill": "$brandSignal",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -13443,7 +13559,7 @@
               "y": 221,
               "name": "Brand token Indigo",
               "fill": "$muted",
-              "content": "Signal #21C995",
+              "content": "On background #052F3E",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13455,7 +13571,7 @@
               "x": 340,
               "y": 214,
               "name": "Brand swatch Bracket",
-              "fill": "$brandSoft",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -13466,7 +13582,7 @@
               "y": 221,
               "name": "Brand token Bracket",
               "fill": "$muted",
-              "content": "Bracket #DDF8EE",
+              "content": "Brackets #052F3E",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13501,7 +13617,7 @@
               "x": 656,
               "y": 214,
               "name": "Brand swatch Wordmark",
-              "fill": "$ink",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -13512,7 +13628,7 @@
               "y": 221,
               "name": "Brand token Active",
               "fill": "$muted",
-              "content": "Wordmark #14211D",
+              "content": "Wordmark #052F3E",
               "fontFamily": "$font-mono",
               "fontSize": "$font-xs",
               "fontWeight": "normal"
@@ -13691,8 +13807,10 @@
               "name": "A · Linked Vault mark",
               "width": 116,
               "height": 116,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 25.52,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 1.8125,
               "layout": "none",
               "children": [
                 {
@@ -13701,6 +13819,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault mark · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -13711,8 +13833,8 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 5.452,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 5.4375,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13722,7 +13844,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault mark · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -13732,8 +13858,8 @@
                   "fill": "#00000000",
                   "width": 116,
                   "height": 116,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 4.25256,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 3.171875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13743,9 +13869,17 @@
                   "x": 38.96875,
                   "y": 37.15625,
                   "name": "A · Linked Vault mark · Note node 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 12.6875,
-                  "height": 12.6875
+                  "height": 12.6875,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.265625
                 },
                 {
                   "type": "ellipse",
@@ -13753,9 +13887,17 @@
                   "x": 63.4375,
                   "y": 33.53125,
                   "name": "A · Linked Vault mark · Note node 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 10.875,
-                  "height": 10.875
+                  "height": 10.875,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.265625
                 },
                 {
                   "type": "ellipse",
@@ -13763,9 +13905,17 @@
                   "x": 46.21875,
                   "y": 63.4375,
                   "name": "A · Linked Vault mark · Note node 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 11.78125,
-                  "height": 11.78125
+                  "height": 11.78125,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.265625
                 },
                 {
                   "type": "ellipse",
@@ -13773,9 +13923,17 @@
                   "x": 66.15625,
                   "y": 56.1875,
                   "name": "A · Linked Vault mark · Note node 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 14.5,
-                  "height": 14.5
+                  "height": 14.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.265625
                 },
                 {
                   "type": "ellipse",
@@ -13783,9 +13941,17 @@
                   "x": 55.28125,
                   "y": 77.03125,
                   "name": "A · Linked Vault mark · Note node 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 9.0625,
-                  "height": 9.0625
+                  "height": 9.0625,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.265625
                 }
               ]
             },
@@ -13795,7 +13961,7 @@
               "x": 164,
               "y": 70,
               "name": "A · Linked Vault wordmark · brain",
-              "fill": "$ink",
+              "fill": "$brandOnBackground",
               "content": "brain",
               "lineHeight": 1.1,
               "fontFamily": "$fontUi",
@@ -13808,7 +13974,7 @@
               "x": 242.1184,
               "y": 70.64,
               "name": "A · Linked Vault wordmark · cli",
-              "fill": "$brandInk",
+              "fill": "$brandOnBackground",
               "content": "-cli",
               "lineHeight": 1.1,
               "fontFamily": "$fontMono",
@@ -13876,8 +14042,10 @@
               "name": "A · Linked Vault 48 pixel",
               "width": 48,
               "height": 48,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 10.56,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 0.75,
               "layout": "none",
               "children": [
                 {
@@ -13886,6 +14054,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault 48 pixel · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -13896,8 +14068,8 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 2.2560000000000002,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.25,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13907,7 +14079,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault 48 pixel · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -13917,8 +14093,8 @@
                   "fill": "#00000000",
                   "width": 48,
                   "height": 48,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 1.7596800000000001,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.3125,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -13928,9 +14104,17 @@
                   "x": 16.125,
                   "y": 15.375,
                   "name": "A · Linked Vault 48 pixel · Note node 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 5.25,
-                  "height": 5.25
+                  "height": 5.25,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.9375
                 },
                 {
                   "type": "ellipse",
@@ -13938,9 +14122,17 @@
                   "x": 26.25,
                   "y": 13.875,
                   "name": "A · Linked Vault 48 pixel · Note node 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 4.5,
-                  "height": 4.5
+                  "height": 4.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.9375
                 },
                 {
                   "type": "ellipse",
@@ -13948,9 +14140,17 @@
                   "x": 19.125,
                   "y": 26.25,
                   "name": "A · Linked Vault 48 pixel · Note node 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 4.875,
-                  "height": 4.875
+                  "height": 4.875,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.9375
                 },
                 {
                   "type": "ellipse",
@@ -13958,9 +14158,17 @@
                   "x": 27.375,
                   "y": 23.25,
                   "name": "A · Linked Vault 48 pixel · Note node 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 6,
-                  "height": 6
+                  "height": 6,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.9375
                 },
                 {
                   "type": "ellipse",
@@ -13968,9 +14176,17 @@
                   "x": 22.875,
                   "y": 31.875,
                   "name": "A · Linked Vault 48 pixel · Note node 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3.75,
-                  "height": 3.75
+                  "height": 3.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.9375
                 }
               ]
             },
@@ -13982,8 +14198,10 @@
               "name": "A · Linked Vault 32 pixel",
               "width": 32,
               "height": 32,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 7.04,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 0.75,
               "layout": "none",
               "children": [
                 {
@@ -13992,6 +14210,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault 32 pixel · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -14002,8 +14224,8 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 1.504,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -14013,7 +14235,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "A · Linked Vault 32 pixel · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -14023,8 +14249,8 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 1.17312,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -14034,9 +14260,17 @@
                   "x": 10.75,
                   "y": 10.25,
                   "name": "A · Linked Vault 32 pixel · Note node 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3.5,
-                  "height": 3.5
+                  "height": 3.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -14044,9 +14278,17 @@
                   "x": 17.5,
                   "y": 9.25,
                   "name": "A · Linked Vault 32 pixel · Note node 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3,
-                  "height": 3
+                  "height": 3,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -14054,9 +14296,17 @@
                   "x": 12.75,
                   "y": 17.5,
                   "name": "A · Linked Vault 32 pixel · Note node 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3.25,
-                  "height": 3.25
+                  "height": 3.25,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -14064,9 +14314,17 @@
                   "x": 18.25,
                   "y": 15.5,
                   "name": "A · Linked Vault 32 pixel · Note node 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 4,
-                  "height": 4
+                  "height": 4,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -14074,9 +14332,17 @@
                   "x": 15.25,
                   "y": 21.25,
                   "name": "A · Linked Vault 32 pixel · Note node 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 2.5,
-                  "height": 2.5
+                  "height": 2.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 }
               ]
             },
@@ -14088,7 +14354,7 @@
               "name": "A · Linked Vault 16 pixel micro",
               "width": 16,
               "height": 16,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 3.52,
               "layout": "none",
               "children": [
@@ -14108,7 +14374,7 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.2,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -14119,7 +14385,7 @@
                   "x": 6.56,
                   "y": 6.56,
                   "name": "A · Linked Vault 16 pixel micro · Focus node",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 2.88,
                   "height": 2.88
                 }
@@ -15110,8 +15376,10 @@
               "name": "Recommended 64",
               "width": 64,
               "height": 64,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 14.08,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 1,
               "layout": "none",
               "children": [
                 {
@@ -15120,6 +15388,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "Recommended 64 · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -15130,8 +15402,8 @@
                   "fill": "#00000000",
                   "width": 64,
                   "height": 64,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 3.008,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 3,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15141,7 +15413,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Recommended 64 · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -15151,8 +15427,8 @@
                   "fill": "#00000000",
                   "width": 64,
                   "height": 64,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 2.34624,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.75,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15162,9 +15438,17 @@
                   "x": 21.5,
                   "y": 20.5,
                   "name": "Recommended 64 · Note node 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 7,
-                  "height": 7
+                  "height": 7,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15172,9 +15456,17 @@
                   "x": 35,
                   "y": 18.5,
                   "name": "Recommended 64 · Note node 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 6,
-                  "height": 6
+                  "height": 6,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15182,9 +15474,17 @@
                   "x": 25.5,
                   "y": 35,
                   "name": "Recommended 64 · Note node 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 6.5,
-                  "height": 6.5
+                  "height": 6.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15192,9 +15492,17 @@
                   "x": 36.5,
                   "y": 31,
                   "name": "Recommended 64 · Note node 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 8,
-                  "height": 8
+                  "height": 8,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15202,9 +15510,17 @@
                   "x": 30.5,
                   "y": 42.5,
                   "name": "Recommended 64 · Note node 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 5,
-                  "height": 5
+                  "height": 5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.25
                 }
               ]
             },
@@ -15216,8 +15532,10 @@
               "name": "Recommended 32",
               "width": 32,
               "height": 32,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 7.04,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 0.75,
               "layout": "none",
               "children": [
                 {
@@ -15226,6 +15544,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "Recommended 32 · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -15236,8 +15558,8 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 1.504,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15247,7 +15569,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "Recommended 32 · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -15257,8 +15583,8 @@
                   "fill": "#00000000",
                   "width": 32,
                   "height": 32,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 1.17312,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15268,9 +15594,17 @@
                   "x": 10.75,
                   "y": 10.25,
                   "name": "Recommended 32 · Note node 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3.5,
-                  "height": 3.5
+                  "height": 3.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15278,9 +15612,17 @@
                   "x": 17.5,
                   "y": 9.25,
                   "name": "Recommended 32 · Note node 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3,
-                  "height": 3
+                  "height": 3,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15288,9 +15630,17 @@
                   "x": 12.75,
                   "y": 17.5,
                   "name": "Recommended 32 · Note node 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 3.25,
-                  "height": 3.25
+                  "height": 3.25,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15298,9 +15648,17 @@
                   "x": 18.25,
                   "y": 15.5,
                   "name": "Recommended 32 · Note node 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 4,
-                  "height": 4
+                  "height": 4,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15308,9 +15666,17 @@
                   "x": 15.25,
                   "y": 21.25,
                   "name": "Recommended 32 · Note node 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 2.5,
-                  "height": 2.5
+                  "height": 2.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.625
                 }
               ]
             },
@@ -15322,7 +15688,7 @@
               "name": "Recommended 16",
               "width": 16,
               "height": 16,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 3.52,
               "layout": "none",
               "children": [
@@ -15342,7 +15708,7 @@
                   "fill": "#00000000",
                   "width": 16,
                   "height": 16,
-                  "stroke": "$brandSoft",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 1.2,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
@@ -15353,7 +15719,7 @@
                   "x": 6.56,
                   "y": 6.56,
                   "name": "Recommended 16 · Focus node",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 2.88,
                   "height": 2.88
                 }
@@ -15405,6 +15771,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "One-color knockout 64 · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -15416,7 +15786,7 @@
                   "width": 64,
                   "height": 64,
                   "stroke": "$surface",
-                  "strokeWidth": 3.008,
+                  "strokeWidth": 3,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15426,7 +15796,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "One-color knockout 64 · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -15437,7 +15811,7 @@
                   "width": 64,
                   "height": 64,
                   "stroke": "$surface",
-                  "strokeWidth": 2.34624,
+                  "strokeWidth": 1.75,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15447,9 +15821,17 @@
                   "x": 21.5,
                   "y": 20.5,
                   "name": "One-color knockout 64 · Note node 1",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 7,
-                  "height": 7
+                  "height": 7,
+                  "stroke": "$surface",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15457,9 +15839,17 @@
                   "x": 35,
                   "y": 18.5,
                   "name": "One-color knockout 64 · Note node 2",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 6,
-                  "height": 6
+                  "height": 6,
+                  "stroke": "$surface",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15467,9 +15857,17 @@
                   "x": 25.5,
                   "y": 35,
                   "name": "One-color knockout 64 · Note node 3",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 6.5,
-                  "height": 6.5
+                  "height": 6.5,
+                  "stroke": "$surface",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15477,9 +15875,17 @@
                   "x": 36.5,
                   "y": 31,
                   "name": "One-color knockout 64 · Note node 4",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
                   "fill": "$surface",
                   "width": 8,
-                  "height": 8
+                  "height": 8,
+                  "stroke": "$surface",
+                  "strokeWidth": 1.25
                 },
                 {
                   "type": "ellipse",
@@ -15487,9 +15893,17 @@
                   "x": 30.5,
                   "y": 42.5,
                   "name": "One-color knockout 64 · Note node 5",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 5,
-                  "height": 5
+                  "height": 5,
+                  "stroke": "$surface",
+                  "strokeWidth": 1.25
                 }
               ]
             },
@@ -15511,6 +15925,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "One-color knockout 32 · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -15522,7 +15940,7 @@
                   "width": 32,
                   "height": 32,
                   "stroke": "$surface",
-                  "strokeWidth": 1.504,
+                  "strokeWidth": 1.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15532,7 +15950,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "One-color knockout 32 · Linked-note graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -15543,7 +15965,7 @@
                   "width": 32,
                   "height": 32,
                   "stroke": "$surface",
-                  "strokeWidth": 1.17312,
+                  "strokeWidth": 0.875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -15553,9 +15975,17 @@
                   "x": 10.75,
                   "y": 10.25,
                   "name": "One-color knockout 32 · Note node 1",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 3.5,
-                  "height": 3.5
+                  "height": 3.5,
+                  "stroke": "$surface",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15563,9 +15993,17 @@
                   "x": 17.5,
                   "y": 9.25,
                   "name": "One-color knockout 32 · Note node 2",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 3,
-                  "height": 3
+                  "height": 3,
+                  "stroke": "$surface",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15573,9 +16011,17 @@
                   "x": 12.75,
                   "y": 17.5,
                   "name": "One-color knockout 32 · Note node 3",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 3.25,
-                  "height": 3.25
+                  "height": 3.25,
+                  "stroke": "$surface",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15583,9 +16029,17 @@
                   "x": 18.25,
                   "y": 15.5,
                   "name": "One-color knockout 32 · Note node 4",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
                   "fill": "$surface",
                   "width": 4,
-                  "height": 4
+                  "height": 4,
+                  "stroke": "$surface",
+                  "strokeWidth": 0.625
                 },
                 {
                   "type": "ellipse",
@@ -15593,9 +16047,17 @@
                   "x": 15.25,
                   "y": 21.25,
                   "name": "One-color knockout 32 · Note node 5",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
                   "fill": "$surface",
                   "width": 2.5,
-                  "height": 2.5
+                  "height": 2.5,
+                  "stroke": "$surface",
+                  "strokeWidth": 0.625
                 }
               ]
             },
@@ -15710,7 +16172,7 @@
               "x": 720,
               "y": 92,
               "name": "Field swatch",
-              "fill": "$actionText",
+              "fill": "$brandBackground",
               "width": 28,
               "height": 28
             },
@@ -15723,7 +16185,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Field\n#052F3E",
+              "content": "Background\n#21C995",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -15736,7 +16198,7 @@
               "x": 910,
               "y": 92,
               "name": "Signal swatch",
-              "fill": "$action",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -15749,7 +16211,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Signal\n#21C995",
+              "content": "On background\n#052F3E",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -15762,7 +16224,7 @@
               "x": 1100,
               "y": 92,
               "name": "Bracket swatch",
-              "fill": "$brandSoft",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -15775,7 +16237,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Bracket\n#DDF8EE",
+              "content": "Bracket\n#052F3E",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -15814,7 +16276,7 @@
               "x": 910,
               "y": 156,
               "name": "Wordmark swatch",
-              "fill": "$ink",
+              "fill": "$brandOnBackground",
               "width": 28,
               "height": 28
             },
@@ -15827,7 +16289,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 140,
-              "content": "Wordmark\n#14211D",
+              "content": "Wordmark\n#052F3E",
               "lineHeight": 1.35,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -15843,8 +16305,10 @@
           "name": "Recommendation strip",
           "width": 1344,
           "height": 98,
-          "fill": "$brandField",
+          "fill": "$brandBackground",
           "cornerRadius": 18,
+          "stroke": "$brandOnBackground",
+          "strokeWidth": 2,
           "layout": "none",
           "children": [
             {
@@ -15853,7 +16317,7 @@
               "x": 24,
               "y": 19,
               "name": "Decision label",
-              "fill": "$brandSignal",
+              "fill": "$brandOnBackground",
               "content": "RECOMMENDATION",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
@@ -15866,7 +16330,7 @@
               "x": 24,
               "y": 42,
               "name": "Decision statement",
-              "fill": "$surface",
+              "fill": "$brandOnBackground",
               "textGrowth": "fixed-width",
               "width": 1280,
               "content": "Choose A · Linked Vault – it keeps Brain recognizable, removes legacy ornament, and remains clear from 16 px to README scale.",
@@ -15887,7 +16351,7 @@
       "name": "16 · Brand study · Banner directions",
       "clip": true,
       "width": 1440,
-      "height": 1300,
+      "height": 1360,
       "fill": "$canvas",
       "layout": "none",
       "children": [
@@ -15951,13 +16415,23 @@
           "x": 80,
           "y": 169,
           "name": "Banner A · Product proof",
+          "metadata": {
+            "type": "brain.banner.v1",
+            "contract": "brain.banner.v1",
+            "state": "implemented",
+            "asset": "assets/banner.svg",
+            "backgroundToken": "brand.background",
+            "width": 1280,
+            "height": 320,
+            "wordmarkRendering": "outlined-paths"
+          },
           "clip": true,
           "width": 1280,
-          "height": 260,
-          "fill": "$surface",
-          "cornerRadius": 20,
-          "stroke": "$border",
-          "strokeWidth": 1,
+          "height": 320,
+          "fill": "$brandBackground",
+          "cornerRadius": 24,
+          "stroke": "$brandOnBackground",
+          "strokeWidth": 2,
           "layout": "none",
           "children": [
             {
@@ -15966,20 +16440,22 @@
               "x": 0,
               "y": 0,
               "name": "A mint rail",
-              "fill": "$brandSignal",
+              "fill": "$brandBackground",
               "width": 12,
-              "height": 260
+              "height": 320
             },
             {
               "type": "frame",
               "id": "gFgZn",
-              "x": 62,
-              "y": 54,
+              "x": 64,
+              "y": 96,
               "name": "A logo",
-              "width": 112,
-              "height": 112,
-              "fill": "$brandField",
-              "cornerRadius": 24.64,
+              "width": 128,
+              "height": 128,
+              "fill": "$brandBackground",
+              "cornerRadius": 28,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 2,
               "layout": "none",
               "children": [
                 {
@@ -15988,6 +16464,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "A logo · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -15996,10 +16476,10 @@
                     128
                   ],
                   "fill": "#00000000",
-                  "width": 112,
-                  "height": 112,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 5.264,
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 6,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16009,7 +16489,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "A logo · Graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -16017,222 +16501,282 @@
                     128
                   ],
                   "fill": "#00000000",
-                  "width": 112,
-                  "height": 112,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 4.10592,
+                  "width": 128,
+                  "height": 128,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 3.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
                 {
                   "type": "ellipse",
                   "id": "n89qRS",
-                  "x": 37.625,
-                  "y": 35.875,
+                  "x": 43,
+                  "y": 41,
                   "name": "A logo · Note 1",
-                  "fill": "$surface",
-                  "width": 12.25,
-                  "height": 12.25
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 14,
+                  "height": 14,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "e3hdo",
-                  "x": 61.25,
-                  "y": 32.375,
+                  "x": 70,
+                  "y": 37,
                   "name": "A logo · Note 2",
-                  "fill": "$surface",
-                  "width": 10.5,
-                  "height": 10.5
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 12,
+                  "height": 12,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "a3xRfP",
-                  "x": 44.625,
-                  "y": 61.25,
+                  "x": 51,
+                  "y": 70,
                   "name": "A logo · Note 3",
-                  "fill": "$surface",
-                  "width": 11.375,
-                  "height": 11.375
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 13,
+                  "height": 13,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "lfq9R",
-                  "x": 63.875,
-                  "y": 54.25,
+                  "x": 73,
+                  "y": 62,
                   "name": "A logo · Note 4",
-                  "fill": "$brandSignal",
-                  "width": 14,
-                  "height": 14
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
+                  "width": 16,
+                  "height": 16,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 },
                 {
                   "type": "ellipse",
                   "id": "Tvi9r",
-                  "x": 53.375,
-                  "y": 74.375,
+                  "x": 61,
+                  "y": 85,
                   "name": "A logo · Note 5",
-                  "fill": "$surface",
-                  "width": 8.75,
-                  "height": 8.75
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
+                  "width": 10,
+                  "height": 10,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.5
                 }
               ]
             },
             {
-              "type": "text",
+              "type": "path",
               "id": "SOnLN",
-              "x": 202,
-              "y": 52,
+              "x": 220,
+              "y": 50,
               "name": "A wordmark brain",
-              "fill": "$ink",
-              "content": "brain",
-              "lineHeight": 1.1,
-              "fontFamily": "$fontUi",
-              "fontSize": 52,
-              "fontWeight": "750"
+              "metadata": {
+                "type": "brain.outlined-wordmark",
+                "role": "outlined-wordmark",
+                "typefaceToken": "font.ui",
+                "fontWeight": 750
+              },
+              "geometry": "M21.25781 69.17969c-3.40234 0-6.24609-0.80078-8.53906-2.40235-2.28906-1.60156-4.01172-3.78125-5.17188-6.53515-1.16016-2.75-1.73828-5.85547-1.73828-9.3086 0-3.46094 0.57422-6.56641 1.72657-9.3164 1.14844-2.75 2.84375-4.92578 5.07812-6.52344 2.23828-1.59766 4.99609-2.39453 8.27735-2.39453 3.28906 0 6.14844 0.78906 8.57812 2.37109 2.42969 1.58203 4.3125 3.74219 5.64844 6.48438 1.33594 2.74219 2.00391 5.87109 2.0039 9.3789 0 3.45703-0.66016 6.55859-1.97656 9.3125-1.32031 2.75391-3.16797 4.92969-5.54297 6.53125-2.375 1.60156-5.15625 2.40234-8.34375 2.40235z m-16.83593-0.96094l0-46.07812 8.26171 0 0 22.10546-1.01562 0 0 23.97266z m15.54687-6.36328c1.94141 0 3.53516-0.48828 4.78125-1.46094 1.24609-0.97266 2.17188-2.28906 2.77344-3.9414 0.60547-1.65234 0.91016-3.49219 0.91015-5.51954 0-2.00391-0.3125-3.83203-0.93359-5.48437-0.62109-1.65234-1.57813-2.96875-2.87109-3.95313-1.29297-0.98438-2.94531-1.47266-4.95313-1.47265-1.88672 0-3.41797 0.45312-4.59765 1.36719-1.17969 0.91016-2.04297 2.1875-2.58985 3.82812-0.54688 1.64453-0.82031 3.54688-0.82031 5.71484 0 2.16406 0.27344 4.06641 0.82031 5.71094 0.54688 1.64453 1.42578 2.92188 2.64453 3.83985 1.21875 0.91406 2.82813 1.37109 4.83594 1.37109z m0 0m24.19922 6.36328l0-34.55859 7.24609 0 0 8.42968-0.83203-1.08593c0.44141-1.17578 1.02734-2.24609 1.75781-3.21094 0.73047-0.96875 1.61719-1.76563 2.66016-2.39453 0.83984-0.54688 1.76563-0.97266 2.77344-1.27735 1.00391-0.30078 2.04297-0.49219 3.10937-0.5664 1.06641-0.07422 2.12109-0.03906 3.16406 0.10547l0 7.66406c-1-0.30078-2.14844-0.39844-3.44531-0.29297-1.29687 0.10156-2.47266 0.43359-3.52734 0.99219-1.03906 0.52344-1.90234 1.20312-2.58984 2.03906-0.6875 0.83594-1.20313 1.80469-1.54297 2.90234-0.33984 1.09766-0.51172 2.3125-0.51172 3.64454l0 17.60937z m0 0m34.87109 0.96094c-2.49219 0-4.59766-0.47656-6.32031-1.42188-1.72266-0.94922-3.02734-2.21875-3.91016-3.80078-0.88281-1.58594-1.32813-3.33203-1.32812-5.24219 0-1.63672 0.26172-3.11328 0.78516-4.4375 0.52344-1.32422 1.35156-2.48438 2.47656-3.47656 1.125-0.99219 2.60938-1.81641 4.44531-2.46875 1.33984-0.46484 2.91797-0.875 4.73438-1.23437 1.8125-0.35938 3.82813-0.69922 6.04296-1.01953 2.21484-0.32031 4.59375-0.67188 7.13672-1.05469l-2.95312 1.63672c0.00781-2.21484-0.50391-3.84766-1.53516-4.89453-1.03125-1.04688-2.76953-1.56641-5.21484-1.56641-1.41797 0-2.83203 0.33594-4.25 1.01172-1.41797 0.67187-2.41016 1.84375-2.97656 3.51562l-7.46485-2.35156c0.86719-2.89063 2.50391-5.22266 4.91406-7.00391 2.40625-1.78125 5.66797-2.67188 9.78516-2.67187 3.0625 0 5.76953 0.48438 8.11719 1.45312 2.34766 0.96875 4.11328 2.60156 5.29297 4.89844 0.64844 1.24609 1.03906 2.50391 1.16797 3.77735 0.125 1.27734 0.19141 2.68359 0.1914 4.22656l0 21.16406-7.1914 0 0-7.30078 1.10546 1.35547c-1.62109 2.40234-3.44141 4.15625-5.45703 5.25781-2.01563 1.09766-4.54688 1.64844-7.59375 1.64844z m1.69141-6.50391c1.67578 0 3.09375-0.29297 4.26172-0.88672 1.16406-0.59375 2.09766-1.29297 2.78906-2.10156 0.69531-0.80469 1.16406-1.53125 1.40625-2.17969 0.42578-0.95703 0.67188-2.06641 0.74219-3.32422 0.06641-1.25781 0.10156-2.29297 0.10156-3.10546l2.46484 0.67578c-2.46094 0.40234-4.50781 0.74219-6.14062 1.01953-1.63281 0.27734-2.99219 0.53906-4.07813 0.77734-1.08203 0.23828-2.04297 0.50391-2.875 0.79688-0.87109 0.33203-1.58984 0.70313-2.16015 1.11328-0.57422 0.40625-1.00391 0.86719-1.28907 1.38281-0.28906 0.51172-0.43359 1.09766-0.43359 1.75781 0 0.81641 0.20313 1.53125 0.61328 2.14453 0.40625 0.61328 0.99609 1.08594 1.77344 1.42579 0.77344 0.33594 1.71484 0.50391 2.82422 0.5039z m0 0m26.40625-34.03515l0-7.38282 8.20312 0 0 7.38282z m0 39.57812l0-34.55859 8.20312 0 0 34.55859z m0 0m41.52344 0l0-16.48437c0-0.92969-0.05859-2.03125-0.17969-3.3086-0.12109-1.27344-0.42578-2.52734-0.91797-3.76172-0.49219-1.23047-1.26172-2.25391-2.30859-3.0625-1.04297-0.8125-2.49219-1.21875-4.34375-1.21875-0.85938 0-1.74219 0.14063-2.64844 0.41797-0.90625 0.27344-1.73828 0.77344-2.5 1.4961-0.76172 0.72266-1.37891 1.75-1.85547 3.08203-0.47266 1.33203-0.71094 3.0625-0.71094 5.1914l-4.78515-2.16406c0-2.83203 0.5625-5.44531 1.6875-7.83594 1.125-2.39453 2.80078-4.30859 5.02343-5.75 2.22266-1.44141 4.99219-2.16406 8.3125-2.16406 2.62891 0 4.78906 0.44141 6.47266 1.32422 1.6875 0.87891 3.01563 2.00391 3.98047 3.37109 0.96484 1.37109 1.66406 2.80859 2.10156 4.32032 0.4375 1.50781 0.71484 2.91406 0.82422 4.21093 0.11328 1.29688 0.16797 2.29297 0.16797 2.99219l0 19.34375z m-23.78516 0l0-34.55859 7.30469 0 0 11.08593 1.01562 0 0 23.47266z m0 0",
+              "viewBox": [
+                0,
+                0,
+                161,
+                87.421875
+              ],
+              "fill": "$brandOnBackground",
+              "width": 161,
+              "height": 87.421875
             },
             {
-              "type": "text",
+              "type": "path",
               "id": "bBKtp",
-              "x": 328.9424,
-              "y": 53.04,
+              "x": 378,
+              "y": 63,
               "name": "A wordmark cli",
-              "fill": "$brandInk",
-              "content": "-cli",
-              "lineHeight": 1.1,
-              "fontFamily": "$fontMono",
-              "fontSize": 42.64,
-              "fontWeight": "650"
+              "metadata": {
+                "type": "brain.outlined-wordmark",
+                "role": "outlined-wordmark",
+                "typefaceToken": "font.mono",
+                "fontWeight": 600
+              },
+              "geometry": "M7.82813 42.27734l0-6.75 16.74218 0 0 6.75z m0 0m41.85937 13.71485c-2.125 0-4.03516-0.34375-5.72656-1.02735-1.69141-0.68359-3.12109-1.65625-4.29297-2.91406-1.16797-1.26172-2.07031-2.79297-2.69922-4.58984-0.62891-1.80078-0.94531-3.81641-0.94531-6.05078 0-2.23047 0.31641-4.24609 0.94531-6.04688 0.62891-1.80078 1.53125-3.32813 2.69922-4.58984 1.17188-1.25781 2.59375-2.23047 4.26562-2.91407 1.67578-0.6875 3.57422-1.02734 5.69922-1.02734 2.95313 0 5.32813 0.61328 7.12891 1.83594 1.79688 1.22266 3.16797 2.84375 4.10156 4.85937l-5.34375 2.91797c-0.50391-1.19141-1.21484-2.15234-2.13281-2.89062-0.91797-0.73828-2.17188-1.10547-3.75391-1.10547-2.05078 0-3.62891 0.59375-4.72656 1.78125-1.09766 1.1875-1.64453 2.80859-1.64453 4.85937l0 4.64453c0 2.01563 0.54688 3.625 1.64453 4.83204 1.09766 1.20703 2.71094 1.80859 4.83594 1.80859 1.65234 0 2.97656-0.37891 3.96875-1.13281 0.98828-0.75781 1.78906-1.76563 2.40234-3.02344l5.18359 3.07812c-0.9375 1.98047-2.35156 3.58984-4.23828 4.83204-1.89063 1.24219-4.34766 1.86328-7.37109 1.86328z m0 0m19.01172-6.10157l8.85547 0 0-29.05468-8.85547 0 0-5.45313 15.76953 0 0 34.50781 8.91016 0 0 5.45313-24.67969 0z m0 0m46.44922-26.73046c-1.62109 0-2.76563-0.34375-3.42969-1.02735-0.66797-0.68359-1-1.51172-1-2.48437l0-1.29297c0-0.97266 0.33203-1.80078 1-2.48438 0.66406-0.68359 1.80859-1.02734 3.42969-1.02734 1.61719 0 2.76172 0.34375 3.42578 1.02734 0.66797 0.68359 1 1.51172 1 2.48438l0 1.29297c0 0.97266-0.33203 1.80078-1 2.48437-0.66406 0.68359-1.80859 1.02734-3.42578 1.02735z m-12.63672 26.73046l9.17969 0 0-16.95703-9.17969 0 0-5.45312 16.08984 0 0 22.41015 8.53125 0 0 5.45313-24.62109 0z m0 0",
+              "viewBox": [
+                0,
+                0,
+                130,
+                70.1875
+              ],
+              "fill": "$brandOnBackground",
+              "width": 130,
+              "height": 70.1875
             },
             {
               "type": "text",
               "id": "ZCVd9",
-              "x": 204,
-              "y": 116,
+              "x": 220,
+              "y": 138,
               "name": "A tagline",
-              "fill": "$ink",
+              "fill": "$brandOnBackground",
               "content": "Headless memory for your markdown vault.",
               "lineHeight": 1.35,
-              "fontFamily": "$fontUi",
-              "fontSize": 24,
+              "fontFamily": "$fontPortableSans",
+              "fontSize": 27,
               "fontWeight": "650"
             },
             {
               "type": "text",
               "id": "bleUE",
-              "x": 204,
-              "y": 153,
+              "x": 220,
+              "y": 180,
               "name": "A support",
-              "fill": "$muted",
+              "fill": "$brandOnBackground",
               "content": "For any agent, on any machine.",
               "lineHeight": 1.35,
-              "fontFamily": "$fontUi",
-              "fontSize": 17,
+              "fontFamily": "$fontPortableSans",
+              "fontSize": 19,
               "fontWeight": "normal"
             },
             {
               "type": "text",
               "id": "f9h6j",
-              "x": 204,
-              "y": 202,
+              "x": 220,
+              "y": 236,
               "name": "A proof line",
-              "fill": "$brandInk",
+              "fill": "$brandOnBackground",
               "textGrowth": "fixed-width",
               "width": 570,
               "content": "LOCAL-FIRST  ·  RANKED SEARCH  ·  ZERO RUNTIME DEPS",
               "lineHeight": 1.3,
-              "fontFamily": "$fontMono",
-              "fontSize": 11,
+              "fontFamily": "$fontPortableMono",
+              "fontSize": 14,
               "fontWeight": "750"
             },
             {
               "type": "frame",
               "id": "odmXt",
-              "x": 842,
-              "y": 42,
+              "x": 820,
+              "y": 52,
               "name": "A terminal proof",
-              "width": 374,
-              "height": 176,
-              "fill": "$brandField",
-              "cornerRadius": 16,
+              "width": 396,
+              "height": 216,
+              "fill": "$brandOnBackground",
+              "cornerRadius": 18,
               "layout": "none",
               "children": [
                 {
                   "type": "ellipse",
                   "id": "EsXEA",
-                  "x": 18,
-                  "y": 16,
+                  "x": 17,
+                  "y": 17,
                   "name": "A terminal dot one",
-                  "fill": "$brandSignal",
-                  "width": 8,
-                  "height": 8
+                  "fill": "$brandBackground",
+                  "width": 10,
+                  "height": 10
                 },
                 {
                   "type": "ellipse",
                   "id": "YW4ZR",
-                  "x": 32,
-                  "y": 16,
+                  "x": 35,
+                  "y": 17,
                   "name": "A terminal dot two",
-                  "fill": "$brandSoft",
-                  "width": 8,
-                  "height": 8
+                  "fill": "$brandPaper",
+                  "width": 10,
+                  "height": 10
                 },
                 {
                   "type": "text",
                   "id": "pJzXZ",
-                  "x": 22,
-                  "y": 48,
+                  "x": 24,
+                  "y": 56,
                   "name": "A terminal command",
-                  "fill": "$surface",
+                  "fill": "$brandPaper",
                   "textGrowth": "fixed-width",
-                  "width": 330,
+                  "width": 350,
                   "content": "$ brain search \"deploy gotchas\"",
                   "lineHeight": 1.4,
-                  "fontFamily": "$fontMono",
-                  "fontSize": 14,
+                  "fontFamily": "$fontPortableMono",
+                  "fontSize": 15,
                   "fontWeight": "500"
                 },
                 {
                   "type": "text",
                   "id": "hp5NA",
-                  "x": 22,
-                  "y": 86,
+                  "x": 24,
+                  "y": 98,
                   "name": "A terminal result one",
                   "fill": "$brandSoft",
                   "textGrowth": "fixed-width",
-                  "width": 330,
+                  "width": 350,
                   "content": "1  Projects/blog/runbook.md",
                   "lineHeight": 1.4,
-                  "fontFamily": "$fontMono",
-                  "fontSize": 12,
+                  "fontFamily": "$fontPortableMono",
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
                   "type": "text",
                   "id": "xQewG",
-                  "x": 22,
-                  "y": 112,
+                  "x": 24,
+                  "y": 129,
                   "name": "A terminal result two",
                   "fill": "$brandSoft",
                   "textGrowth": "fixed-width",
-                  "width": 330,
+                  "width": 350,
                   "content": "2  firstmate/learnings/…",
                   "lineHeight": 1.4,
-                  "fontFamily": "$fontMono",
-                  "fontSize": 12,
+                  "fontFamily": "$fontPortableMono",
+                  "fontSize": 13,
                   "fontWeight": "normal"
                 },
                 {
                   "type": "text",
                   "id": "L3Qvy2",
-                  "x": 22,
-                  "y": 146,
+                  "x": 24,
+                  "y": 170,
                   "name": "A terminal status",
-                  "fill": "$brandSignal",
+                  "fill": "$brandBackground",
                   "textGrowth": "fixed-width",
-                  "width": 330,
+                  "width": 350,
                   "content": "3 notes · fresh on read · local",
                   "lineHeight": 1.3,
-                  "fontFamily": "$fontMono",
-                  "fontSize": 11,
+                  "fontFamily": "$fontPortableMono",
+                  "fontSize": 12,
                   "fontWeight": "650"
                 }
               ]
@@ -16243,7 +16787,7 @@
           "type": "text",
           "id": "XlDmD",
           "x": 80,
-          "y": 463,
+          "y": 523,
           "name": "B banner label",
           "fill": "$muted",
           "content": "B · Terminal first  /  strongest developer tone",
@@ -16256,7 +16800,7 @@
           "type": "frame",
           "id": "QJTXv",
           "x": 80,
-          "y": 491,
+          "y": 551,
           "name": "Banner B · Terminal first",
           "clip": true,
           "width": 1280,
@@ -16273,8 +16817,10 @@
               "name": "B logo",
               "width": 96,
               "height": 96,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 21.12,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 1.5,
               "layout": "none",
               "children": [
                 {
@@ -16283,6 +16829,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "B logo · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -16293,8 +16843,8 @@
                   "fill": "#00000000",
                   "width": 96,
                   "height": 96,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 4.5120000000000005,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 4.5,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16304,7 +16854,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "B logo · Graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -16314,8 +16868,8 @@
                   "fill": "#00000000",
                   "width": 96,
                   "height": 96,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 3.5193600000000003,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 2.625,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16325,9 +16879,17 @@
                   "x": 32.25,
                   "y": 30.75,
                   "name": "B logo · Note 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 10.5,
-                  "height": 10.5
+                  "height": 10.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.875
                 },
                 {
                   "type": "ellipse",
@@ -16335,9 +16897,17 @@
                   "x": 52.5,
                   "y": 27.75,
                   "name": "B logo · Note 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 9,
-                  "height": 9
+                  "height": 9,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.875
                 },
                 {
                   "type": "ellipse",
@@ -16345,9 +16915,17 @@
                   "x": 38.25,
                   "y": 52.5,
                   "name": "B logo · Note 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 9.75,
-                  "height": 9.75
+                  "height": 9.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.875
                 },
                 {
                   "type": "ellipse",
@@ -16355,9 +16933,17 @@
                   "x": 54.75,
                   "y": 46.5,
                   "name": "B logo · Note 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 12,
-                  "height": 12
+                  "height": 12,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.875
                 },
                 {
                   "type": "ellipse",
@@ -16365,9 +16951,17 @@
                   "x": 45.75,
                   "y": 63.75,
                   "name": "B logo · Note 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 7.5,
-                  "height": 7.5
+                  "height": 7.5,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.875
                 }
               ]
             },
@@ -16377,7 +16971,7 @@
               "x": 190,
               "y": 50,
               "name": "B wordmark brain",
-              "fill": "$surface",
+              "fill": "$brandOnBackground",
               "content": "brain",
               "lineHeight": 1.1,
               "fontFamily": "$fontUi",
@@ -16390,7 +16984,7 @@
               "x": 331.5896,
               "y": 51.16,
               "name": "B wordmark cli",
-              "fill": "$brandSignal",
+              "fill": "$brandOnBackground",
               "content": "-cli",
               "lineHeight": 1.1,
               "fontFamily": "$fontMono",
@@ -16403,7 +16997,7 @@
               "x": 194,
               "y": 126,
               "name": "B tagline",
-              "fill": "$surface",
+              "fill": "$brandOnBackground",
               "content": "Headless memory for your markdown vault.",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
@@ -16416,7 +17010,7 @@
               "x": 194,
               "y": 166,
               "name": "B support",
-              "fill": "$brandSoft",
+              "fill": "$brandOnBackground",
               "content": "For any agent, on any machine.",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
@@ -16429,7 +17023,7 @@
               "x": 194,
               "y": 211,
               "name": "B command",
-              "fill": "$brandSignal",
+              "fill": "$brandOnBackground",
               "textGrowth": "fixed-width",
               "width": 540,
               "content": "npm install -g github:phuhien92/brain-cli",
@@ -16464,7 +17058,7 @@
                   "fill": "#00000000",
                   "width": 360,
                   "height": 200,
-                  "stroke": "#21C99566",
+                  "stroke": "$brandOnBackground",
                   "strokeWidth": 3,
                   "strokeLinecap": "round"
                 },
@@ -16475,7 +17069,7 @@
                   "y": 90,
                   "name": "B motif node 1",
                   "opacity": 0.72,
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "width": 20,
                   "height": 20
                 },
@@ -16486,7 +17080,7 @@
                   "y": 33,
                   "name": "B motif node 2",
                   "opacity": 0.72,
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "width": 24,
                   "height": 24
                 },
@@ -16497,7 +17091,7 @@
                   "y": 83,
                   "name": "B motif node 3",
                   "opacity": 0.72,
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "width": 24,
                   "height": 24
                 },
@@ -16507,7 +17101,7 @@
                   "x": 300,
                   "y": 25,
                   "name": "B motif node 4",
-                  "fill": "$brandSignal",
+                  "fill": "$brandOnBackground",
                   "width": 30,
                   "height": 30
                 },
@@ -16518,7 +17112,7 @@
                   "y": 140,
                   "name": "B motif node 5",
                   "opacity": 0.72,
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "width": 30,
                   "height": 30
                 },
@@ -16529,7 +17123,7 @@
                   "y": 145,
                   "name": "B motif node 6",
                   "opacity": 0.72,
-                  "fill": "$brandSoft",
+                  "fill": "$brandOnBackground",
                   "width": 30,
                   "height": 30
                 }
@@ -16541,7 +17135,7 @@
           "type": "text",
           "id": "M4JhNB",
           "x": 80,
-          "y": 785,
+          "y": 845,
           "name": "C banner label",
           "fill": "$muted",
           "content": "C · Editorial split  /  strongest local-first explanation",
@@ -16554,7 +17148,7 @@
           "type": "frame",
           "id": "djbSQ",
           "x": 80,
-          "y": 813,
+          "y": 873,
           "name": "Banner C · Editorial split",
           "clip": true,
           "width": 1280,
@@ -16583,8 +17177,10 @@
               "name": "C logo",
               "width": 72,
               "height": 72,
-              "fill": "$brandField",
+              "fill": "$brandBackground",
               "cornerRadius": 15.84,
+              "stroke": "$brandOnBackground",
+              "strokeWidth": 1.125,
               "layout": "none",
               "children": [
                 {
@@ -16593,6 +17189,10 @@
                   "x": 0,
                   "y": 0,
                   "name": "C logo · Wiki-link brackets",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "wiki-link-brackets"
+                  },
                   "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                   "viewBox": [
                     0,
@@ -16603,8 +17203,8 @@
                   "fill": "#00000000",
                   "width": 72,
                   "height": 72,
-                  "stroke": "$brandSoft",
-                  "strokeWidth": 3.384,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 3.375,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16614,7 +17214,11 @@
                   "x": 0,
                   "y": 0,
                   "name": "C logo · Graph",
-                  "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "linked-note-graph"
+                  },
+                  "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                   "viewBox": [
                     0,
                     0,
@@ -16624,8 +17228,8 @@
                   "fill": "#00000000",
                   "width": 72,
                   "height": 72,
-                  "stroke": "$brandSignal",
-                  "strokeWidth": 2.63952,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.96875,
                   "strokeLinejoin": "round",
                   "strokeLinecap": "round"
                 },
@@ -16635,9 +17239,17 @@
                   "x": 24.1875,
                   "y": 23.0625,
                   "name": "C logo · Note 1",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 1,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 7.875,
-                  "height": 7.875
+                  "height": 7.875,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.40625
                 },
                 {
                   "type": "ellipse",
@@ -16645,9 +17257,17 @@
                   "x": 39.375,
                   "y": 20.8125,
                   "name": "C logo · Note 2",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 2,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 6.75,
-                  "height": 6.75
+                  "height": 6.75,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.40625
                 },
                 {
                   "type": "ellipse",
@@ -16655,9 +17275,17 @@
                   "x": 28.6875,
                   "y": 39.375,
                   "name": "C logo · Note 3",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 3,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 7.3125,
-                  "height": 7.3125
+                  "height": 7.3125,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.40625
                 },
                 {
                   "type": "ellipse",
@@ -16665,9 +17293,17 @@
                   "x": 41.0625,
                   "y": 34.875,
                   "name": "C logo · Note 4",
-                  "fill": "$brandSignal",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 4,
+                    "state": "focus"
+                  },
+                  "fill": "$brandOnBackground",
                   "width": 9,
-                  "height": 9
+                  "height": 9,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.40625
                 },
                 {
                   "type": "ellipse",
@@ -16675,9 +17311,17 @@
                   "x": 34.3125,
                   "y": 47.8125,
                   "name": "C logo · Note 5",
-                  "fill": "$surface",
+                  "metadata": {
+                    "type": "brain.logo-part",
+                    "role": "note-node",
+                    "index": 5,
+                    "state": "paper"
+                  },
+                  "fill": "$brandPaper",
                   "width": 5.625,
-                  "height": 5.625
+                  "height": 5.625,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 1.40625
                 }
               ]
             },
@@ -16769,7 +17413,7 @@
           "type": "frame",
           "id": "XlebD",
           "x": 80,
-          "y": 1112,
+          "y": 1172,
           "name": "Banner comparison",
           "width": 1280,
           "height": 140,
@@ -17012,7 +17656,7 @@
                       "name": "Tab icon",
                       "width": 16,
                       "height": 16,
-                      "fill": "$brandField",
+                      "fill": "$brandBackground",
                       "cornerRadius": 3.52,
                       "layout": "none",
                       "children": [
@@ -17032,7 +17676,7 @@
                           "fill": "#00000000",
                           "width": 16,
                           "height": 16,
-                          "stroke": "$brandSoft",
+                          "stroke": "$brandOnBackground",
                           "strokeWidth": 1.2,
                           "strokeLinejoin": "round",
                           "strokeLinecap": "round"
@@ -17043,7 +17687,7 @@
                           "x": 6.56,
                           "y": 6.56,
                           "name": "Tab icon · Focus",
-                          "fill": "$brandSignal",
+                          "fill": "$brandOnBackground",
                           "width": 2.88,
                           "height": 2.88
                         }
@@ -17089,8 +17733,10 @@
                   "name": "Sidebar brand icon",
                   "width": 32,
                   "height": 32,
-                  "fill": "$brandField",
+                  "fill": "$brandBackground",
                   "cornerRadius": 7.04,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.75,
                   "layout": "none",
                   "children": [
                     {
@@ -17099,6 +17745,10 @@
                       "x": 0,
                       "y": 0,
                       "name": "Sidebar brand icon · Brackets",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "wiki-link-brackets"
+                      },
                       "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                       "viewBox": [
                         0,
@@ -17109,8 +17759,8 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandSoft",
-                      "strokeWidth": 1.504,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 1.5,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -17120,7 +17770,11 @@
                       "x": 0,
                       "y": 0,
                       "name": "Sidebar brand icon · Graph",
-                      "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "linked-note-graph"
+                      },
+                      "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                       "viewBox": [
                         0,
                         0,
@@ -17130,8 +17784,8 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandSignal",
-                      "strokeWidth": 1.17312,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -17141,9 +17795,17 @@
                       "x": 10.75,
                       "y": 10.25,
                       "name": "Sidebar brand icon · Note 1",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 1,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3.5,
-                      "height": 3.5
+                      "height": 3.5,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17151,9 +17813,17 @@
                       "x": 17.5,
                       "y": 9.25,
                       "name": "Sidebar brand icon · Note 2",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 2,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3,
-                      "height": 3
+                      "height": 3,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17161,9 +17831,17 @@
                       "x": 12.75,
                       "y": 17.5,
                       "name": "Sidebar brand icon · Note 3",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 3,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3.25,
-                      "height": 3.25
+                      "height": 3.25,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17171,9 +17849,17 @@
                       "x": 18.25,
                       "y": 15.5,
                       "name": "Sidebar brand icon · Note 4",
-                      "fill": "$brandSignal",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 4,
+                        "state": "focus"
+                      },
+                      "fill": "$brandOnBackground",
                       "width": 4,
-                      "height": 4
+                      "height": 4,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17181,9 +17867,17 @@
                       "x": 15.25,
                       "y": 21.25,
                       "name": "Sidebar brand icon · Note 5",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 5,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 2.5,
-                      "height": 2.5
+                      "height": 2.5,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     }
                   ]
                 },
@@ -17909,8 +18603,10 @@
                   "name": "Compact header icon",
                   "width": 32,
                   "height": 32,
-                  "fill": "$brandField",
+                  "fill": "$brandBackground",
                   "cornerRadius": 7.04,
+                  "stroke": "$brandOnBackground",
+                  "strokeWidth": 0.75,
                   "layout": "none",
                   "children": [
                     {
@@ -17919,6 +18615,10 @@
                       "x": 0,
                       "y": 0,
                       "name": "Compact header icon · Brackets",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "wiki-link-brackets"
+                      },
                       "geometry": "M31 30h-9v68h9m10-68h-9v68h9m56-68h9v68h-9m-10-68h9v68h-9",
                       "viewBox": [
                         0,
@@ -17929,8 +18629,8 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandSoft",
-                      "strokeWidth": 1.504,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 1.5,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -17940,7 +18640,11 @@
                       "x": 0,
                       "y": 0,
                       "name": "Compact header icon · Graph",
-                      "geometry": "M49 47l27-4 5 27-23 7-9-30m9 30l9 14",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "linked-note-graph"
+                      },
+                      "geometry": "M50 48l26-5 5 27-23 7-8-29m8 29l8 13",
                       "viewBox": [
                         0,
                         0,
@@ -17950,8 +18654,8 @@
                       "fill": "#00000000",
                       "width": 32,
                       "height": 32,
-                      "stroke": "$brandSignal",
-                      "strokeWidth": 1.17312,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.875,
                       "strokeLinejoin": "round",
                       "strokeLinecap": "round"
                     },
@@ -17961,9 +18665,17 @@
                       "x": 10.75,
                       "y": 10.25,
                       "name": "Compact header icon · Note 1",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 1,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3.5,
-                      "height": 3.5
+                      "height": 3.5,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17971,9 +18683,17 @@
                       "x": 17.5,
                       "y": 9.25,
                       "name": "Compact header icon · Note 2",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 2,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3,
-                      "height": 3
+                      "height": 3,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17981,9 +18701,17 @@
                       "x": 12.75,
                       "y": 17.5,
                       "name": "Compact header icon · Note 3",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 3,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 3.25,
-                      "height": 3.25
+                      "height": 3.25,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -17991,9 +18719,17 @@
                       "x": 18.25,
                       "y": 15.5,
                       "name": "Compact header icon · Note 4",
-                      "fill": "$brandSignal",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 4,
+                        "state": "focus"
+                      },
+                      "fill": "$brandOnBackground",
                       "width": 4,
-                      "height": 4
+                      "height": 4,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     },
                     {
                       "type": "ellipse",
@@ -18001,9 +18737,17 @@
                       "x": 15.25,
                       "y": 21.25,
                       "name": "Compact header icon · Note 5",
-                      "fill": "$surface",
+                      "metadata": {
+                        "type": "brain.logo-part",
+                        "role": "note-node",
+                        "index": 5,
+                        "state": "paper"
+                      },
+                      "fill": "$brandPaper",
                       "width": 2.5,
-                      "height": 2.5
+                      "height": 2.5,
+                      "stroke": "$brandOnBackground",
+                      "strokeWidth": 0.625
                     }
                   ]
                 },
@@ -18450,8 +19194,13 @@
           "x": 48,
           "y": 30,
           "name": "Handoff eyebrow",
-          "fill": "$brandInk",
-          "content": "BRAND HANDOFF · PRE-IMPLEMENTATION",
+          "metadata": {
+            "type": "brain.brand-lifecycle.v1",
+            "contract": "brain.brand-lifecycle.v1",
+            "state": "implemented"
+          },
+          "fill": "$brandOnBackground",
+          "content": "BRAND HANDOFF · IMPLEMENTED",
           "lineHeight": 1.35,
           "fontFamily": "$fontUi",
           "fontSize": 13,
@@ -18479,7 +19228,7 @@
           "fill": "$muted",
           "textGrowth": "fixed-width",
           "width": 1280,
-          "content": "A focused revision of assets/logo.svg and assets/banner.svg. This Pen file is design-only; repository assets remain unchanged.",
+          "content": "Direction A is implemented in assets/logo.svg and assets/banner.svg; this Pen file and design/tokens.json are the canonical design sources.",
           "lineHeight": 1.35,
           "fontFamily": "$fontUi",
           "fontSize": 15,
@@ -18592,7 +19341,7 @@
               "x": 22,
               "y": 60,
               "name": "brand.field swatch",
-              "fill": "#052F3E",
+              "fill": "#21C995",
               "width": 22,
               "height": 22
             },
@@ -18605,7 +19354,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.field",
+              "content": "brand.background",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18620,7 +19369,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "actionText",
+              "content": "color.action",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18635,7 +19384,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#052F3E",
+              "content": "#21C995",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18650,7 +19399,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "tile / dark banner",
+              "content": "logo + banner field",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -18663,7 +19412,7 @@
               "x": 22,
               "y": 100,
               "name": "brand.signal swatch",
-              "fill": "#21C995",
+              "fill": "#052F3E",
               "width": 22,
               "height": 22
             },
@@ -18676,7 +19425,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 150,
-              "content": "brand.signal",
+              "content": "brand.onBackground",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18691,7 +19440,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "action",
+              "content": "color.actionText",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18706,7 +19455,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#21C995",
+              "content": "#052F3E",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18721,7 +19470,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "active node / rail",
+              "content": "brackets / graph / copy",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -18734,7 +19483,7 @@
               "x": 22,
               "y": 140,
               "name": "brand.bracket swatch",
-              "fill": "#DDF8EE",
+              "fill": "#052F3E",
               "width": 22,
               "height": 22
             },
@@ -18762,7 +19511,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "brandSoft",
+              "content": "brand.onBackground",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18777,7 +19526,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#DDF8EE",
+              "content": "#052F3E",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18792,7 +19541,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "brackets on field",
+              "content": "wiki-link boundary",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -18876,7 +19625,7 @@
               "x": 22,
               "y": 220,
               "name": "wordmark.primary swatch",
-              "fill": "#14211D",
+              "fill": "#052F3E",
               "width": 22,
               "height": 22
             },
@@ -18904,7 +19653,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "ink",
+              "content": "brand.onBackground",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18919,7 +19668,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#14211D",
+              "content": "#052F3E",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18934,7 +19683,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "“brain” on light",
+              "content": "outlined “brain”",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -18947,7 +19696,7 @@
               "x": 22,
               "y": 260,
               "name": "wordmark.suffix swatch",
-              "fill": "#075E46",
+              "fill": "#052F3E",
               "width": 22,
               "height": 22
             },
@@ -18975,7 +19724,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 120,
-              "content": "accentInk",
+              "content": "brand.onBackground",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -18990,7 +19739,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "#075E46",
+              "content": "#052F3E",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19005,7 +19754,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 160,
-              "content": "“-cli” on light",
+              "content": "outlined “-cli”",
               "lineHeight": 1.3,
               "fontFamily": "$fontUi",
               "fontSize": 11,
@@ -19090,7 +19839,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 300,
-              "content": "• indigo / lavender / amber removed\n• gradients replaced by flat token color\n• five-node graph simplified at micro size\n• decorative banner network removed\n• feature pills replaced by proof line",
+              "content": "• indigo / lavender / amber removed\n• logo and banner share the action-green field\n• five-node graph simplified at micro size\n• decorative banner network removed\n• feature pills replaced by product proof",
               "lineHeight": 1.55,
               "fontFamily": "$fontUi",
               "fontSize": 14,
@@ -19209,7 +19958,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 260,
-              "content": "signal / field",
+              "content": "onBackground / background",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19239,7 +19988,7 @@
               "fill": "$ink",
               "textGrowth": "fixed-width",
               "width": 260,
-              "content": "white / field",
+              "content": "paper / background",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19254,7 +20003,7 @@
               "fill": "$brandInk",
               "textGrowth": "fixed-width",
               "width": 100,
-              "content": "14.16:1",
+              "content": "1.99:1 + dark edge",
               "lineHeight": 1.3,
               "fontFamily": "$fontMono",
               "fontSize": 12,
@@ -19299,7 +20048,7 @@
               "fill": "$muted",
               "textGrowth": "fixed-width",
               "width": 200,
-              "content": "All listed text pairs pass WCAG AA for normal text. The 16 px avatar is symbolic, not text. Monochrome uses one ink plus paper and never relies on color to distinguish nodes.",
+              "content": "Dark text and icon strokes on the green field pass WCAG AA at 6.65:1. Paper nodes use a dark edge because their fill alone is not sufficient contrast. The 16 px avatar is symbolic, not text.",
               "lineHeight": 1.5,
               "fontFamily": "$fontUi",
               "fontSize": 13,
@@ -19400,8 +20149,10 @@
           "name": "Captain choice",
           "width": 1344,
           "height": 72,
-          "fill": "$brandField",
+          "fill": "$brandBackground",
           "cornerRadius": 16,
+          "stroke": "$brandOnBackground",
+          "strokeWidth": 2,
           "layout": "none",
           "children": [
             {
@@ -19410,8 +20161,8 @@
               "x": 22,
               "y": 15,
               "name": "Choice label",
-              "fill": "$brandSignal",
-              "content": "SINGLE CHOICE BEFORE IMPLEMENTATION",
+              "fill": "$brandOnBackground",
+              "content": "APPROVED DIRECTION",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
               "fontSize": 10,
@@ -19423,10 +20174,10 @@
               "x": 22,
               "y": 36,
               "name": "Choice text",
-              "fill": "$surface",
+              "fill": "$brandOnBackground",
               "textGrowth": "fixed-width",
               "width": 1280,
-              "content": "Approve A · Linked Vault with Banner A · Product proof – or name B / C for one revision round. Repository SVGs stay untouched until approval.",
+              "content": "A · Linked Vault with Banner A · Product proof is implemented in the repository SVGs and canonical design sources.",
               "lineHeight": 1.35,
               "fontFamily": "$fontUi",
               "fontSize": 15,
@@ -19668,15 +20419,15 @@
     },
     "logo-bg-1": {
       "type": "color",
-      "value": "#052F3E"
+      "value": "$action"
     },
     "logo-bg-2": {
       "type": "color",
-      "value": "#052F3E"
+      "value": "$action"
     },
     "logo-banner-bg": {
       "type": "color",
-      "value": "#FFFFFF"
+      "value": "$action"
     },
     "logo-banner-bg-3": {
       "type": "color",
@@ -19684,23 +20435,23 @@
     },
     "logo-bracket": {
       "type": "color",
-      "value": "#DDF8EE"
+      "value": "$actionText"
     },
     "logo-link": {
       "type": "color",
-      "value": "#21C995"
+      "value": "$actionText"
     },
     "logo-highlight": {
       "type": "color",
-      "value": "#21C995"
+      "value": "$actionText"
     },
     "logo-graph": {
       "type": "color",
-      "value": "#21C995"
+      "value": "$actionText"
     },
     "logo-node": {
       "type": "color",
-      "value": "#21C995"
+      "value": "$canvas"
     },
     "accentInk": {
       "type": "color",
@@ -19728,7 +20479,11 @@
     },
     "brandField": {
       "type": "color",
-      "value": "$actionText"
+      "value": "$brandBackground"
+    },
+    "brandBackground": {
+      "type": "color",
+      "value": "$action"
     },
     "brandSignal": {
       "type": "color",
@@ -19736,11 +20491,23 @@
     },
     "brandInk": {
       "type": "color",
-      "value": "$accentInk"
+      "value": "$brandOnBackground"
+    },
+    "brandOnBackground": {
+      "type": "color",
+      "value": "$actionText"
     },
     "brandPaper": {
       "type": "color",
       "value": "$canvas"
+    },
+    "fontPortableSans": {
+      "type": "string",
+      "value": "Arial"
+    },
+    "fontPortableMono": {
+      "type": "string",
+      "value": "Menlo"
     }
   },
   "fileToken": "be267aad-ec4e-4e9e-b49e-c92aeb1a9d49"
