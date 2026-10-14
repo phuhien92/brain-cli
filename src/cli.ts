@@ -567,7 +567,7 @@ async function run(argv: string[]): Promise<number> {
         if (!ref) throw new CliError("usage", "get needs a note: brain get <path|name|title>", 2);
         // Out-of-scope notes are reported as not found, not as forbidden:
         // a restricted caller should not learn what else the vault holds.
-        const matches = store.resolve(ref).filter((p) => inScope(p, scope));
+        const matches = store.resolve(ref).filter((p) => inReadScope(store!, cfg, p, scope));
         if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
         if (matches.length > 1) {
           throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, {
@@ -761,7 +761,7 @@ async function run(argv: string[]): Promise<number> {
           throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <title> [--body <text>]", 2);
         }
         const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
-          .filter((e) => inScope(e.path, scope))
+          .filter((e) => inReadScope(store!, cfg, e.path, scope))
           .slice(0, n);
         print(out, "log", { entries }, { vault, index }, () =>
           entries.length
@@ -775,7 +775,7 @@ async function run(argv: string[]): Promise<number> {
         const kind = slug(args[0] ?? "");
         if (!kind) throw new CliError("usage", "usage: brain view <kind>", 2);
         if (cfg.as) permit(inScope(`${cfg.logDir}/${kind}/`, scope), `read '${kind}' entries`);
-        const entries = listEntries(store, cfg, { kind });
+        const entries = listEntries(store, cfg, { kind }).filter((entry) => inReadScope(store!, cfg, entry.path, scope));
         const markdown = renderView(entries);
         print(out, command, { kind, entries: entries.length, markdown }, { vault, index }, () => markdown);
         return 0;
@@ -844,7 +844,7 @@ async function run(argv: string[]): Promise<number> {
         }
         const ref = rest.join(" ").trim();
         if (!ref) throw new CliError("usage", `usage: brain lifecycle ${sub} <note>`, 2);
-        const matches = store.resolve(ref).filter((p) => inScope(p, scope));
+        const matches = store.resolve(ref).filter((p) => inReadScope(store!, cfg, p, scope));
         if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
         if (matches.length > 1) {
           throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, { candidates: matches });
@@ -1468,6 +1468,15 @@ function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number):
 
 function runExports(store: Store, cfg: Config, force: boolean): ExportResult[] {
   return cfg.exports.map((t) => exportView(store, cfg, t, force));
+}
+
+function inReadScope(store: Store, cfg: Config, path: string, scope: string[] | null): boolean {
+  if (scope === null) return true;
+  if (!inScope(path, scope)) return false;
+  const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
+  if (!path.startsWith(lifecyclePrefix)) return true;
+  const target = store.get(path)?.frontmatter.target;
+  return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
 }
 
 function resolveLogEntry(store: Store, cfg: Config, ref: string, scope: string[] | null): Entry {

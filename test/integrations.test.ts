@@ -39,7 +39,7 @@ before(() => {
     JSON.stringify({
       sync: "none",
       integrations: {
-        "interview-coach": { read: ["Career HQ"], write: ["interview"] },
+        "interview-coach": { read: ["Career HQ"], write: ["interview", "lifecycle"] },
         firstmate: { read: ["firstmate/"], write: ["learning", "lifecycle"], views: { learning: { header: "<!-- stow -->" } } },
         everything: { read: ["*"], write: [] },
       },
@@ -80,7 +80,8 @@ test("search and get see only the acting integration's folders", () => {
 test("an integration writes only its kinds and reads its own log", () => {
   assert.equal(brain(["log", "add", "learning", "Crew lesson"], { BRAIN_AS: "firstmate" }).code, 0);
   const disposable = brain(["log", "add", "learning", "Retire through the integration"], { BRAIN_AS: "firstmate" });
-  assert.equal(brain(["log", "retire", disposable.body.data.path], { BRAIN_AS: "firstmate" }).code, 0);
+  const privateRetirement = brain(["log", "retire", disposable.body.data.path, "--reason", "private crew reason"], { BRAIN_AS: "firstmate" });
+  assert.equal(privateRetirement.code, 0);
   const replaceable = brain(["log", "add", "learning", "Replace through the integration"], { BRAIN_AS: "firstmate" });
   assert.equal(brain(["log", "replace", replaceable.body.data.path, "--text", "Replacement through the integration"], { BRAIN_AS: "firstmate" }).code, 0);
   const denied = brain(["log", "add", "interview", "Not mine"], { BRAIN_AS: "firstmate" });
@@ -89,6 +90,16 @@ test("an integration writes only its kinds and reads its own log", () => {
   const interview = brain(["log", "add", "interview", "Brex screen"], { BRAIN_AS: "interview-coach" });
   assert.equal(interview.code, 0);
   assert.equal(brain(["log", "retire", interview.body.data.path], { BRAIN_AS: "firstmate" }).code, 3, "out-of-scope entries stay hidden");
+  const coachRetirement = brain(["log", "retire", interview.body.data.path, "--reason", "coach reason"], { BRAIN_AS: "interview-coach" });
+  assert.equal(coachRetirement.code, 0);
+
+  assert.equal(brain(["get", privateRetirement.body.data.event], { BRAIN_AS: "interview-coach" }).code, 3);
+  assert.equal(brain(["get", coachRetirement.body.data.event], { BRAIN_AS: "interview-coach" }).code, 0);
+  const coachEvents = brain(["log", "10", "--kind", "lifecycle"], { BRAIN_AS: "interview-coach" });
+  assert.deepEqual(coachEvents.body.data.entries.map((entry: { path: string }) => entry.path), [coachRetirement.body.data.event]);
+  const coachView = brain(["view", "lifecycle"], { BRAIN_AS: "interview-coach" });
+  assert.match(coachView.body.data.markdown, /coach reason/);
+  assert.doesNotMatch(coachView.body.data.markdown, /private crew reason/);
 
   const fmLog = brain(["log", "--kind", "learning"], { BRAIN_AS: "firstmate" });
   assert.deepEqual(fmLog.body.data.entries.map((e: { title: string }) => e.title), ["Replacement through the integration", "Crew lesson"]);

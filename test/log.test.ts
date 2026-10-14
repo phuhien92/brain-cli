@@ -107,6 +107,21 @@ test("renderView is oldest first and shows a duplicate text once", () => {
   );
 });
 
+test("export provenance includes only entries represented in the rendered view", () => {
+  const target = join(root, "learnings.md");
+  const c = cfg("mini", [{ kind: "learning", path: target }]);
+  addEntry(vault, c, { kind: "learning", title: "Foo", body: "Body" });
+  addEntry(vault, c, { kind: "learning", title: "foo", body: "body" });
+  const store = Store.open(vault);
+  store.refresh();
+
+  assert.equal(exportView(store, c, c.exports[0]!).status, "written");
+  const result = importFile(store, c, "learning", target);
+  assert.deepEqual(result.retirementCandidates, []);
+  assert.deepEqual(result.replacementCandidates, []);
+  store.close();
+});
+
 test("import proposes retirement only for entries this target exported that were later removed", () => {
   const target = join(root, "learnings.md");
   const c = cfg("mini", [{ kind: "learning", path: target }]);
@@ -126,6 +141,8 @@ test("import proposes retirement only for entries this target exported that were
   const result = importFile(store, c, "learning", target);
   assert.deepEqual(result.retirementCandidates, [{ path: two, title: "Two", body: "" }]);
   assert.deepEqual(result.replacementCandidates, []);
+  assert.equal(exportView(store, c, c.exports[0]!).status, "drift", "a pending retirement cannot authorize overwriting the edit");
+  assert.equal(readFileSync(target, "utf8"), "- One\n");
   store.refresh();
   assert.deepEqual(listEntries(store, c, { kind: "learning" }).map((entry) => entry.path).sort(), [one, two, later].sort());
 

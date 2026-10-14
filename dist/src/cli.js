@@ -515,7 +515,7 @@ async function run(argv) {
                     throw new CliError("usage", "get needs a note: brain get <path|name|title>", 2);
                 // Out-of-scope notes are reported as not found, not as forbidden:
                 // a restricted caller should not learn what else the vault holds.
-                const matches = store.resolve(ref).filter((p) => inScope(p, scope));
+                const matches = store.resolve(ref).filter((p) => inReadScope(store, cfg, p, scope));
                 if (matches.length === 0)
                     throw new CliError("not_found", `no note matches '${ref}'`, 3);
                 if (matches.length > 1) {
@@ -699,7 +699,7 @@ async function run(argv) {
                     throw new CliError("usage", "usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <title> [--body <text>]", 2);
                 }
                 const entries = listEntries(store, cfg, { kind: flags.kind ? slug(flags.kind) : undefined, limit: scope ? -1 : n })
-                    .filter((e) => inScope(e.path, scope))
+                    .filter((e) => inReadScope(store, cfg, e.path, scope))
                     .slice(0, n);
                 print(out, "log", { entries }, { vault, index }, () => entries.length
                     ? entries.map((e) => `${e.created.slice(0, 10)}  ${e.kind.padEnd(10)} ${e.machine.padEnd(12)} ${e.title}`).join("\n")
@@ -712,7 +712,7 @@ async function run(argv) {
                     throw new CliError("usage", "usage: brain view <kind>", 2);
                 if (cfg.as)
                     permit(inScope(`${cfg.logDir}/${kind}/`, scope), `read '${kind}' entries`);
-                const entries = listEntries(store, cfg, { kind });
+                const entries = listEntries(store, cfg, { kind }).filter((entry) => inReadScope(store, cfg, entry.path, scope));
                 const markdown = renderView(entries);
                 print(out, command, { kind, entries: entries.length, markdown }, { vault, index }, () => markdown);
                 return 0;
@@ -776,7 +776,7 @@ async function run(argv) {
                 const ref = rest.join(" ").trim();
                 if (!ref)
                     throw new CliError("usage", `usage: brain lifecycle ${sub} <note>`, 2);
-                const matches = store.resolve(ref).filter((p) => inScope(p, scope));
+                const matches = store.resolve(ref).filter((p) => inReadScope(store, cfg, p, scope));
                 if (matches.length === 0)
                     throw new CliError("not_found", `no note matches '${ref}'`, 3);
                 if (matches.length > 1) {
@@ -1359,6 +1359,17 @@ function doctor(vault, cfg, index, notes) {
 }
 function runExports(store, cfg, force) {
     return cfg.exports.map((t) => exportView(store, cfg, t, force));
+}
+function inReadScope(store, cfg, path, scope) {
+    if (scope === null)
+        return true;
+    if (!inScope(path, scope))
+        return false;
+    const lifecyclePrefix = `${cfg.logDir}/${LIFECYCLE_KIND}/`;
+    if (!path.startsWith(lifecyclePrefix))
+        return true;
+    const target = store.get(path)?.frontmatter.target;
+    return typeof target === "string" && !target.startsWith(lifecyclePrefix) && inScope(target, scope);
 }
 function resolveLogEntry(store, cfg, ref, scope) {
     const entries = new Map(listEntries(store, cfg, { includeRetired: true })
