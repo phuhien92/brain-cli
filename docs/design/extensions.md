@@ -24,6 +24,10 @@ Every extension is **a separate process** that talks to brain through things tha
 already exist and are versioned: the `--json` envelope (`brain.v1`), environment
 variables, and stdin/stdout. Never in-process code.
 
+`brain.v1` may gain optional fields, so extensions must ignore fields they do not
+recognize. Removing, renaming or retyping a field, or changing an exit code, is breaking
+and bumps the envelope schema version.
+
 Why that and not plugins loaded into brain:
 
 - **Any language.** A Python importer and a Go ranker are equally welcome.

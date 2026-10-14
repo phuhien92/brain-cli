@@ -124,4 +124,6 @@ code, so an agent can branch without parsing prose:
 | 6 | `not_permitted`, `permission_confirmation_required` | the acting integration may not write that kind, or extension installation needs an interactive person |
 | 7 | `lint_failed` | `brain lint --strict` found warnings |
 
-`schema` changes only on a breaking change to this shape.
+`brain.v1` may gain optional fields, so consumers must ignore fields they do not
+recognize. Removing, renaming or retyping a field, or changing an exit code, is breaking
+and bumps `schema`.
