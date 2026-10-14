@@ -372,12 +372,15 @@ test("brand contract names one shared accessible green gradient", () => {
   const onDark = String(resolveToken(tokenDocument.brand.foregroundDarkToken));
   const onLight = String(resolveToken(tokenDocument.brand.foregroundLightToken));
   const accent = String(resolveToken(tokenDocument.brand.logo.accentToken));
+  const signal = String(resolveToken("brand.signal"));
   assert.equal(gradient.role, "brand.gradient");
   assert.equal(start, "#075E46");
   assert.equal(end, "#108160");
   assert.equal(onDark, "#F4F8F6");
   assert.equal(onLight, "#052F3E");
   assert.equal(accent, "#FBBF24");
+  assert.equal(signal, resolveToken("color.action"));
+  assert.notEqual(signal, end);
   assert.ok(contrastRatio(onDark, start) >= 4.5);
   assert.ok(contrastRatio(onDark, end) >= 4.5);
   assert.ok(contrastRatio(accent, start) >= 4.5);
@@ -471,6 +474,7 @@ test("canonical Pen source matches the implemented asset contract", () => {
   assert.equal(resolvePenVariable("brandBackgroundEnd"), resolveToken(tokenDocument.brand.backgroundGradient.endToken));
   assert.equal(resolvePenVariable("brandOnDark"), resolveToken(tokenDocument.brand.foregroundDarkToken));
   assert.equal(resolvePenVariable("brandOnLight"), resolveToken(tokenDocument.brand.foregroundLightToken));
+  assert.equal(resolvePenVariable("brandSignal"), resolveToken("brand.signal"));
   assert.equal(resolvePenVariable("brandMarkHalo"), resolveToken(tokenDocument.brand.logo.haloToken));
   assert.equal(resolvePenVariable("brandAccent"), resolveToken(tokenDocument.brand.logo.accentToken));
 
