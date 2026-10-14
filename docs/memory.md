@@ -18,8 +18,10 @@ brain sync                       # commit new entries, pull --rebase, push, re-e
 
 Ordinary entries include the machine and timestamp in their paths, so two machines do not
 create the same file. The single-file shape that existing tools expect is *generated* from
-the log, so it is never edited by two machines either. Each entry records which machine
-wrote it. Source importers can instead request a deterministic, create-only path with
+the log, so it is never edited by two machines either. Every active entry renders as its
+own bullet, including identical entries created on different machines, so each bullet can
+be retired or replaced independently. Each entry records which machine wrote it. Source
+importers can instead request a deterministic, create-only path with
 `--source-id`; matching imports then merge as the same file, while different content for one
 source ID deliberately produces a sync conflict. See [Command extensions](extensions.md#process-contract).
 
