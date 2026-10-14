@@ -220,18 +220,20 @@ export function renderView(entries: Entry[], header?: string): string {
 }
 
 function renderedEntries(entries: Entry[]): Entry[] {
+  return renderedEntryGroups(entries).map((group) => group[0]!);
+}
+
+function renderedEntryGroups(entries: Entry[]): Entry[][] {
   const sorted = [...entries].sort((a, b) => a.created.localeCompare(b.created) || a.path.localeCompare(b.path));
   // Two machines that each imported the same learning before either synced
   // hold two entry files with the same text. Both files stay (deleting one is a
   // write a sync could fight over); the view shows the oldest once.
-  const seen = new Set<string>();
-  const unique = sorted.filter((e) => {
+  const groups = new Map<string, Entry[]>();
+  for (const e of sorted) {
     const key = renderKey(e);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-  return unique;
+    groups.set(key, [...(groups.get(key) ?? []), e]);
+  }
+  return [...groups.values()];
 }
 
 export interface ExportResult {
@@ -255,7 +257,7 @@ export function exportView(store: Store, cfg: Config, target: ExportTarget, forc
   const current = existsSync(target.path) ? readFileSync(target.path, "utf8") : null;
   if (current === content) {
     store.setMeta(key, sha(content));
-    recordExported(store, target.path, exportedEntries);
+    recordExported(store, target.path, entries);
     return { ...base, status: "unchanged" };
   }
   const lastWritten = store.getMeta(key);
@@ -266,7 +268,7 @@ export function exportView(store: Store, cfg: Config, target: ExportTarget, forc
   writeFileSync(tmp, content);
   renameSync(tmp, target.path); // atomic: a reader never sees half a file
   store.setMeta(key, sha(content));
-  recordExported(store, target.path, exportedEntries);
+  recordExported(store, target.path, entries);
   return { ...base, status: "written" };
 }
 
@@ -348,19 +350,20 @@ export function importFile(
   const existing = new Set(allEntries.map(importKey));
   const active = new Set(activeEntries.map(importKey));
   const items = parseImport(source);
-  const imported = new Set(items.map(importKey));
   // Only an entry brain exported to this file can have been removed from it; an
   // active entry the file never held is not evidence of anything.
   const exported = exportedPaths(store, file);
-  const missing = activeEntries
-    .filter((entry) => exported.has(entry.path) && !imported.has(importKey(entry)));
+  const exportedGroups = renderedEntryGroups(activeEntries)
+    .map((group) => ({ representative: group[0]!, entries: group.filter((entry) => exported.has(entry.path)) }))
+    .filter((group) => group.entries.length);
+  const importedRendered = new Set(items.map(renderKey));
+  const missing = exportedGroups.filter((group) => !importedRendered.has(renderKey(group.representative)));
   // A missing entry whose title is still in the file was reworded, not removed.
   // Its new text is not added: `log replace` records it and retires the old one.
-  const exportedByTitle = new Map<string, Entry[]>();
-  for (const entry of activeEntries) {
-    if (!exported.has(entry.path)) continue;
-    const key = titleKey(entry);
-    exportedByTitle.set(key, [...(exportedByTitle.get(key) ?? []), entry]);
+  const exportedByTitle = new Map<string, (typeof exportedGroups)>();
+  for (const group of exportedGroups) {
+    const key = titleKey(group.representative);
+    exportedByTitle.set(key, [...(exportedByTitle.get(key) ?? []), group]);
   }
   const newByTitle = new Map<string, (typeof items)>();
   for (const item of items) {
@@ -371,20 +374,22 @@ export function importFile(
   const retirementCandidates: RetirementCandidate[] = [];
   const replacementCandidates: ReplacementCandidate[] = [];
   const reworded = new Set<(typeof items)[number]>();
-  for (const { path, title, body } of missing) {
-    const key = titleKey({ title });
+  for (const group of missing) {
+    const key = titleKey(group.representative);
     const newItems = newByTitle.get(key) ?? [];
     if (!newItems.length) {
-      retirementCandidates.push({ path, title, body });
+      retirementCandidates.push(...group.entries.map(({ path, title, body }) => ({ path, title, body })));
       continue;
     }
     if ((exportedByTitle.get(key) ?? []).length !== 1 || newItems.length !== 1) {
-      retirementCandidates.push({ path, title, body, reason: "ambiguous-title" });
+      retirementCandidates.push(...group.entries.map(({ path, title, body }) => ({ path, title, body, reason: "ambiguous-title" as const })));
       continue;
     }
     const item = newItems[0]!;
     reworded.add(item);
-    replacementCandidates.push({ path, title, body, replacement: { title: item.title, body: item.body } });
+    replacementCandidates.push(
+      ...group.entries.map(({ path, title, body }) => ({ path, title, body, replacement: { title: item.title, body: item.body } })),
+    );
   }
   const added: string[] = [];
   let skipped = 0;
