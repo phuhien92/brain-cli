@@ -200,8 +200,8 @@ function exportedPaths(store, path) {
 // (with its indented continuation lines), one per free-standing paragraph.
 // Headings become tags. HTML comments — stow's tier markers and file
 // pointers — are dropped from titles. Matching title-and-body occurrences
-// already recorded for this kind are skipped, so surplus identical list items
-// remain separate entries without duplicating what another machine captured.
+// with active entries of this kind are skipped, so surplus identical list
+// items remain separate entries without duplicating what another machine captured.
 export function parseImport(markdown) {
     const items = [];
     let section = null;
@@ -251,15 +251,7 @@ export function parseImport(markdown) {
 export function importFile(store, cfg, kind, file) {
     const source = readFileSync(file, "utf8");
     const entryKind = slug(kind);
-    const allEntries = listEntries(store, cfg, { kind: entryKind, includeRetired: true });
     const activeEntries = listEntries(store, cfg, { kind: entryKind });
-    // A retired entry remains recorded: importing a stale generated file must
-    // not silently recreate it as a new active entry.
-    const existingCounts = new Map();
-    for (const entry of allEntries) {
-        const key = importKey(entry);
-        existingCounts.set(key, (existingCounts.get(key) ?? 0) + 1);
-    }
     const items = parseImport(source);
     // Only an entry brain exported to this file can have been removed from it; an
     // active entry the file never held is not evidence of anything.
@@ -267,19 +259,21 @@ export function importFile(store, cfg, kind, file) {
     const exportedEntries = activeEntries
         .filter((entry) => exported.has(entry.path))
         .sort((a, b) => a.created.localeCompare(b.created) || a.path.localeCompare(b.path));
-    const importedCounts = new Map();
+    const itemsByContent = new Map();
     for (const item of items) {
         const key = importKey(item);
-        importedCounts.set(key, (importedCounts.get(key) ?? 0) + 1);
+        itemsByContent.set(key, [...(itemsByContent.get(key) ?? []), item]);
     }
+    const matchedExportItems = new Set();
     const missing = exportedEntries.filter((entry) => {
         const key = importKey(entry);
-        const count = importedCounts.get(key) ?? 0;
-        if (!count)
+        const item = itemsByContent.get(key)?.shift();
+        if (!item)
             return true;
-        importedCounts.set(key, count - 1);
+        matchedExportItems.add(item);
         return false;
     });
+    const surplusItems = items.filter((item) => !matchedExportItems.has(item));
     // A missing entry whose title is still in the file was reworded, not removed.
     // Its new text is not added: `log replace` records it and retires the old one.
     const exportedByTitle = new Map();
@@ -288,18 +282,7 @@ export function importFile(store, cfg, kind, file) {
         exportedByTitle.set(key, [...(exportedByTitle.get(key) ?? []), entry]);
     }
     const newByTitle = new Map();
-    const activeCounts = new Map();
-    for (const entry of activeEntries) {
-        const key = importKey(entry);
-        activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
-    }
-    for (const item of items) {
-        const content = importKey(item);
-        const count = activeCounts.get(content) ?? 0;
-        if (count) {
-            activeCounts.set(content, count - 1);
-            continue;
-        }
+    for (const item of surplusItems) {
         const key = titleKey(item);
         newByTitle.set(key, [...(newByTitle.get(key) ?? []), item]);
     }
@@ -327,17 +310,24 @@ export function importFile(store, cfg, kind, file) {
         });
     }
     const added = [];
-    let skipped = 0;
+    let skipped = matchedExportItems.size;
+    const activeCounts = new Map();
+    for (const entry of activeEntries) {
+        if (exported.has(entry.path))
+            continue;
+        const key = importKey(entry);
+        activeCounts.set(key, (activeCounts.get(key) ?? 0) + 1);
+    }
     // A millisecond apart and ending now, so the view (oldest first) keeps the
     // file's original order and nothing imported sorts after a later entry.
     const base = Date.now() - items.length;
     items.forEach((item, i) => {
-        if (reworded.has(item))
+        if (matchedExportItems.has(item) || reworded.has(item))
             return;
         const key = importKey(item);
-        const count = existingCounts.get(key) ?? 0;
+        const count = activeCounts.get(key) ?? 0;
         if (count) {
-            existingCounts.set(key, count - 1);
+            activeCounts.set(key, count - 1);
             skipped++;
             return;
         }

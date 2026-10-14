@@ -199,9 +199,10 @@ test("import proposes retirement only for entries this target exported that were
   assert.equal(importFile(store, c, "learning", target).retirementCandidates.length, 0, "retired entries are not candidates again");
   store.refresh();
   writeFileSync(target, "- One\n- Two\n");
-  importFile(store, c, "learning", target);
+  const restored = importFile(store, c, "learning", target);
+  assert.equal(restored.added.length, 1, "an explicitly restored bullet is active again");
   store.refresh();
-  assert.equal(listEntries(store, c, { kind: "learning", includeRetired: true }).length, 3, "a stale import does not recreate a retired entry");
+  assert.equal(listEntries(store, c, { kind: "learning", includeRetired: true }).length, 4);
   store.close();
 });
 
@@ -229,6 +230,27 @@ test("import reports a same-title body change to an exported entry as a replacem
   store.close();
 });
 
+test("a non-exported active match cannot absorb an exported rewording", () => {
+  const target = join(root, "learnings.md");
+  const c = cfg("mini", [{ kind: "learning", path: target }]);
+  const old = addEntry(vault, c, { kind: "learning", title: "Deploy safely", body: "old" });
+  const store = Store.open(vault);
+  store.refresh();
+  assert.equal(exportView(store, c, c.exports[0]!).status, "written");
+
+  const alreadyActive = addEntry(vault, c, { kind: "learning", title: "Deploy safely", body: "new" });
+  store.refresh();
+  writeFileSync(target, readFileSync(target, "utf8").replace("  old\n", "  new\n"));
+  const result = importFile(store, c, "learning", target);
+  assert.deepEqual(result.added, []);
+  assert.deepEqual(result.retirementCandidates, []);
+  assert.deepEqual(result.replacementCandidates, [
+    { path: old, title: "Deploy safely", body: "old", replacement: { title: "Deploy safely", body: "new" } },
+  ]);
+  assert.ok(listEntries(store, c, { kind: "learning" }).some((entry) => entry.path === alreadyActive));
+  store.close();
+});
+
 test("import then export: lossless round trip, then drift protection", () => {
   const target = join(root, "fm/data/learnings.md");
   mkdirSync(join(root, "fm/data"), { recursive: true });
@@ -244,7 +266,7 @@ test("import then export: lossless round trip, then drift protection", () => {
   const result = importFile(store, c, "learning", target);
   assert.equal(result.added.length, 2);
   store.refresh();
-  assert.equal(importFile(store, c, "learning", target).skipped, 2, "re-import skips recorded titles");
+  assert.equal(importFile(store, c, "learning", target).skipped, 2, "re-import skips active occurrences");
   store.refresh();
 
   // Captured, so the export may now replace it — and keeps the order.
