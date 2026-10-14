@@ -412,14 +412,27 @@ function extensionDirectory(vault) {
   return `${logDir}/extensions`;
 }
 
-function isExtensionMarker(vault, path, directory) {
+function extensionMarkerName(path, directory) {
   if (!path.startsWith(`${directory}/`)) return false;
   const file = path.slice(directory.length + 1);
   if (file.includes("/") || !file.endsWith(".md")) return false;
   const name = file.slice(0, -3);
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(name)) return false;
+  return name;
+}
+
+function isExtensionMarker(vault, path, directory, offline) {
+  const name = extensionMarkerName(path, directory);
+  if (!name) return false;
+  if (offline) return true;
   const text = readFileSync(join(vault, ...path.split("/")), "utf8");
   return frontmatterString(text, "kind") === "extension" && frontmatterString(text, "extension") === name;
+}
+
+function isCountedNote(vault, path, enablementDirectory, offline = false) {
+  const full = join(vault, ...path.split("/"));
+  if (path.startsWith("sources/") && existsSync(full + ".source.md")) return false;
+  return !isExtensionMarker(vault, path, enablementDirectory, offline);
 }
 
 function countNotes(vault) {
@@ -427,8 +440,10 @@ function countNotes(vault) {
   const enablementDirectory = extensionDirectory(vault);
   const visit = (d) => {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
-      if (/^\..+\.md\.icloud$/i.test(entry.name) && entry.isFile()) {
-        n++;
+      const placeholder = /^\.(.+\.md)\.icloud$/i.exec(entry.name);
+      if (placeholder && entry.isFile()) {
+        const path = toPosix(relative(vault, join(d, placeholder[1])));
+        if (isCountedNote(vault, path, enablementDirectory, true)) n++;
         continue;
       }
       if (entry.name.startsWith(".")) continue;
@@ -437,8 +452,7 @@ function countNotes(vault) {
       } else if (entry.isFile() && entry.name.toLowerCase().endsWith(".md")) {
         const full = join(d, entry.name);
         const path = toPosix(relative(vault, full));
-        if (path.startsWith("sources/") && existsSync(full + ".source.md")) continue;
-        if (!isExtensionMarker(vault, path, enablementDirectory)) n++;
+        if (isCountedNote(vault, path, enablementDirectory)) n++;
       }
     }
   };

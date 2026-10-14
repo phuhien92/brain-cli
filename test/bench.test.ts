@@ -299,9 +299,11 @@ test("brain bench note count matches indexed notes", (t) => {
   assert.equal(indexed.code, 0, JSON.stringify(indexed.body));
   assert.equal(indexed.body.data.vaultNotes, 20, "18 demo notes, the source sidecar, and the live note");
   renameSync(join(f.vault, "Offline.md"), join(f.vault, ".Offline.md.icloud"));
+  renameSync(join(f.vault, "sources", "paper.md"), join(f.vault, "sources", ".paper.md.icloud"));
+  renameSync(join(f.vault, "memory", "extensions", "sample.md"), join(f.vault, "memory", "extensions", ".sample.md.icloud"));
   const evicted = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
   assert.equal(evicted.code, 0, JSON.stringify(evicted.body));
-  assert.equal(evicted.body.data.vaultNotes, 20, "the iCloud placeholder remains one logical note");
+  assert.equal(evicted.body.data.vaultNotes, 20, "only the ordinary iCloud placeholder remains one logical note");
 });
 
 test("brain bench fails when grep is unavailable", (t) => {
