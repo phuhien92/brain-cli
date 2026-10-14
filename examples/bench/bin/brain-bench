@@ -206,7 +206,8 @@ function grepMethod(vault, question, expect, questionsFile) {
       const r = run("grep", args, vault);
       requireGrep(r, "search");
       cost.calls++;
-      found = r.stdout.split("\n").filter(Boolean).map((p) => toPosix(relative(vault, p)));
+      const output = r.stdout.replace(/\r\n/g, "\n");
+      found = output.split("\n").filter(Boolean).map((p) => toPosix(relative(vault, p)));
       cost.bytes += Buffer.byteLength(found.map((p) => `./${p}`).join("\n") + (found.length ? "\n" : ""));
     } else {
       // One `xargs grep -il` round, chunked only to stay under argument limits.
@@ -216,8 +217,9 @@ function grepMethod(vault, question, expect, questionsFile) {
         const chunk = candidates.slice(i, i + 500).map((p) => `./${p}`);
         const r = run("grep", ["-ilF", "-e", term, "--", ...chunk], vault);
         requireGrep(r, "narrowing");
-        cost.bytes += Buffer.byteLength(r.stdout);
-        found.push(...r.stdout.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, "")));
+        const output = r.stdout.replace(/\r\n/g, "\n");
+        cost.bytes += Buffer.byteLength(output);
+        found.push(...output.split("\n").filter(Boolean).map((p) => p.replace(/^\.\//, "")));
       }
     }
     found = found.map(toPosix).filter((p) => p !== questionsFile).sort();

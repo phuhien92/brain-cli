@@ -161,6 +161,30 @@ test("grep skips every dot-directory", { skip: process.platform === "win32" }, (
   assert.equal(r.body.data.results[0].grep.calls, 2);
 });
 
+test("grep normalizes CRLF paths in search and narrowing output", { skip: process.platform === "win32" }, (t) => {
+  const f = fixture(t);
+  const fake = join(f.bin, "grep");
+  writeFileSync(
+    fake,
+    `#!/usr/bin/env node
+const path = require("path");
+const args = process.argv.slice(2);
+if (args[0] === "-rilF") {
+  const files = ["MEMORY.md", "Projects/Garden Plan.md", "Finance/Budget 2026.md", "People/Dr Patel.md", "Home/Wifi and router.md", "Travel/Packing list.md"];
+  process.stdout.write(files.map((file) => path.join(process.cwd(), file)).join("\\r\\n") + "\\r\\n");
+} else {
+  process.stdout.write("./MEMORY.md\\r\\n");
+}
+`,
+  );
+  chmodSync(fake, 0o755);
+  writeFileSync(join(f.root, "q.jsonl"), JSON.stringify({ question: "alpha beta", expect: "MEMORY.md" }) + "\n");
+  const r = standalone(f, [join(f.root, "q.jsonl"), "--json"]);
+  assert.equal(r.code, 0, JSON.stringify(r.body));
+  assert.equal(r.body.data.results[0].grep.rank, 1);
+  assert.equal(r.body.data.results[0].grep.calls, 3);
+});
+
 test("brain bench rejects missing vault option values", (t) => {
   const f = fixture(t);
   for (const args of [
