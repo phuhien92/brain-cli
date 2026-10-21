@@ -225,6 +225,19 @@ test("log.added fires once for each entry created by add, import, and replace", 
   assert.deepEqual(JSON.parse(afterReplace[2]!), [replaced.body.data.replacement, "Replacement", "new body"]);
 });
 
+test("a log.added hook that ignores a large payload does not stop later hooks", { skip: process.platform === "win32" }, async (t) => {
+  const f = fixture(t);
+  const marker = join(f.root, "later.txt");
+  enabledHook(f, "a-ignorer", { read: [], write: ["learning"], network: [] }, { "log.added": "exit 0" }, "sh");
+  enabledHook(f, "b-recorder", { read: [], write: ["learning"], network: [], environment: ["HOOK_MARKER"] }, {
+    "log.added": `let input="";for await(const chunk of process.stdin)input+=chunk;const fs=await import("node:fs");fs.appendFileSync(process.env.HOOK_MARKER,JSON.parse(input).data.entry.title+"\\n");process.stdout.write(JSON.stringify({schema:"brain.hook.v1",event:"log.added",ok:true,data:{}})+"\\n")`,
+  });
+
+  const result = json(f, ["log", "add", "learning", "Large entry", "--body", "x".repeat(400_000)], { HOOK_MARKER: marker });
+  assert.equal(result.code, 0, result.stderr);
+  assert.deepEqual(await waitForLines(marker, 1), ["Large entry"]);
+});
+
 test("hooks from an extension's own write keep the initiating caller scope and do not re-trigger", { skip: process.platform === "win32" }, async (t) => {
   const f = fixture(t);
   const marker = join(f.root, "observed.txt");

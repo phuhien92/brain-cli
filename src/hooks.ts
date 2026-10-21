@@ -155,6 +155,7 @@ async function runHook(job: HookJob, timeoutMs: number): Promise<HookResult> {
       child.stdout.on("data", capture(stdout));
       child.stderr.on("data", capture(stderr));
       child.on("error", (error) => { problem = `could not start: ${error.message}`; });
+      child.stdin.on("error", () => {});
       child.stdin.end(JSON.stringify({ schema: HOOK_SCHEMA, event: job.event, data: job.data }) + "\n");
       const timer = setTimeout(() => stop(`exceeded the ${timeoutMs} ms time limit`), Math.max(1, timeoutMs));
       child.on("close", (code) => {
@@ -244,6 +245,10 @@ export function dispatchLogAddedHooks(store: Store, cfg: Config, paths: string[]
       env: process.env,
       stdio: "ignore",
       windowsHide: true,
+    });
+    worker.on("error", (error) => {
+      rmSync(jobFile, { force: true });
+      diagnostic(store.vault, "log.added", "supervisor", error);
     });
     worker.unref();
   } catch (error) {
