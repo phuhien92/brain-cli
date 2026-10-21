@@ -11,6 +11,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -19,7 +20,9 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseNote, type Frontmatter } from "./note.js";
 import { extensionsRoot } from "./paths.js";
 
@@ -30,12 +33,15 @@ export interface ExtensionPermissions {
   environment?: string[];
 }
 
+export type HookEvent = "context.build" | "log.added";
+
 export interface ExtensionManifest {
   name: string;
   version: string;
   brain?: string;
   description?: string;
   command: string;
+  hooks?: Partial<Record<HookEvent, string>>;
   permissions: ExtensionPermissions;
 }
 
@@ -77,7 +83,7 @@ const RESERVED = new Set([
 const RESERVED_ENVIRONMENT = new Set([
   "BRAIN_AS", "BRAIN_BIN", "BRAIN_BIN_ARGS_JSON", "BRAIN_EXTENSION_ARGS_JSON", "BRAIN_EXTENSION_LAUNCHER",
   "BRAIN_EXTENSION_PARENT_AS", "BRAIN_EXTENSION_SCOPE", "BRAIN_EXT_DIR", "BRAIN_EXT_REDACT",
-  "BRAIN_EXT_REDACT_TOKEN", "BRAIN_MACHINE", "BRAIN_VAULT",
+  "BRAIN_EXT_REDACT_TOKEN", "BRAIN_HOOK_EVENT", "BRAIN_MACHINE", "BRAIN_VAULT",
 ]);
 
 function slug(s: string): string {
@@ -155,6 +161,21 @@ export function readManifest(directory: string): ExtensionManifest {
       throw new ExtensionError("invalid_manifest", `${path}: environment permission '${variable}' is not an allowed variable name`, 2);
     }
   }
+  let hooks: Partial<Record<HookEvent, string>> | undefined;
+  if (o.hooks !== undefined) {
+    const declared = object(o.hooks, `${path}: hooks`);
+    hooks = {};
+    for (const [event, rawHook] of Object.entries(declared)) {
+      if (event !== "context.build" && event !== "log.added") {
+        throw new ExtensionError("invalid_manifest", `${path}: unsupported hook event '${event}'`, 2);
+      }
+      const hook = typeof rawHook === "string" ? rawHook.replace(/\\/g, "/") : "";
+      if (!hook || isAbsolute(hook) || hook.split("/").some((part) => !part || part === "." || part === "..")) {
+        throw new ExtensionError("invalid_manifest", `${path}: hooks.${event} must be a relative path inside the extension`, 2);
+      }
+      hooks[event] = hook;
+    }
+  }
   const brain = o.brain === undefined ? undefined : typeof o.brain === "string" ? o.brain : null;
   const description = o.description === undefined ? undefined : typeof o.description === "string" ? o.description.trim() : null;
   if (brain === null || description === null) throw new ExtensionError("invalid_manifest", `${path}: brain and description must be strings`, 2);
@@ -172,13 +193,14 @@ export function readManifest(directory: string): ExtensionManifest {
   };
   if (brain !== undefined) manifest.brain = brain;
   if (description !== undefined && description) manifest.description = description;
+  if (hooks !== undefined) manifest.hooks = hooks;
   return manifest;
 }
 
 // Launcher convention: manifests use one platform-neutral path. Unix runs it
 // verbatim; Windows resolves an extensionless path to .exe first, then .cmd.
-export function resolveLauncher(directory: string, manifest: ExtensionManifest, platform = process.platform): string {
-  const base = resolve(directory, ...manifest.command.split("/"));
+function resolveExecutable(directory: string, relativePath: string, platform: NodeJS.Platform): string {
+  const base = resolve(directory, ...relativePath.split("/"));
   if (!inside(resolve(directory), base)) throw new ExtensionError("invalid_manifest", "extension command escapes its directory", 2);
   const candidates = platform === "win32" && !extname(base) ? [`${base}.exe`, `${base}.cmd`] : [base];
   const found = candidates.find((p) => existsSync(p));
@@ -198,6 +220,16 @@ export function resolveLauncher(directory: string, manifest: ExtensionManifest, 
     }
   }
   return found;
+}
+
+export function resolveLauncher(directory: string, manifest: ExtensionManifest, platform = process.platform): string {
+  return resolveExecutable(directory, manifest.command, platform);
+}
+
+export function resolveHookLauncher(directory: string, manifest: ExtensionManifest, event: HookEvent, platform = process.platform): string {
+  const hook = manifest.hooks?.[event];
+  if (!hook) throw new ExtensionError("invalid_manifest", `${MANIFEST}: hook '${event}' is not declared`, 2);
+  return resolveExecutable(directory, hook, platform);
 }
 
 export interface ExtensionProcess {
@@ -221,9 +253,45 @@ export function extensionBrainProcess(runner: string): ExtensionProcess {
   return { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] };
 }
 
+const RUNTIME_ENVIRONMENT = new Set([
+  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
+  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
+]);
+const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
+
+export function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
+  const allowed = new Set([...RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
+  const normalized = process.platform === "win32"
+    ? new Set([...allowed].map((key) => key.toUpperCase()))
+    : allowed;
+  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
+    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
+  ));
+}
+
+export function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; file: string; args: string[] } {
+  const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
+  const path = join(directory, "brain.mjs");
+  const launch = extensionBrainProcess(path);
+  const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
+  writeFileSync(path, `const locked = ${JSON.stringify(values)};
+for (const [key, value] of Object.entries(locked)) {
+  if (value === null) delete process.env[key];
+  else process.env[key] = value;
+}
+await import(${JSON.stringify(pathToFileURL(BIN).href)});
+`);
+  return { directory, file: launch.file, args: launch.args };
+}
+
 export function extensionDirectory(name: string): string {
   if (!name || slug(name) !== name) throw new ExtensionError("usage", `invalid extension name '${name}'`, 2);
   return join(extensionsRoot(), name);
+}
+
+function validateLaunchers(directory: string, manifest: ExtensionManifest): void {
+  resolveLauncher(directory, manifest);
+  for (const event of Object.keys(manifest.hooks ?? {}) as HookEvent[]) resolveHookLauncher(directory, manifest, event);
 }
 
 export function installedManifest(name: string): { directory: string; manifest: ExtensionManifest } | null {
@@ -231,7 +299,7 @@ export function installedManifest(name: string): { directory: string; manifest: 
   if (!existsSync(directory)) return null;
   const manifest = readManifest(directory);
   if (manifest.name !== name) throw new ExtensionError("invalid_manifest", `${MANIFEST}: expected name '${name}', found '${manifest.name}'`, 2);
-  resolveLauncher(directory, manifest);
+  validateLaunchers(directory, manifest);
   return { directory, manifest };
 }
 
@@ -392,7 +460,7 @@ export async function installExtension(
     const metadata = prepare(source, stage);
     const stagedHash = installationHash(stage);
     const manifest = readManifest(stage);
-    resolveLauncher(stage, manifest);
+    validateLaunchers(stage, manifest);
     destination = extensionDirectory(manifest.name);
     if (existsSync(destination)) {
       const current = installedManifest(manifest.name)!;
@@ -438,7 +506,7 @@ export function listExtensions(vault: string): ExtensionRecord[] {
     }
     try {
       const manifest = readManifest(directory);
-      resolveLauncher(directory, manifest);
+      validateLaunchers(directory, manifest);
       let metadata: Partial<InstallMetadata> = {};
       try {
         metadata = JSON.parse(readFileSync(join(directory, METADATA), "utf8")) as Partial<InstallMetadata>;

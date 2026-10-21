@@ -108,8 +108,8 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
 | [Telemetry](docs/telemetry.md) | opt-in anonymous usage data: what is collected, how the one-time question works |
 | [Updates](docs/updates.md) | how brain tells you a newer release is out, and the release process |
 | [Benchmark](docs/benchmark.md) | grep vs. the Obsidian CLI vs. brain on real questions, and timings at 20,000 notes |
-| [Extensions](docs/extensions.md) | install and build process-isolated commands; permissions and scopes |
-| [Extensions and UI design](docs/design/extensions.md) | proposed hooks and local web interface |
+| [Extensions](docs/extensions.md) | install and build process-isolated commands and hooks; permissions and scopes |
+| [Extensions and UI design](docs/design/extensions.md) | proposed further hooks and local web interface |
 
 ## Roadmap
 
@@ -124,12 +124,13 @@ file lives: **[docs/architecture.md](docs/architecture.md)**.
    questions (`brain bench`): whether the right note came back, tokens read, calls. ✅
 5. **Extensions** — anyone can add a command (`brain <name>`) in any language, as a
    separate process speaking the `--json` contract, with a manifest that declares what it
-   reads, writes and contacts. Command extensions and the meetings reference are built;
-   event hooks remain next. [Use or build an extension](docs/extensions.md). 🚧
+   reads, writes and contacts. Command extensions, the meetings reference and the first
+   event hooks (`context.build`, `log.added`) are built; further hooks remain next.
+   [Use or build an extension](docs/extensions.md). 🚧
 6. **`brain ui`** — a local web page (127.0.0.1 only) for status, integrations, this
    machine's config, extensions and a search playground, like Serena's dashboard.
 
-Hooks and step 6 remain design work: [docs/design/extensions.md](docs/design/extensions.md).
+Further hooks and step 6 remain design work: [docs/design/extensions.md](docs/design/extensions.md).
 
 ## Develop
 

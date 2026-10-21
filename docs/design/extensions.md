@@ -1,7 +1,8 @@
 # Design: extensions and a local web interface
 
-*Status: command extensions (kind 1) are implemented. Hooks (kind 2) and the local UI
-remain proposed. See [the extension documentation](../extensions.md) for the shipped contract.*
+*Status: command extensions and the first two hooks (`context.build`, `log.added`) are
+implemented. Other hooks and the local UI remain proposed. See the
+[extension documentation](../extensions.md) for the shipped contract.*
 
 brain's core should stay small: index, search, get, log, sync, scopes. Most good ideas —
 a Granola importer, embeddings, a Readwise sync, a lint rule, a view for a new tool —
@@ -57,9 +58,9 @@ stdin and reads one JSON response from stdout (`brain.hook.v1`), with a timeout:
 | Event | When | The hook can |
 | --- | --- | --- |
 | `note.indexed` | a note was added or changed (incremental, so rarely) | add derived fields: people, dates, a summary, an embedding id |
-| `log.added` | an entry was created | notify, mirror elsewhere, add tags |
-| `search.after` | results are ranked, before output | re-rank or add results (embeddings, recency) — opt-in per call: `--with <ext>` |
-| `context.build` | building the session primer | add a few lines (today's calendar, open PRs) |
+| `log.added` (implemented) | an entry was created | notify, mirror elsewhere, add tags |
+| `search.after` | results are ranked, before output | re-rank or add results (embeddings, recency) — per-call only: `--with <ext>` |
+| `context.build` (implemented) | building the session primer | add a few lines (today's calendar, open PRs) |
 | `sync.after` | a sync finished | push a notification, run a backup |
 | `view.render` | rendering a view for export | render another format (Cursor rules, a CLAUDE.md block) |
 | `lint.run` | `brain lint` (roadmap step 4) | report findings for its own rules |
@@ -72,11 +73,11 @@ Embeddings are the clearest example: semantic search can arrive as a `note.index
 `search.after` extension with its own model and store, so brain's core keeps no model,
 no network and no native dependency, and users who never want it never pay for it.
 
-### Proposed hook manifest addition
+### Hook manifest addition
 
-Hooks would extend the implemented [`brain-extension.json` contract](../extensions.md#manifest)
-with a mapping such as `"hooks": { "context.build": "bin/context-hook" }`. Its exact schema,
-permissions and enablement behavior remain to be designed with the first hook.
+Hooks extend the implemented [`brain-extension.json` contract](../extensions.md#manifest)
+with a mapping such as `"hooks": { "context.build": "bin/context-hook" }`. The shipped process,
+permission, timeout, payload, and failure contracts are documented there.
 
 ### Proposed discovery and contribution
 
@@ -114,13 +115,12 @@ Rules it must follow:
 1. **Lifecycle and lint** (roadmap step 4). Done, with the [benchmark](../benchmark.md) as `brain bench`.
 2. **Extension commands** (kind 1) and the manifest, with `brain ext install/list/remove`.
    Done, designed against the meetings reference extension.
-3. **Hooks** (kind 2), one event at a time, starting with `context.build` and `log.added`.
+3. **Hooks** (kind 2). `context.build` and `log.added` are done; later events remain proposed.
 4. **`brain ui`**, once there is enough configuration to deserve a page.
 
 ## Open questions
 
-- Should hook output that changes ranking (`search.after`) ever be on by default, or only
-  per call? Proposed: per call, so search stays explainable.
+- `search.after`, if implemented, is per call only so search stays explainable.
 - Does a hosted index of extensions ever make sense, or is a GitHub topic enough?
 
 The implemented Windows launcher convention is documented in

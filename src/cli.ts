@@ -1,10 +1,10 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
+import { existsSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ConfigError, inReadScope, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
 import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
@@ -28,6 +28,7 @@ import * as update from "./update.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
+import { contextHookLines, dispatchLogAddedHooks } from "./hooks.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
@@ -36,7 +37,8 @@ import { ingest } from "./source.js";
 import {
   ExtensionError,
   enabledExtensionNames,
-  extensionBrainProcess,
+  extensionBrainRunner,
+  extensionEnvironment,
   extensionProcess,
   installExtension,
   installedManifest,
@@ -47,7 +49,7 @@ import {
   type ExtensionManifest,
 } from "./extensions.js";
 
-export const VERSION = "0.11.0";
+export const VERSION = "0.12.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -206,10 +208,6 @@ const BUILT_INS = new Set(COMMANDS);
 const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle"]);
 const EXTENSION_TIMEOUT_MS = 30_000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
-const EXTENSION_RUNTIME_ENVIRONMENT = new Set([
-  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
-  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
-]);
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -477,7 +475,7 @@ async function run(argv: string[]): Promise<number> {
       const cfg = loadConfig(vault, { as: flags.as });
       ctxStore = Store.open(vault);
       const index = ctxStore.refresh();
-      const text = context(ctxStore, cfg, limit);
+      const text = context(ctxStore, cfg, limit, await contextHookLines(vault, cfg));
       print(out, "context", { context: text }, { vault, index }, () => text);
     } catch {
       if (out.json) print(out, "context", { context: "" }, null, () => "");
@@ -726,6 +724,7 @@ async function run(argv: string[]): Promise<number> {
           print(out, "log.add", { ...result, kind: slug(kind) }, { vault, index }, () =>
             result.added ? result.path : `already recorded: ${result.path}`,
           );
+          if (result.added) dispatchLogAddedHooks(store, cfg, [result.path]);
           return 0;
         }
         if (sub === "import") {
@@ -760,6 +759,7 @@ async function run(argv: string[]): Promise<number> {
             }
             return lines.join("\n");
           });
+          dispatchLogAddedHooks(store, cfg, result.added);
           return 0;
         }
         if (sub === "retire" || sub === "replace") {
@@ -798,6 +798,7 @@ async function run(argv: string[]): Promise<number> {
           print(out, "log.replace", { target: target.path, replacement, event }, { vault, index }, () =>
             `${target.path}: retired and replaced by ${replacement}  (${event})`,
           );
+          dispatchLogAddedHooks(store, cfg, [replacement]);
           return 0;
         }
         const n = sub === undefined ? 10 : Number(sub);
@@ -1043,6 +1044,7 @@ async function confirmExtensionInstall(manifest: ExtensionManifest): Promise<boo
       `  writes:   ${show(manifest.permissions.write, "nothing")}`,
       `  contacts: ${show(manifest.permissions.network, "no hosts declared")}`,
       `  receives: ${show(manifest.permissions.environment ?? [], "no ambient variables")}`,
+      `  hooks:    ${show(Object.keys(manifest.hooks ?? {}), "none")}`,
       "",
       "This is code that runs with your operating-system permissions. brain enforces its",
       "read/write scope when it calls brain; declared network hosts are not sandboxed.",
@@ -1061,31 +1063,6 @@ interface ExtensionInvocation {
   args: string[];
   vault?: string;
   as?: string;
-}
-
-function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; file: string; args: string[] } {
-  const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
-  const path = join(directory, "brain.mjs");
-  const launch = extensionBrainProcess(path);
-  const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
-  writeFileSync(path, `const locked = ${JSON.stringify(values)};
-for (const [key, value] of Object.entries(locked)) {
-  if (value === null) delete process.env[key];
-  else process.env[key] = value;
-}
-await import(${JSON.stringify(pathToFileURL(BIN).href)});
-`);
-  return { directory, file: launch.file, args: launch.args };
-}
-
-function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
-  const allowed = new Set([...EXTENSION_RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
-  const normalized = process.platform === "win32"
-    ? new Set([...allowed].map((key) => key.toUpperCase()))
-    : allowed;
-  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
-    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
-  ));
 }
 
 function commandPosition(argv: string[]): number {
