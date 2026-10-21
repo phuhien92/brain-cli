@@ -1,8 +1,8 @@
 import "./isolate.js";
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -53,17 +53,28 @@ function environment(f: Fixture, extra: Record<string, string> = {}): NodeJS.Pro
   return env;
 }
 
-function brain(f: Fixture, args: string[], extra: Record<string, string> = {}) {
-  const result = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, ...args], {
-    cwd: f.vault,
-    env: environment(f, extra),
-    encoding: "utf8",
-  });
-  return { code: result.status, stdout: result.stdout, stderr: result.stderr };
+function brain(f: Fixture, args: string[], extra: Record<string, string> = {}, input?: string) {
+  let stdin: number | undefined;
+  if (input !== undefined) {
+    const file = join(f.root, `stdin-${randomUUID()}`);
+    writeFileSync(file, input);
+    stdin = openSync(file, "r");
+  }
+  try {
+    const result = spawnSync(process.execPath, ["--no-warnings=ExperimentalWarning", BIN, ...args], {
+      cwd: f.vault,
+      env: environment(f, extra),
+      encoding: "utf8",
+      stdio: [stdin ?? "pipe", "pipe", "pipe"],
+    });
+    return { code: result.status, stdout: result.stdout, stderr: result.stderr };
+  } finally {
+    if (stdin !== undefined) closeSync(stdin);
+  }
 }
 
-function json(f: Fixture, args: string[], extra: Record<string, string> = {}) {
-  const result = brain(f, [...args, "--json"], extra);
+function json(f: Fixture, args: string[], extra: Record<string, string> = {}, input?: string) {
+  const result = brain(f, [...args, "--json"], extra, input);
   return { ...result, body: JSON.parse(result.stdout) };
 }
 
@@ -233,7 +244,7 @@ test("a log.added hook that ignores a large payload does not stop later hooks", 
     "log.added": `let input="";for await(const chunk of process.stdin)input+=chunk;const fs=await import("node:fs");fs.appendFileSync(process.env.HOOK_MARKER,JSON.parse(input).data.entry.title+"\\n");process.stdout.write(JSON.stringify({schema:"brain.hook.v1",event:"log.added",ok:true,data:{}})+"\\n")`,
   });
 
-  const result = json(f, ["log", "add", "learning", "Large entry", "--body", "x".repeat(400_000)], { HOOK_MARKER: marker });
+  const result = json(f, ["log", "add", "learning", "Large entry", "--body", "-"], { HOOK_MARKER: marker }, "x".repeat(400_000));
   assert.equal(result.code, 0, result.stderr);
   assert.deepEqual(await waitForLines(marker, 1), ["Large entry"]);
 });
