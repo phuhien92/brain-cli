@@ -3,8 +3,10 @@
 // loaded into brain's process.
 import { execFileSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { accessSync, constants, cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, } from "node:fs";
+import { accessSync, constants, cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeFileSync, } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseNote } from "./note.js";
 import { extensionsRoot } from "./paths.js";
 export class ExtensionError extends Error {
@@ -193,6 +195,32 @@ export function extensionProcess(launcher, args, platform = process.platform) {
 }
 export function extensionBrainProcess(runner) {
     return { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] };
+}
+const RUNTIME_ENVIRONMENT = new Set([
+    "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
+    "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
+]);
+const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
+export function extensionEnvironment(manifest) {
+    const allowed = new Set([...RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
+    const normalized = process.platform === "win32"
+        ? new Set([...allowed].map((key) => key.toUpperCase()))
+        : allowed;
+    return Object.fromEntries(Object.entries(process.env).filter(([key, value]) => value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key)));
+}
+export function extensionBrainRunner(locked) {
+    const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
+    const path = join(directory, "brain.mjs");
+    const launch = extensionBrainProcess(path);
+    const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
+    writeFileSync(path, `const locked = ${JSON.stringify(values)};
+for (const [key, value] of Object.entries(locked)) {
+  if (value === null) delete process.env[key];
+  else process.env[key] = value;
+}
+await import(${JSON.stringify(pathToFileURL(BIN).href)});
+`);
+    return { directory, file: launch.file, args: launch.args };
 }
 export function extensionDirectory(name) {
     if (!name || slug(name) !== name)

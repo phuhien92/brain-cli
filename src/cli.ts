@@ -1,10 +1,10 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { hostname, tmpdir } from "node:os";
+import { existsSync, readFileSync, realpathSync, rmSync, statSync } from "node:fs";
+import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { ConfigError, inReadScope, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
 import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
@@ -37,7 +37,8 @@ import { ingest } from "./source.js";
 import {
   ExtensionError,
   enabledExtensionNames,
-  extensionBrainProcess,
+  extensionBrainRunner,
+  extensionEnvironment,
   extensionProcess,
   installExtension,
   installedManifest,
@@ -207,10 +208,6 @@ const BUILT_INS = new Set(COMMANDS);
 const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle"]);
 const EXTENSION_TIMEOUT_MS = 30_000;
 const EXTENSION_OUTPUT_LIMIT = 1024 * 1024;
-const EXTENSION_RUNTIME_ENVIRONMENT = new Set([
-  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
-  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
-]);
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
   lifecycle: ["set", "review", "archive", "restore", "status"],
@@ -1066,31 +1063,6 @@ interface ExtensionInvocation {
   args: string[];
   vault?: string;
   as?: string;
-}
-
-function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; file: string; args: string[] } {
-  const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
-  const path = join(directory, "brain.mjs");
-  const launch = extensionBrainProcess(path);
-  const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
-  writeFileSync(path, `const locked = ${JSON.stringify(values)};
-for (const [key, value] of Object.entries(locked)) {
-  if (value === null) delete process.env[key];
-  else process.env[key] = value;
-}
-await import(${JSON.stringify(pathToFileURL(BIN).href)});
-`);
-  return { directory, file: launch.file, args: launch.args };
-}
-
-function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
-  const allowed = new Set([...EXTENSION_RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
-  const normalized = process.platform === "win32"
-    ? new Set([...allowed].map((key) => key.toUpperCase()))
-    : allowed;
-  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
-    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
-  ));
 }
 
 function commandPosition(argv: string[]): number {

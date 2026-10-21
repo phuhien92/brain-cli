@@ -11,6 +11,7 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   readdirSync,
   realpathSync,
@@ -19,7 +20,9 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseNote, type Frontmatter } from "./note.js";
 import { extensionsRoot } from "./paths.js";
 
@@ -248,6 +251,37 @@ export function extensionProcess(launcher: string, args: string[], platform = pr
 
 export function extensionBrainProcess(runner: string): ExtensionProcess {
   return { file: process.execPath, args: ["--no-warnings=ExperimentalWarning", runner] };
+}
+
+const RUNTIME_ENVIRONMENT = new Set([
+  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
+  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
+]);
+const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
+
+export function extensionEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
+  const allowed = new Set([...RUNTIME_ENVIRONMENT, ...(manifest.permissions.environment ?? [])]);
+  const normalized = process.platform === "win32"
+    ? new Set([...allowed].map((key) => key.toUpperCase()))
+    : allowed;
+  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
+    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
+  ));
+}
+
+export function extensionBrainRunner(locked: Record<string, string | null>): { directory: string; file: string; args: string[] } {
+  const directory = mkdtempSync(join(tmpdir(), "brain-extension-"));
+  const path = join(directory, "brain.mjs");
+  const launch = extensionBrainProcess(path);
+  const values = { ...locked, BRAIN_BIN: launch.file, BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args) };
+  writeFileSync(path, `const locked = ${JSON.stringify(values)};
+for (const [key, value] of Object.entries(locked)) {
+  if (value === null) delete process.env[key];
+  else process.env[key] = value;
+}
+await import(${JSON.stringify(pathToFileURL(BIN).href)});
+`);
+  return { directory, file: launch.file, args: launch.args };
 }
 
 export function extensionDirectory(name: string): string {

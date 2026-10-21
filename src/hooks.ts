@@ -4,18 +4,18 @@
 
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { inScope, readScope, type Config } from "./config.js";
 import {
   enabledExtensionNames,
-  extensionBrainProcess,
+  extensionBrainRunner,
+  extensionEnvironment,
   extensionProcess,
   installedManifest,
   resolveHookLauncher,
-  type ExtensionManifest,
   type HookEvent,
 } from "./extensions.js";
 import { entryAt } from "./log.js";
@@ -26,11 +26,6 @@ const HOOK_SCHEMA = "brain.hook.v1";
 const CONTEXT_BUDGET_MS = 300;
 const LOG_TIMEOUT_MS = 30_000;
 const OUTPUT_LIMIT = 64 * 1024;
-const RUNTIME_ENV = new Set([
-  "COMSPEC", "DO_NOT_TRACK", "HOME", "LANG", "LC_ALL", "LC_CTYPE", "NO_COLOR", "PATH",
-  "PATHEXT", "SYSTEMROOT", "TEMP", "TERM", "TMP", "TMPDIR", "TZ", "USERPROFILE", "WINDIR",
-]);
-const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
 
 interface HookJob {
   vault: string;
@@ -56,20 +51,9 @@ function diagnostic(vault: string, event: HookEvent, name: string, error: unknow
   }
 }
 
-function hookEnvironment(manifest: ExtensionManifest): NodeJS.ProcessEnv {
-  const allowed = new Set([...RUNTIME_ENV, ...(manifest.permissions.environment ?? [])]);
-  const normalized = process.platform === "win32" ? new Set([...allowed].map((key) => key.toUpperCase())) : allowed;
-  return Object.fromEntries(Object.entries(process.env).filter(([key, value]) =>
-    value !== undefined && normalized.has(process.platform === "win32" ? key.toUpperCase() : key),
-  ));
-}
-
 function scopedRunner(job: HookJob, directory: string): { directory: string; file: string; args: string[]; token: string } {
-  const runnerDirectory = mkdtempSync(join(tmpdir(), "brain-hook-"));
-  const runner = join(runnerDirectory, "brain.mjs");
-  const launch = extensionBrainProcess(runner);
   const token = randomUUID();
-  const locked: Record<string, string | null> = {
+  const runner = extensionBrainRunner({
     BRAIN_VAULT: job.vault,
     BRAIN_CONFIG: process.env.BRAIN_CONFIG ?? null,
     BRAIN_STATE_DIR: process.env.BRAIN_STATE_DIR ?? null,
@@ -81,17 +65,8 @@ function scopedRunner(job: HookJob, directory: string): { directory: string; fil
     BRAIN_HOOK_EVENT: job.event,
     BRAIN_EXT_REDACT: "1",
     BRAIN_EXT_REDACT_TOKEN: token,
-    BRAIN_BIN: launch.file,
-    BRAIN_BIN_ARGS_JSON: JSON.stringify(launch.args),
-  };
-  writeFileSync(runner, `const locked = ${JSON.stringify(locked)};
-for (const [key, value] of Object.entries(locked)) {
-  if (value === null) delete process.env[key];
-  else process.env[key] = value;
-}
-await import(${JSON.stringify(pathToFileURL(BIN).href)});
-`);
-  return { directory: runnerDirectory, file: launch.file, args: launch.args, token };
+  });
+  return { ...runner, token };
 }
 
 function killTree(child: ChildProcess, detached: boolean): void {
@@ -116,7 +91,7 @@ async function runHook(job: HookJob, timeoutMs: number): Promise<HookResult> {
       const launch = extensionProcess(launcher, []);
       const detached = process.platform !== "win32";
       const env: NodeJS.ProcessEnv = {
-        ...hookEnvironment(installed.manifest),
+        ...extensionEnvironment(installed.manifest),
         ...launch.env,
         BRAIN_VAULT: job.vault,
         BRAIN_BIN: runner.file,
