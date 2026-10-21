@@ -28,6 +28,7 @@ import * as update from "./update.js";
 import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
+import { contextHookLines, dispatchLogAddedHooks } from "./hooks.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
@@ -47,7 +48,7 @@ import {
   type ExtensionManifest,
 } from "./extensions.js";
 
-export const VERSION = "0.11.0";
+export const VERSION = "0.12.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 
@@ -477,7 +478,7 @@ async function run(argv: string[]): Promise<number> {
       const cfg = loadConfig(vault, { as: flags.as });
       ctxStore = Store.open(vault);
       const index = ctxStore.refresh();
-      const text = context(ctxStore, cfg, limit);
+      const text = context(ctxStore, cfg, limit, await contextHookLines(vault, cfg));
       print(out, "context", { context: text }, { vault, index }, () => text);
     } catch {
       if (out.json) print(out, "context", { context: "" }, null, () => "");
@@ -726,6 +727,16 @@ async function run(argv: string[]): Promise<number> {
           print(out, "log.add", { ...result, kind: slug(kind) }, { vault, index }, () =>
             result.added ? result.path : `already recorded: ${result.path}`,
           );
+          if (result.added) {
+            dispatchLogAddedHooks(vault, cfg, {
+              path: result.path,
+              kind: slug(kind),
+              title,
+              body: input.body ?? "",
+              tags: input.tags ?? [],
+              machine: result.machine,
+            });
+          }
           return 0;
         }
         if (sub === "import") {
@@ -1043,6 +1054,7 @@ async function confirmExtensionInstall(manifest: ExtensionManifest): Promise<boo
       `  writes:   ${show(manifest.permissions.write, "nothing")}`,
       `  contacts: ${show(manifest.permissions.network, "no hosts declared")}`,
       `  receives: ${show(manifest.permissions.environment ?? [], "no ambient variables")}`,
+      `  hooks:    ${show(Object.keys(manifest.hooks ?? {}), "none")}`,
       "",
       "This is code that runs with your operating-system permissions. brain enforces its",
       "read/write scope when it calls brain; declared network hosts are not sandboxed.",

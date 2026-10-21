@@ -3,6 +3,11 @@
 Every release is a git tag `v<version>`. Install a specific one with
 `npm install -g github:phuhien92/brain-cli#v<version>`.
 
+## 0.12.0 (2026-10-21)
+
+- Extensions may declare bounded `context.build` and post-write `log.added` process hooks;
+  failures are isolated and hook payloads honor extension and caller scopes (issue #4).
+
 ## 0.11.0 (2026-10-14)
 
 - `brain update [--check]`: is a newer release out? Once a day brain checks GitHub in the

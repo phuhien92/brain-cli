@@ -8,7 +8,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { test } from "node:test";
-import { extensionBrainProcess, extensionProcess, resolveLauncher, type ExtensionManifest } from "../src/extensions.js";
+import { loadConfig } from "../src/config.js";
+import { extensionBrainProcess, extensionProcess, resolveLauncher, type ExtensionManifest, type HookEvent } from "../src/extensions.js";
+import { contextHookLines } from "../src/hooks.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const BIN = resolve(HERE, "../../bin/brain.js");
@@ -99,6 +101,100 @@ function echoExtension(path: string, name = "echoer"): string {
     permissions: { read: ["Allowed/"], write: ["event"], network: ["api.example.test"], environment: ["BRAIN_TEST_ALLOWED"] },
   }, `process.stdout.write(JSON.stringify({schema:"brain.v1",command:"${name}",ok:true,data:{args:process.argv.slice(2),vault:process.env.BRAIN_VAULT,as:process.env.BRAIN_AS,machine:process.env.BRAIN_MACHINE,dir:process.env.BRAIN_EXT_DIR,allowed:process.env.BRAIN_TEST_ALLOWED??null,secret:process.env.AWS_SECRET_ACCESS_KEY??null}})+"\\n")`);
 }
+
+function enabledHook(
+  f: Fixture,
+  name: string,
+  permissions: ExtensionManifest["permissions"],
+  hooks: Partial<Record<HookEvent, string>>,
+  runtime: "node" | "sh" = "node",
+): void {
+  const directory = join(f.extensions, name);
+  mkdirSync(join(directory, "bin"), { recursive: true });
+  writeFileSync(join(directory, "brain-extension.json"), JSON.stringify({
+    name, version: "1.0.0", command: "bin/command.mjs", hooks: Object.fromEntries(Object.keys(hooks).map((event) => [event, `bin/${event}.mjs`])), permissions,
+  }));
+  for (const [event, program] of Object.entries(hooks)) {
+    const path = join(directory, "bin", `${event}.mjs`);
+    writeFileSync(path, `${runtime === "sh" ? "#!/bin/sh" : "#!/usr/bin/env node"}\n${program}\n`);
+    chmodSync(path, 0o755);
+  }
+  const command = join(directory, "bin", "command.mjs");
+  writeFileSync(command, `#!/usr/bin/env node\nprocess.stdout.write('{"schema":"brain.v1","command":"${name}","ok":true,"data":{}}\\n')\n`);
+  chmodSync(command, 0o755);
+  mkdirSync(join(f.vault, "log", "extensions"), { recursive: true });
+  writeFileSync(join(f.vault, "log", "extensions", `${name}.md`), `---\nkind: extension\nextension: ${JSON.stringify(name)}\n---\n# ${name}\n`);
+}
+
+async function waitFor(path: string): Promise<void> {
+  for (let attempt = 0; attempt < 100 && !existsSync(path); attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.ok(existsSync(path), `timed out waiting for ${path}`);
+}
+
+test("context.build aggregates ordered lines while a broken hook is isolated", { skip: process.platform === "win32" }, async (t) => {
+  const f = fixture(t);
+  const response = `printf '%s\\n' '{"schema":"brain.hook.v1","event":"context.build","ok":true,"data":{"lines":["first hook","second hook"]}}'`;
+  enabledHook(f, "a-healthy", { read: [], write: [], network: [] }, { "context.build": response }, "sh");
+  enabledHook(f, "b-broken", { read: [], write: [], network: [] }, { "context.build": response }, "sh");
+  chmodSync(join(f.extensions, "b-broken", "bin", "context.build.mjs"), 0o644);
+
+  const keys = ["BRAIN_EXTENSIONS_DIR", "BRAIN_STATE_DIR", "BRAIN_CONFIG", "BRAIN_MACHINE"] as const;
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  Object.assign(process.env, {
+    BRAIN_EXTENSIONS_DIR: f.extensions,
+    BRAIN_STATE_DIR: f.state,
+    BRAIN_CONFIG: f.config,
+    BRAIN_MACHINE: "test-machine",
+  });
+  try {
+    assert.deepEqual(await contextHookLines(f.vault, loadConfig(f.vault), 2_000), ["first hook", "second hook"]);
+  } finally {
+    for (const key of keys) previous[key] === undefined ? delete process.env[key] : process.env[key] = previous[key];
+  }
+});
+
+for (const [name, program] of [["malformed", `printf 'not json\\n'`], ["failed", "exit 9"], ["slow", "sleep 2"]] as const) {
+  test(`context.build keeps the primer when a hook is ${name}`, { skip: process.platform === "win32" }, (t) => {
+    const f = fixture(t);
+    enabledHook(f, `hook-${name}`, { read: [], write: [], network: [] }, { "context.build": program }, "sh");
+    const started = Date.now();
+    const result = brain(f, ["context"]);
+    assert.equal(result.code, 0, result.stderr);
+    assert.ok(Date.now() - started < 1200, "context hooks have a hard 300 ms budget");
+    assert.match(result.stdout, /The user's notes and long-term memory/);
+    assert.match(result.stdout, /<\/brain>/);
+    assert.match(readFileSync(join(f.state, readdirSync(f.state)[0]!, "hooks.log"), "utf8"), new RegExp(`context\\.build hook-${name}`));
+  });
+}
+
+test("log.added is post-write, scoped, detached from success, and reports failures", { skip: process.platform === "win32" }, async (t) => {
+  const f = fixture(t);
+  const marker = join(f.root, "received.json");
+  const skipped = join(f.root, "out-of-scope");
+  enabledHook(f, "a-recorder", { read: [], write: ["learning"], network: [], environment: ["HOOK_MARKER"] }, {
+    "log.added": `let input="";for await(const chunk of process.stdin)input+=chunk;const message=JSON.parse(input);const fs=await import("node:fs");if(!fs.existsSync(process.env.BRAIN_VAULT+"/"+message.data.entry.path))process.exit(8);fs.writeFileSync(process.env.HOOK_MARKER,JSON.stringify(message));process.stdout.write(JSON.stringify({schema:"brain.hook.v1",event:"log.added",ok:true,data:{}})+"\\n")`,
+  });
+  enabledHook(f, "b-out-of-scope", { read: ["Private/"], write: [], network: [] }, {
+    "log.added": `const fs=await import("node:fs");fs.writeFileSync(${JSON.stringify(skipped)},"ran")`,
+  });
+  enabledHook(f, "c-failed", { read: [], write: ["learning"], network: [] }, { "log.added": `process.exit(7)` });
+
+  const result = json(f, ["log", "add", "learning", "Hook payload", "--body", "safe body"], { HOOK_MARKER: marker });
+  assert.equal(result.code, 0, result.stderr);
+  assert.equal(result.body.ok, true);
+  assert.ok(existsSync(join(f.vault, ...result.body.data.path.split("/"))), "entry exists before detached hooks run");
+  await waitFor(marker);
+  const message = JSON.parse(readFileSync(marker, "utf8"));
+  assert.deepEqual(message, {
+    schema: "brain.hook.v1",
+    event: "log.added",
+    data: { entry: { path: result.body.data.path, kind: "learning", title: "Hook payload", body: "safe body", tags: [], machine: "test-machine" } },
+  });
+  assert.equal(existsSync(skipped), false, "a hook cannot receive an entry outside its declared scope");
+  const diagnostics = join(f.state, readdirSync(f.state)[0]!, "hooks.log");
+  await waitFor(diagnostics);
+  assert.match(readFileSync(diagnostics, "utf8"), /log\.added c-failed: exited 7/);
+});
 
 test("install needs human permission approval and exposes the declared permissions", { skip: process.platform === "win32" }, (t) => {
   const f = fixture(t);

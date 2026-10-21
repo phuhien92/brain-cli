@@ -17,8 +17,17 @@ PI=${PI:-"npx --yes @earendil-works/pi-coding-agent"}
 mkdir -p "$WORK/home" "$WORK/bin" "$WORK/vault/.obsidian"
 printf '#!/bin/sh\nexec "%s/bin/brain.js" "$@"\n' "$ROOT" > "$WORK/bin/brain" && chmod +x "$WORK/bin/brain"
 export HOME="$WORK/home" PATH="$WORK/bin:$PATH" BRAIN_VAULT="$WORK/vault" BRAIN_CONFIG="$WORK/none.json" BRAIN_MACHINE=ci
+export BRAIN_EXTENSIONS_DIR="$WORK/extensions"
 
 brain log add learning "pnpm cache breaks after macOS updates" -q
+mkdir -p "$BRAIN_EXTENSIONS_DIR/pi-check/bin" "$WORK/vault/log/extensions"
+cat > "$BRAIN_EXTENSIONS_DIR/pi-check/brain-extension.json" <<'JSON'
+{"name":"pi-check","version":"1.0.0","command":"bin/command","hooks":{"context.build":"bin/context"},"permissions":{"read":[],"write":[],"network":[]}}
+JSON
+printf '#!/bin/sh\nprintf '\''%%s\\n'\'' '\''{"schema":"brain.v1","command":"pi-check","ok":true,"data":{}}'\''\n' > "$BRAIN_EXTENSIONS_DIR/pi-check/bin/command"
+printf '#!/bin/sh\nprintf '\''%%s\\n'\'' '\''{"schema":"brain.hook.v1","event":"context.build","ok":true,"data":{"lines":["Pi context hook ran"]}}'\''\n' > "$BRAIN_EXTENSIONS_DIR/pi-check/bin/context"
+chmod +x "$BRAIN_EXTENSIONS_DIR/pi-check/bin/command" "$BRAIN_EXTENSIONS_DIR/pi-check/bin/context"
+printf '%s\n' '---' 'kind: extension' 'extension: "pi-check"' '---' '# pi-check' > "$WORK/vault/log/extensions/pi-check.md"
 brain agent install pi -q
 
 cat > "$WORK/server.mjs" <<JS
@@ -55,5 +64,6 @@ for (const [i, r] of reqs.entries()) {
   if (n !== 1) fail(`request ${i + 1} carries ${n} <brain> primers, expected exactly 1`);
 }
 if (!reqs[0].includes("pnpm cache breaks")) fail("the primer does not carry recent memory");
-console.log("ok: Pi lists the brain skill and injects one primer per session");
+if (!reqs[0].includes("Pi context hook ran")) fail("the primer does not carry context.build output");
+console.log("ok: Pi lists the brain skill and injects one primer with hook output per session");
 JS

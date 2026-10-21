@@ -1,8 +1,7 @@
-# Command extensions
+# Extensions
 
-Kind-1 extensions are implemented. They add `brain <name>` commands without loading
-third-party code into brain's process. Hooks and the local web interface remain design work in
-[`design/extensions.md`](design/extensions.md).
+Extensions add commands and event hooks without loading third-party code into brain's process.
+The local web interface remains design work in [`design/extensions.md`](design/extensions.md).
 
 ## Install, inspect, remove
 
@@ -43,6 +42,10 @@ An extension directory has a `brain-extension.json` at its root:
   "brain": ">=0.10 <1",
   "description": "Import summaries from Example",
   "command": "bin/brain-example",
+  "hooks": {
+    "context.build": "bin/context-hook",
+    "log.added": "bin/log-hook"
+  },
   "permissions": {
     "read": ["Projects/"],
     "write": ["example"],
@@ -55,6 +58,8 @@ An extension directory has a `brain-extension.json` at its root:
 - `name` is the command after `brain`; it uses lowercase letters, numbers, and dashes.
 - `version` is a semantic version. `brain` and `description` are optional metadata.
 - `command` is a relative path that must remain inside the installation and be executable.
+- `hooks` optionally maps `context.build` and `log.added` to separate executable paths inside
+  the installation. Other event names are rejected.
 - `permissions.read` lists vault folder prefixes; `"*"` means the whole vault.
 - `permissions.write` lists log kinds the extension may add.
 - `permissions.network` lists host names shown during approval.
@@ -127,6 +132,53 @@ On failure it uses `ok: false`, an `error` object, and a non-zero exit. Diagnost
 stderr. brain validates the envelope and exit code before forwarding it. A command's process tree is killed
 after 30 seconds or after stdout and stderr together exceed 1 MiB. Invalid output, a crash, or either limit fails only that
 extension command; built-ins and `brain context` continue normally.
+
+## Hook contract
+
+Each declared hook is another separate process, started in extension-name order with the same
+working directory, scoped `BRAIN_BIN`, environment allowlist, and permissions as a command.
+It reads one event from stdin and must write one success envelope to stdout:
+
+```json
+{"schema":"brain.hook.v1","event":"context.build","data":{}}
+{"schema":"brain.hook.v1","event":"context.build","ok":true,"data":{"lines":["3 notes need review"]}}
+```
+
+The first line is an example input and the second is its output. Output must be exactly one
+non-empty JSON line. A `log.added` success returns an object in `data` (normally `{}`). Hook
+stdout and stderr together are limited to 64 KiB. Failures are appended to
+`<brain path state>/hooks.log`; they never replace normal command output.
+
+### `context.build`
+
+This event's input `data` is empty: it does not hand vault content across the process boundary.
+The hook may use its scoped `BRAIN_BIN` to derive a line from only its declared read folders and
+log kinds, intersected with the caller's `BRAIN_AS` scope. Its output `data.lines` may contain up
+to 20 non-empty, single-line strings of at most 1,000 characters each. brain preserves extension
+and line order and inserts valid lines into the primer.
+
+All `context.build` processes share a 300 ms execution budget. A timeout, crash, malformed
+envelope, invalid lines, or broken installed extension is dropped. Healthy output and the core
+primer still print, and `brain context` still exits 0.
+
+### `log.added`
+
+This event is dispatched only for a newly created entry, after its file has been created with
+exclusive-write semantics and the index has refreshed. It is not emitted for an idempotent
+`--source-id` entry that already existed. Input data has this shape:
+
+```json
+{"entry":{"path":"log/learning/…md","kind":"learning","title":"…","body":"…","tags":[],"machine":"laptop"}}
+```
+
+brain dispatches only when the entry path is readable under both the hook's declared permissions
+and the caller's scope. A detached supervisor gives each hook 30 seconds; hook latency, malformed
+output, or failure cannot change `log add`'s output or exit status. The entry is already durable
+when the hook starts, so reactions must be idempotent if their own side effects may be retried.
+
+Hooks run with the user's OS permissions – these payload and child-command checks are guardrails,
+not a sandbox. `search.after`, `sync.after`, and `lint.run` are not implemented. A future
+`search.after` will be enabled per call only, so ordinary search ranking stays explainable.
 
 ## Reference: meetings
 

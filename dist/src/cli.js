@@ -14,13 +14,14 @@ import * as update from "./update.js";
 import { context, HARNESSES, install } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows } from "./lifecycle.js";
 import { lint } from "./lint.js";
+import { contextHookLines, dispatchLogAddedHooks } from "./hooks.js";
 import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView } from "./log.js";
 import { OfflineNoteError, Store } from "./store.js";
 import { brainPaths, describePaths, PATH_NAMES } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 import { ingest } from "./source.js";
 import { ExtensionError, enabledExtensionNames, extensionBrainProcess, extensionProcess, installExtension, installedManifest, listExtensions, publicExtensionSource, removeExtension, resolveLauncher, } from "./extensions.js";
-export const VERSION = "0.11.0";
+export const VERSION = "0.12.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
 export const SCHEMA = "brain.v1";
 const HELP = `brain — headless memory for a markdown vault
@@ -424,7 +425,7 @@ async function run(argv) {
             const cfg = loadConfig(vault, { as: flags.as });
             ctxStore = Store.open(vault);
             const index = ctxStore.refresh();
-            const text = context(ctxStore, cfg, limit);
+            const text = context(ctxStore, cfg, limit, await contextHookLines(vault, cfg));
             print(out, "context", { context: text }, { vault, index }, () => text);
         }
         catch {
@@ -676,6 +677,16 @@ async function run(argv) {
                         : addEntryOnce(store, cfg, input, sourceId, sourceDate, sourceMachine);
                     index = store.refresh();
                     print(out, "log.add", { ...result, kind: slug(kind) }, { vault, index }, () => result.added ? result.path : `already recorded: ${result.path}`);
+                    if (result.added) {
+                        dispatchLogAddedHooks(vault, cfg, {
+                            path: result.path,
+                            kind: slug(kind),
+                            title,
+                            body: input.body ?? "",
+                            tags: input.tags ?? [],
+                            machine: result.machine,
+                        });
+                    }
                     return 0;
                 }
                 if (sub === "import") {
@@ -961,6 +972,7 @@ async function confirmExtensionInstall(manifest) {
         `  writes:   ${show(manifest.permissions.write, "nothing")}`,
         `  contacts: ${show(manifest.permissions.network, "no hosts declared")}`,
         `  receives: ${show(manifest.permissions.environment ?? [], "no ambient variables")}`,
+        `  hooks:    ${show(Object.keys(manifest.hooks ?? {}), "none")}`,
         "",
         "This is code that runs with your operating-system permissions. brain enforces its",
         "read/write scope when it calls brain; declared network hosts are not sandboxed.",

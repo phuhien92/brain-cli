@@ -30,12 +30,15 @@ export interface ExtensionPermissions {
   environment?: string[];
 }
 
+export type HookEvent = "context.build" | "log.added";
+
 export interface ExtensionManifest {
   name: string;
   version: string;
   brain?: string;
   description?: string;
   command: string;
+  hooks?: Partial<Record<HookEvent, string>>;
   permissions: ExtensionPermissions;
 }
 
@@ -155,6 +158,21 @@ export function readManifest(directory: string): ExtensionManifest {
       throw new ExtensionError("invalid_manifest", `${path}: environment permission '${variable}' is not an allowed variable name`, 2);
     }
   }
+  let hooks: Partial<Record<HookEvent, string>> | undefined;
+  if (o.hooks !== undefined) {
+    const declared = object(o.hooks, `${path}: hooks`);
+    hooks = {};
+    for (const [event, rawHook] of Object.entries(declared)) {
+      if (event !== "context.build" && event !== "log.added") {
+        throw new ExtensionError("invalid_manifest", `${path}: unsupported hook event '${event}'`, 2);
+      }
+      const hook = typeof rawHook === "string" ? rawHook.replace(/\\/g, "/") : "";
+      if (!hook || isAbsolute(hook) || hook.split("/").some((part) => !part || part === "." || part === "..")) {
+        throw new ExtensionError("invalid_manifest", `${path}: hooks.${event} must be a relative path inside the extension`, 2);
+      }
+      hooks[event] = hook;
+    }
+  }
   const brain = o.brain === undefined ? undefined : typeof o.brain === "string" ? o.brain : null;
   const description = o.description === undefined ? undefined : typeof o.description === "string" ? o.description.trim() : null;
   if (brain === null || description === null) throw new ExtensionError("invalid_manifest", `${path}: brain and description must be strings`, 2);
@@ -172,13 +190,14 @@ export function readManifest(directory: string): ExtensionManifest {
   };
   if (brain !== undefined) manifest.brain = brain;
   if (description !== undefined && description) manifest.description = description;
+  if (hooks !== undefined) manifest.hooks = hooks;
   return manifest;
 }
 
 // Launcher convention: manifests use one platform-neutral path. Unix runs it
 // verbatim; Windows resolves an extensionless path to .exe first, then .cmd.
-export function resolveLauncher(directory: string, manifest: ExtensionManifest, platform = process.platform): string {
-  const base = resolve(directory, ...manifest.command.split("/"));
+function resolveExecutable(directory: string, relativePath: string, platform: NodeJS.Platform): string {
+  const base = resolve(directory, ...relativePath.split("/"));
   if (!inside(resolve(directory), base)) throw new ExtensionError("invalid_manifest", "extension command escapes its directory", 2);
   const candidates = platform === "win32" && !extname(base) ? [`${base}.exe`, `${base}.cmd`] : [base];
   const found = candidates.find((p) => existsSync(p));
@@ -198,6 +217,16 @@ export function resolveLauncher(directory: string, manifest: ExtensionManifest, 
     }
   }
   return found;
+}
+
+export function resolveLauncher(directory: string, manifest: ExtensionManifest, platform = process.platform): string {
+  return resolveExecutable(directory, manifest.command, platform);
+}
+
+export function resolveHookLauncher(directory: string, manifest: ExtensionManifest, event: HookEvent, platform = process.platform): string {
+  const hook = manifest.hooks?.[event];
+  if (!hook) throw new ExtensionError("invalid_manifest", `${MANIFEST}: hook '${event}' is not declared`, 2);
+  return resolveExecutable(directory, hook, platform);
 }
 
 export interface ExtensionProcess {
@@ -226,12 +255,17 @@ export function extensionDirectory(name: string): string {
   return join(extensionsRoot(), name);
 }
 
+function validateLaunchers(directory: string, manifest: ExtensionManifest): void {
+  resolveLauncher(directory, manifest);
+  for (const event of Object.keys(manifest.hooks ?? {}) as HookEvent[]) resolveHookLauncher(directory, manifest, event);
+}
+
 export function installedManifest(name: string): { directory: string; manifest: ExtensionManifest } | null {
   const directory = extensionDirectory(name);
   if (!existsSync(directory)) return null;
   const manifest = readManifest(directory);
   if (manifest.name !== name) throw new ExtensionError("invalid_manifest", `${MANIFEST}: expected name '${name}', found '${manifest.name}'`, 2);
-  resolveLauncher(directory, manifest);
+  validateLaunchers(directory, manifest);
   return { directory, manifest };
 }
 
@@ -392,7 +426,7 @@ export async function installExtension(
     const metadata = prepare(source, stage);
     const stagedHash = installationHash(stage);
     const manifest = readManifest(stage);
-    resolveLauncher(stage, manifest);
+    validateLaunchers(stage, manifest);
     destination = extensionDirectory(manifest.name);
     if (existsSync(destination)) {
       const current = installedManifest(manifest.name)!;
@@ -438,7 +472,7 @@ export function listExtensions(vault: string): ExtensionRecord[] {
     }
     try {
       const manifest = readManifest(directory);
-      resolveLauncher(directory, manifest);
+      validateLaunchers(directory, manifest);
       let metadata: Partial<InstallMetadata> = {};
       try {
         metadata = JSON.parse(readFileSync(join(directory, METADATA), "utf8")) as Partial<InstallMetadata>;

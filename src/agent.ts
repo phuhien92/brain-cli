@@ -20,7 +20,7 @@ export type Harness = (typeof HARNESSES)[number];
 // The primer: what brain is, where the vault is, and the most recent memory
 // titles. Titles only — a session should start knowing what exists, and pay
 // for the detail only when it searches.
-export function context(store: Store, cfg: Config, limit = 5): string {
+export function context(store: Store, cfg: Config, limit = 5, hookLines: string[] = []): string {
   // Over-fetch, then drop titles already shown: two machines may hold the same
   // learning as two entries (see renderView).
   const seen = new Set<string>();
@@ -50,6 +50,7 @@ export function context(store: Store, cfg: Config, limit = 5): string {
       `${overdue.length} note(s) are past their review date (\`brain lifecycle status --due\`): treat facts from them as possibly stale and say so.`,
     );
   }
+  if (hookLines.length) lines.push(...hookLines);
   if (entries.length) {
     lines.push("", "Recent memory (newest first):");
     for (const e of entries) lines.push(`- ${e.created.slice(0, 10)} [${e.kind}] ${e.title}`);
