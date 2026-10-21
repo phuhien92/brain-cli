@@ -29,7 +29,7 @@ const RESERVED = new Set([
 const RESERVED_ENVIRONMENT = new Set([
     "BRAIN_AS", "BRAIN_BIN", "BRAIN_BIN_ARGS_JSON", "BRAIN_EXTENSION_ARGS_JSON", "BRAIN_EXTENSION_LAUNCHER",
     "BRAIN_EXTENSION_PARENT_AS", "BRAIN_EXTENSION_SCOPE", "BRAIN_EXT_DIR", "BRAIN_EXT_REDACT",
-    "BRAIN_EXT_REDACT_TOKEN", "BRAIN_MACHINE", "BRAIN_VAULT",
+    "BRAIN_EXT_REDACT_TOKEN", "BRAIN_HOOK_EVENT", "BRAIN_MACHINE", "BRAIN_VAULT",
 ]);
 function slug(s) {
     return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60).replace(/-+$/, "");

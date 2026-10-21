@@ -6,7 +6,8 @@ Every release is a git tag `v<version>`. Install a specific one with
 ## 0.12.0 (2026-10-21)
 
 - Extensions may declare bounded `context.build` and post-write `log.added` process hooks;
-  failures are isolated and hook payloads honor extension and caller scopes (issue #4).
+  `log.added` fires for entries from `log add`, `log import` and `log replace`; failures are
+  isolated and hook payloads honor extension and caller scopes (issue #4).
 
 ## 0.11.0 (2026-10-14)
 

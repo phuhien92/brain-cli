@@ -727,16 +727,7 @@ async function run(argv: string[]): Promise<number> {
           print(out, "log.add", { ...result, kind: slug(kind) }, { vault, index }, () =>
             result.added ? result.path : `already recorded: ${result.path}`,
           );
-          if (result.added) {
-            dispatchLogAddedHooks(vault, cfg, {
-              path: result.path,
-              kind: slug(kind),
-              title,
-              body: input.body ?? "",
-              tags: input.tags ?? [],
-              machine: result.machine,
-            });
-          }
+          if (result.added) dispatchLogAddedHooks(store, cfg, [result.path]);
           return 0;
         }
         if (sub === "import") {
@@ -771,6 +762,7 @@ async function run(argv: string[]): Promise<number> {
             }
             return lines.join("\n");
           });
+          dispatchLogAddedHooks(store, cfg, result.added);
           return 0;
         }
         if (sub === "retire" || sub === "replace") {
@@ -809,6 +801,7 @@ async function run(argv: string[]): Promise<number> {
           print(out, "log.replace", { target: target.path, replacement, event }, { vault, index }, () =>
             `${target.path}: retired and replaced by ${replacement}  (${event})`,
           );
+          dispatchLogAddedHooks(store, cfg, [replacement]);
           return 0;
         }
         const n = sub === undefined ? 10 : Number(sub);

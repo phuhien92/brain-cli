@@ -117,6 +117,20 @@ export function listEntries(store, cfg, opts = {}) {
         };
     });
 }
+export function entryAt(store, path) {
+    const note = store.get(path);
+    if (!note || typeof note.frontmatter.kind !== "string")
+        return null;
+    return {
+        path,
+        kind: note.frontmatter.kind,
+        title: note.title,
+        created: String(note.frontmatter.created ?? ""),
+        machine: String(note.frontmatter.machine ?? ""),
+        tags: note.tags,
+        body: entryBody(readFileSync(join(store.vault, ...path.split("/")), "utf8")),
+    };
+}
 // Record a retirement as a separate lifecycle entry. Multiple machines may
 // retire the same target; each event is valid and no existing file is touched.
 export function recordRetirement(vault, cfg, target, opts = {}) {

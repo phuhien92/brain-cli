@@ -18,7 +18,9 @@ import {
   type ExtensionManifest,
   type HookEvent,
 } from "./extensions.js";
+import { entryAt } from "./log.js";
 import { vaultStateDir } from "./paths.js";
+import type { Store } from "./store.js";
 
 const HOOK_SCHEMA = "brain.hook.v1";
 const CONTEXT_BUDGET_MS = 300;
@@ -76,6 +78,7 @@ function scopedRunner(job: HookJob, directory: string): { directory: string; fil
     BRAIN_MACHINE: job.machine,
     BRAIN_EXTENSION_SCOPE: job.name,
     BRAIN_EXTENSION_PARENT_AS: job.parentAs || null,
+    BRAIN_HOOK_EVENT: job.event,
     BRAIN_EXT_REDACT: "1",
     BRAIN_EXT_REDACT_TOKEN: token,
     BRAIN_BIN: launch.file,
@@ -182,6 +185,8 @@ async function runHook(job: HookJob, timeoutMs: number): Promise<HookResult> {
 }
 
 function jobs(vault: string, cfg: Config, event: HookEvent, data: Record<string, unknown>, path?: string): HookJob[] {
+  if (process.env.BRAIN_HOOK_EVENT) return [];
+  const parentAs = process.env.BRAIN_EXTENSION_SCOPE ? process.env.BRAIN_EXTENSION_PARENT_AS ?? "" : cfg.as?.name ?? "";
   return enabledExtensionNames(vault).flatMap((name) => {
     try {
       const installed = installedManifest(name);
@@ -190,7 +195,7 @@ function jobs(vault: string, cfg: Config, event: HookEvent, data: Record<string,
         ? null
         : [...installed.manifest.permissions.read, ...installed.manifest.permissions.write.map((kind) => `${cfg.logDir}/${kind}/`)];
       if (path && (!inScope(path, readScope(cfg)) || !inScope(path, manifestScope))) return [];
-      return [{ vault, machine: cfg.machine, parentAs: cfg.as?.name ?? "", name, event, data }];
+      return [{ vault, machine: cfg.machine, parentAs, name, event, data }];
     } catch (error) {
       diagnostic(vault, event, name, error);
       return [];
@@ -218,41 +223,47 @@ export async function contextHookLines(vault: string, cfg: Config, budgetMs = CO
   return results.flatMap((result) => result.lines);
 }
 
-export function dispatchLogAddedHooks(vault: string, cfg: Config, entry: Record<string, unknown>): void {
-  const path = typeof entry.path === "string" ? entry.path : "";
-  let hookJobs: HookJob[];
-  try {
-    hookJobs = jobs(vault, cfg, "log.added", { entry }, path);
-  } catch (error) {
-    diagnostic(vault, "log.added", "discovery", error);
-    return;
-  }
-  for (const job of hookJobs) {
-    const jobFile = join(tmpdir(), `brain-hook-${process.pid}-${randomUUID()}.json`);
+export function dispatchLogAddedHooks(store: Store, cfg: Config, paths: string[]): void {
+  const hookJobs = paths.flatMap((path) => {
     try {
-      writeFileSync(jobFile, JSON.stringify(job), { flag: "wx", mode: 0o600 });
-      const worker = spawn(process.execPath, [fileURLToPath(import.meta.url), "worker", jobFile], {
-        detached: process.platform !== "win32",
-        env: process.env,
-        stdio: "ignore",
-        windowsHide: true,
-      });
-      worker.unref();
+      const found = entryAt(store, path);
+      if (!found) return [];
+      const { created: _created, ...entry } = found;
+      return jobs(store.vault, cfg, "log.added", { entry }, path);
     } catch (error) {
-      rmSync(jobFile, { force: true });
-      diagnostic(vault, job.event, job.name, error);
+      diagnostic(store.vault, "log.added", "discovery", error);
+      return [];
     }
+  });
+  if (!hookJobs.length) return;
+  const jobFile = join(tmpdir(), `brain-hook-${process.pid}-${randomUUID()}.json`);
+  try {
+    writeFileSync(jobFile, JSON.stringify(hookJobs), { flag: "wx", mode: 0o600 });
+    const worker = spawn(process.execPath, [fileURLToPath(import.meta.url), "worker", jobFile], {
+      detached: process.platform !== "win32",
+      env: process.env,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    worker.unref();
+  } catch (error) {
+    rmSync(jobFile, { force: true });
+    diagnostic(store.vault, "log.added", "supervisor", error);
   }
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv[2] === "worker") {
-  let job: HookJob | undefined;
+  let hookJobs: HookJob[] = [];
   try {
     const jobFile = process.argv[3]!;
-    job = JSON.parse(readFileSync(jobFile, "utf8")) as HookJob;
+    hookJobs = JSON.parse(readFileSync(jobFile, "utf8")) as HookJob[];
     rmSync(jobFile, { force: true });
-    await runHook(job, LOG_TIMEOUT_MS);
-  } catch (error) {
-    if (job) diagnostic(job.vault, job.event, job.name, error);
+  } catch {}
+  for (const job of hookJobs) {
+    try {
+      await runHook(job, LOG_TIMEOUT_MS);
+    } catch (error) {
+      diagnostic(job.vault, job.event, job.name, error);
+    }
   }
 }

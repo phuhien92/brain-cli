@@ -163,17 +163,21 @@ primer still print, and `brain context` still exits 0.
 
 ### `log.added`
 
-This event is dispatched only for a newly created entry, after its file has been created with
-exclusive-write semantics and the index has refreshed. It is not emitted for an idempotent
-`--source-id` entry that already existed. Input data has this shape:
+This event is dispatched once for each newly created entry — from `log add`, `log import` and
+the replacement written by `log replace` — after its file has been created with exclusive-write
+semantics and the index has refreshed. It is not emitted for an idempotent `--source-id` entry
+that already existed. Input data has this shape:
 
 ```json
 {"entry":{"path":"log/learning/…md","kind":"learning","title":"…","body":"…","tags":[],"machine":"laptop"}}
 ```
 
 brain dispatches only when the entry path is readable under both the hook's declared permissions
-and the caller's scope. A detached supervisor gives each hook 30 seconds; hook latency, malformed
-output, or failure cannot change `log add`'s output or exit status. The entry is already durable
+and the caller's scope. When the entry was written by an extension, the hook's `BRAIN_AS` is the
+integration that launched that extension, not the extension itself. One detached supervisor runs
+a command's hooks one event at a time and gives each 30 seconds; hook latency, malformed output,
+or failure cannot change the command's output or exit status. Commands a hook runs through its
+`BRAIN_BIN` dispatch no further hooks, so a hook that writes an entry cannot re-trigger itself. The entry is already durable
 when the hook starts, so reactions must be idempotent if their own side effects may be retried.
 
 Hooks run with the user's OS permissions – these payload and child-command checks are guardrails,

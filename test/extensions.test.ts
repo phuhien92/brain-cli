@@ -196,6 +196,61 @@ test("log.added is post-write, scoped, detached from success, and reports failur
   assert.match(readFileSync(diagnostics, "utf8"), /log\.added c-failed: exited 7/);
 });
 
+async function waitForLines(path: string, count: number): Promise<string[]> {
+  const read = () => existsSync(path) ? readFileSync(path, "utf8").split("\n").filter(Boolean) : [];
+  for (let attempt = 0; attempt < 150 && read().length < count; attempt++) await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.equal(read().length, count, `timed out waiting for ${count} lines in ${path}`);
+  return read();
+}
+
+test("log.added fires once for each entry created by add, import, and replace", { skip: process.platform === "win32" }, async (t) => {
+  const f = fixture(t);
+  const marker = join(f.root, "events.txt");
+  enabledHook(f, "recorder", { read: [], write: ["learning"], network: [], environment: ["HOOK_MARKER"] }, {
+    "log.added": `let input="";for await(const chunk of process.stdin)input+=chunk;const {entry}=JSON.parse(input).data;const fs=await import("node:fs");fs.appendFileSync(process.env.HOOK_MARKER,JSON.stringify([entry.path,entry.title,entry.body])+"\\n");process.stdout.write(JSON.stringify({schema:"brain.hook.v1",event:"log.added",ok:true,data:{}})+"\\n")`,
+  });
+  const file = join(f.root, "import.md");
+  writeFileSync(file, "- First imported\n- Second imported\n  with body\n");
+
+  const imported = json(f, ["log", "import", "learning", file], { HOOK_MARKER: marker });
+  assert.equal(imported.code, 0, imported.stderr);
+  assert.equal(imported.body.data.added.length, 2);
+  const afterImport = (await waitForLines(marker, 2)).map((line) => JSON.parse(line));
+  assert.deepEqual(afterImport.map(([path]) => path).sort(), [...imported.body.data.added].sort());
+  assert.deepEqual(afterImport.map(([, title, body]) => [title, body]).sort(), [["First imported", ""], ["Second imported", "with body"]]);
+
+  const replaced = json(f, ["log", "replace", imported.body.data.added[0], "--text", "Replacement", "--body", "new body"], { HOOK_MARKER: marker });
+  assert.equal(replaced.code, 0, replaced.stderr);
+  const afterReplace = await waitForLines(marker, 3);
+  assert.deepEqual(JSON.parse(afterReplace[2]!), [replaced.body.data.replacement, "Replacement", "new body"]);
+});
+
+test("hooks from an extension's own write keep the initiating caller scope and do not re-trigger", { skip: process.platform === "win32" }, async (t) => {
+  const f = fixture(t);
+  const marker = join(f.root, "observed.txt");
+  writeFileSync(join(f.vault, "brain.json"), JSON.stringify({ integrations: { caller: { read: ["Notes/"], write: ["learning"] } } }));
+  enabledHook(f, "a-writer", { read: [], write: ["learning"], network: [], environment: ["HOOK_MARKER"] }, {});
+  writeFileSync(join(f.extensions, "a-writer", "bin", "command.mjs"), `#!/usr/bin/env node
+import { spawnSync } from "node:child_process";
+const r=spawnSync(process.env.BRAIN_BIN,[...JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]"),"log","add","learning","From extension","--json"],{encoding:"utf8"});
+const child=JSON.parse(r.stdout);
+process.stdout.write(JSON.stringify({schema:"brain.v1",command:"a-writer",ok:child.ok,data:child.data,error:child.error})+"\\n");process.exitCode=r.status;
+`);
+  enabledHook(f, "b-observer", { read: [], write: ["learning"], network: [], environment: ["HOOK_MARKER"] }, {
+    "log.added": `import { spawnSync } from "node:child_process";let input="";for await(const chunk of process.stdin)input+=chunk;const {entry}=JSON.parse(input).data;const prefix=JSON.parse(process.env.BRAIN_BIN_ARGS_JSON??"[]");const listed=spawnSync(process.env.BRAIN_BIN,[...prefix,"log","5","--json"],{encoding:"utf8"});const echoed=spawnSync(process.env.BRAIN_BIN,[...prefix,"log","add","learning","Echo of "+entry.title,"--json"],{encoding:"utf8"});const fs=await import("node:fs");fs.appendFileSync(process.env.HOOK_MARKER,JSON.stringify({as:process.env.BRAIN_AS,listed:listed.status,echoed:echoed.status,title:entry.title})+"\\n");process.stdout.write(JSON.stringify({schema:"brain.hook.v1",event:"log.added",ok:true,data:{}})+"\\n")`,
+  });
+
+  const written = json(f, ["a-writer"], { BRAIN_AS: "caller", HOOK_MARKER: marker });
+  assert.equal(written.code, 0, written.stderr);
+  assert.equal(written.body.ok, true);
+  const [observed] = await waitForLines(marker, 1);
+  assert.deepEqual(JSON.parse(observed!), { as: "caller", listed: 0, echoed: 0, title: "From extension" });
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  assert.equal(readFileSync(marker, "utf8").split("\n").filter(Boolean).length, 1, "a hook's own write does not dispatch another hook");
+  const titles = json(f, ["log", "10"], { BRAIN_AS: "caller" }).body.data.entries.map((entry: { title: string }) => entry.title).sort();
+  assert.deepEqual(titles, ["Echo of From extension", "From extension"]);
+});
+
 test("install needs human permission approval and exposes the declared permissions", { skip: process.platform === "win32" }, (t) => {
   const f = fixture(t);
   const source = echoExtension(join(f.root, "source"));
