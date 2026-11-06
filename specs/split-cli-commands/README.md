@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: 01 to 06 built. 06 moved setup, telemetry, feedback, agent, context and update to `src/commands/`, each keeping the name its failures are reported as (`telemetry.<sub>`, `feedback.<sub>`, `agent.install`), and `context` keeping its own catch-all (invariant 11). It also removed every unused import in `cli.ts` and `src/commands/` (checked with `tsc --noUnusedLocals`). `cli.ts` is at 519 lines. Next: 07 (move HELP; under 500).
+Status: all seven slices built. 07 moved HELP to `src/commands/help.ts`; `cli.ts` is 388 lines and holds only parsing, the command tables, extension pre-dispatch, vault discovery, `print`, `fail`, telemetry wiring, and the re-exports tests use. `CLAUDE.md` documents `src/commands/`. Next: a decisions-ledger check over 03 to 07, the after-scorecard, then a draft PR.
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.
