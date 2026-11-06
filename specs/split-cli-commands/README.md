@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: 01 to 03 built. 03 moved `ext` and the extension runner to `src/commands/ext.ts`; the router's table entries can now name what a failure is reported as (`ext` fails as `ext.<sub>`, as before). The context gained `schema`, and one `makeCtx` serves both the extension pre-dispatch and the normal path. `cli.ts` is at 1,376 lines. Next: 04 (log and export) and 06 (early commands).
+Status: 01 to 04 built. 04 moved `log` (all subcommands) and `export` to `src/commands/log.ts` with `runExports`, `resolveLogEntry`, `formatExports`, and `driftMessage`; `cli.ts` imports the export helpers back for the commands that still use them. `cli.ts` is at 1,148 lines. Next: 05 (remaining vault commands) and 06 (early commands).
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.
