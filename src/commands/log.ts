@@ -1,7 +1,7 @@
 // `brain log` (list, add, import, retire, replace) and `brain export`, plus the
 // helpers they share with other commands.
 import { existsSync, readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { resolve } from "node:path";
 import { inReadScope, inScope, slug, type Config } from "../config.js";
 import { redactor } from "../feedback.js";
 import { dispatchLogAddedHooks } from "../hooks.js";
@@ -13,7 +13,6 @@ export const logCommand: Handler = async (args, flags, ctx) => {
   const { out, print } = ctx;
   const { vault, cfg, scope, permit, store } = ctx.vault!;
   let index = ctx.vault!.index;
-  const command = "log";
   const [sub, ...rest] = args;
   if (sub === "add") {
     const [kind = "", ...titleWords] = rest;

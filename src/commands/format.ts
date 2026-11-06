@@ -1,5 +1,4 @@
 // Small formatting helpers shared by the read and lint commands.
-import { join } from "node:path";
 import { type LifecycleState } from "../lifecycle.js";
 import { Store } from "../store.js";
 

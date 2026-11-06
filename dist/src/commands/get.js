@@ -1,3 +1,4 @@
+// `brain get`.
 import { inReadScope } from "../config.js";
 import { lifecycleStates } from "../lifecycle.js";
 import { brief, formatMeta, extractSections } from "./format.js";

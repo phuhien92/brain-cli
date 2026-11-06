@@ -1,5 +1,4 @@
 // `brain sync`.
-import { join } from "node:path";
 import { sync } from "../sync.js";
 import { runExports, formatExports, driftMessage } from "./log.js";
 import { type Handler } from "./shared.js";

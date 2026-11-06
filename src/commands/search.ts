@@ -1,5 +1,4 @@
 // `brain search`.
-import { join } from "node:path";
 import { lifecycleStates } from "../lifecycle.js";
 import { LIFECYCLE_KIND } from "../log.js";
 import { brief, staleMark, stem } from "./format.js";

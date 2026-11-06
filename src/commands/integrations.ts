@@ -1,5 +1,4 @@
 // `brain integrations`.
-import { join } from "node:path";
 import { type Handler } from "./shared.js";
 
 export const integrationsCommand: Handler = (args, flags, ctx) => {

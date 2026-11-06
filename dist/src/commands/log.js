@@ -11,7 +11,6 @@ export const logCommand = async (args, flags, ctx) => {
     const { out, print } = ctx;
     const { vault, cfg, scope, permit, store } = ctx.vault;
     let index = ctx.vault.index;
-    const command = "log";
     const [sub, ...rest] = args;
     if (sub === "add") {
         const [kind = "", ...titleWords] = rest;

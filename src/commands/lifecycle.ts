@@ -1,5 +1,4 @@
 // `brain lifecycle`.
-import { join, resolve } from "node:path";
 import { inReadScope } from "../config.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category } from "../lifecycle.js";
 import { LIFECYCLE_KIND } from "../log.js";

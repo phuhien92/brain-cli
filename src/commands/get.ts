@@ -1,5 +1,4 @@
 // `brain get`.
-import { join, resolve } from "node:path";
 import { inReadScope } from "../config.js";
 import { lifecycleStates } from "../lifecycle.js";
 import { brief, formatMeta, extractSections } from "./format.js";

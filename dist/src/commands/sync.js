@@ -1,3 +1,4 @@
+// `brain sync`.
 import { sync } from "../sync.js";
 import { runExports, formatExports, driftMessage } from "./log.js";
 export const syncCommand = (args, flags, ctx) => {

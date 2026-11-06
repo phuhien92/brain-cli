@@ -1,3 +1,4 @@
+// `brain lifecycle`.
 import { inReadScope } from "../config.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows } from "../lifecycle.js";
 import { LIFECYCLE_KIND } from "../log.js";

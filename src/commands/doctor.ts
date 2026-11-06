@@ -1,11 +1,11 @@
 // `brain doctor`.
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { userSettings, type Config } from "../config.js";
 import * as update from "../update.js";
 import { type RefreshStats } from "../store.js";
 import { brainPaths } from "../paths.js";
-import { isGitRepo, resolveSyncMode, sync } from "../sync.js";
+import { isGitRepo, resolveSyncMode } from "../sync.js";
 import { type Handler } from "./shared.js";
 
 export const doctorCommand: Handler = (args, flags, ctx) => {

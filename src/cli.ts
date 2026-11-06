@@ -1,35 +1,15 @@
 import { existsSync, realpathSync, statSync } from "node:fs";
-import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { ConfigError, inReadScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
-import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
+import { ConfigError, loadConfig, readScope, readUserConfig, userSettings } from "./config.js";
 import {
-  createDraft,
-  diagnostics,
-  getDraft,
-  issueUrl,
-  KINDS,
-  lastError,
-  listDrafts,
-  markSubmitted,
-  postWithGh,
-  redactor,
-  repo,
   saveLastError,
-  type Kind,
 } from "./feedback.js";
 import * as telemetry from "./telemetry.js";
 import * as update from "./update.js";
-import { context, HARNESSES, install, type Harness } from "./agent.js";
-import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
-import { lint } from "./lint.js";
-import { contextHookLines } from "./hooks.js";
-import { LIFECYCLE_KIND, type Entry } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
-import { brainPaths, PATH_NAMES } from "./paths.js";
-import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
-import { ingest } from "./source.js";
+import { PATH_NAMES } from "./paths.js";
+import { SyncError } from "./sync.js";
 import {
   ExtensionError,
   publicExtensionSource,
@@ -38,7 +18,7 @@ import { CliError, parseFlags, type Ctx, type Handler, type Out } from "./comman
 import { pathCommand } from "./commands/path.js";
 import { viewCommand } from "./commands/view.js";
 import { extensionManagementCommand, runExtensionCommand } from "./commands/ext.js";
-import { driftMessage, exportCommand, formatExports, logCommand, runExports } from "./commands/log.js";
+import { exportCommand, logCommand } from "./commands/log.js";
 import { ingestCommand } from "./commands/ingest.js";
 import { indexCommand } from "./commands/index.js";
 import { searchCommand } from "./commands/search.js";
@@ -48,6 +28,12 @@ import { lifecycleCommand } from "./commands/lifecycle.js";
 import { lintCommand } from "./commands/lint.js";
 import { integrationsCommand } from "./commands/integrations.js";
 import { doctorCommand } from "./commands/doctor.js";
+import { setupHandler } from "./commands/setup.js";
+import { telemetryCommand } from "./commands/telemetry.js";
+import { feedbackHandler } from "./commands/feedback.js";
+import { agentCommand } from "./commands/agent.js";
+import { contextCommand } from "./commands/context.js";
+import { updateCommand } from "./commands/update.js";
 export { extractSections } from "./commands/format.js";
 
 export const VERSION = "0.12.0";
@@ -229,6 +215,13 @@ function route<T>(table: Record<string, T>, command: string): T | undefined {
 const EARLY: Record<string, Route> = {
   path: pathCommand,
   ext: { handler: (args, flags, ctx) => extensionManagementCommand(args, flags, ctx), failAs: byTelemetryName },
+  setup: setupHandler,
+  telemetry: { handler: telemetryCommand, failAs: byTelemetryName },
+  feedback: { handler: feedbackHandler, failAs: byTelemetryName },
+  agent: { handler: agentCommand, failAs: () => "agent.install" },
+  // Never fails: it catches everything itself (CLAUDE.md invariant 11).
+  context: contextCommand,
+  update: updateCommand,
 };
 const VAULT: Record<string, Handler> = {
   ingest: ingestCommand,
@@ -360,134 +353,12 @@ async function run(argv: string[]): Promise<number> {
     return 0;
   }
 
-  if (command === "setup") {
-    try {
-      return await setupCommand(flags, out);
-    } catch (err) {
-      return fail(out, "setup", err);
-    }
-  }
-
-  if (command === "telemetry") {
-    try {
-      const [sub = "status"] = args;
-      const settings = userSettings();
-      if (sub === "flush") {
-        const r = await telemetry.flush();
-        print(out, "telemetry.flush", r, null, () => (r.error ? `not sent: ${r.error}` : `sent ${r.sent} event(s)`));
-        return 0;
-      }
-      if (sub === "enable" || sub === "disable") telemetry.setEnabled(sub === "enable");
-      if (sub === "reset") telemetry.resetInstallId();
-      if (!["status", "show", "enable", "disable", "reset"].includes(sub)) {
-        throw new CliError("usage", "usage: brain telemetry [status|show|enable|disable|reset]", 2);
-      }
-      const st = telemetry.status(settings.telemetry);
-      if (sub === "show") {
-        const events = telemetry.queue();
-        print(out, "telemetry.show", { ...st, events }, null, () =>
-          events.length ? events.map((e) => JSON.stringify(e)).join("\n") : "no events queued",
-        );
-        return 0;
-      }
-      print(out, `telemetry.${sub}`, st, null, () =>
-        [
-          `telemetry: ${st.enabled ? "on" : "off"} (${st.reason})`,
-          `collector: ${st.collector ?? "not configured — events stay on this machine"}`,
-          `queued: ${st.queued} event(s) · install id: ${st.install}`,
-          "what is collected: docs/telemetry.md · see it: brain telemetry show · stop: brain telemetry disable",
-        ].join("\n"),
-      );
-      return 0;
-    } catch (err) {
-      return fail(out, tCommand, err);
-    }
-  }
-
-  if (command === "feedback") {
-    try {
-      return await feedbackCommand(args, flags, out);
-    } catch (err) {
-      return fail(out, tCommand, err);
-    }
-  }
 
 
-  if (command === "agent") {
-    try {
-      const [sub, harness = ""] = args;
-      if (sub !== "install" || !(HARNESSES as readonly string[]).includes(harness)) {
-        throw new CliError("usage", `usage: brain agent install <${HARNESSES.join("|")}> [--dry-run] [--force]`, 2);
-      }
-      const result = install(harness as Harness, { force: flags.force, dryRun: flags["dry-run"] });
-      const conflicts = result.files.filter((f) => f.status === "conflict");
-      if (conflicts.length) {
-        throw new CliError(
-          "install_conflict",
-          `${conflicts.map((f) => f.path).join(", ")} exists and was not written by brain; rerun with --force to replace it`,
-          5,
-          { files: conflicts.map((f) => f.path) },
-        );
-      }
-      print(out, "agent.install", { ...result, dryRun: flags["dry-run"] }, null, () =>
-        [
-          ...result.files.map((f) => `${flags["dry-run"] && f.status === "written" ? "would write" : f.status}  ${f.path}`),
-          ...result.warnings.map((w) => `warning: ${w}`),
-          ...(result.next.length ? ["", ...result.next] : []),
-        ].join("\n"),
-      );
-      return 0;
-    } catch (err) {
-      return fail(out, "agent.install", err);
-    }
-  }
 
-  if (command === "context") {
-    // Runs inside other tools' session-start hooks: any failure prints nothing
-    // and exits 0, so a missing vault never breaks the agent that called it.
-    let ctxStore: Store | null = null;
-    try {
-      const limit = flags.limit === undefined ? 5 : Math.max(0, Math.min(Number(flags.limit) || 0, 50));
-      const vault = findVault(flags.vault);
-      const cfg = loadConfig(vault, { as: flags.as });
-      ctxStore = Store.open(vault);
-      const index = ctxStore.refresh();
-      const text = context(ctxStore, cfg, limit, await contextHookLines(vault, cfg));
-      print(out, "context", { context: text }, { vault, index }, () => text);
-    } catch {
-      if (out.json) print(out, "context", { context: "" }, null, () => "");
-    } finally {
-      ctxStore?.close();
-    }
-    return 0;
-  }
 
-  if (command === "update") {
-    try {
-      if (args.length) throw new CliError("usage", "usage: brain update [--check]", 2);
-      const configCheck = userSettings().updateCheck;
-      let error: string | null = null;
-      if (flags.check) error = (await update.check(VERSION)).error;
-      const st = update.status(VERSION, configCheck);
-      print(out, command, { ...st, error }, null, () =>
-        [
-          st.available
-            ? `brain ${st.latest} is available (you have ${st.current}). Update with:\n  ${st.command}`
-            : st.latest
-              ? `brain ${st.current} is the latest release.`
-              : `brain ${st.current}. No release has been checked yet${flags.check ? "" : ": run brain update --check"}.`,
-          ...(error ? [`check failed: ${error}`] : []),
-          st.checkedAt ? `last checked ${st.checkedAt.slice(0, 10)}` : "",
-          st.enabled ? "" : `daily check off (${st.reason})`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
-      return 0;
-    } catch (err) {
-      return fail(out, command, err);
-    }
-  }
+
+
 
   const early = route(EARLY, command);
   if (early) {
@@ -542,171 +413,6 @@ function commandPosition(argv: string[]): number {
     }
   }
   return -1;
-}
-
-async function setupCommand(flags: Record<string, unknown>, out: Out): Promise<number> {
-  const interactive = process.stdin.isTTY === true && process.stderr.isTTY === true && !flags.yes && !out.json;
-  let choices: SetupChoices | null;
-  if (interactive) {
-    choices = await interactiveSetup();
-    if (!choices) {
-      process.stderr.write("Nothing was written.\n");
-      return 0;
-    }
-  } else {
-    if (!flags.yes) {
-      throw new CliError("usage", "setup asks questions in a terminal; elsewhere pass --yes with the choices as flags (brain help)", 2);
-    }
-    const vaultFlag = flags.vault as string | undefined;
-    const vault = vaultFlag ? resolve(vaultFlag) : findVaultCandidates()[0];
-    if (!vault || !existsSync(vault)) throw new CliError("no_vault", "no vault given or found: pass --vault <dir>", 1);
-    const sync = (flags.sync as string | undefined) ?? recommendSync(vault).mode;
-    if (!["auto", "git", "none"].includes(sync)) throw new CliError("usage", "--sync must be auto, git or none", 2);
-    const agents = flags.agents === undefined ? detectHarnesses() : String(flags.agents).split(",").map((a) => a.trim()).filter(Boolean);
-    for (const a of agents) if (!["claude", "pi", "agents"].includes(a)) throw new CliError("usage", `unknown agent harness '${a}'`, 2);
-    const t = flags.telemetry as string | undefined;
-    if (t !== undefined && !["yes", "no"].includes(t)) throw new CliError("usage", "--telemetry must be yes or no", 2);
-    const u = flags["update-check"] as string | undefined;
-    if (u !== undefined && !["yes", "no"].includes(u)) throw new CliError("usage", "--update-check must be yes or no", 2);
-    const machine = slug((flags.machine as string | undefined) ?? String(readUserConfig().machine ?? "")) || slug(hostname().replace(/\.local$/i, ""));
-    choices = {
-      vault,
-      machine,
-      sync: sync as SetupChoices["sync"],
-      agents: agents as Harness[],
-      telemetry: t === undefined ? null : t === "yes",
-      updateCheck: u === undefined ? null : u === "yes",
-      profile: flags.profile === true,
-    };
-  }
-  const result = applySetup(choices);
-  const conflicts = result.installs.flatMap((r) => r.files.filter((f) => f.status === "conflict").map((f) => f.path));
-  print(out, "setup", { ...result, conflicts }, null, () =>
-    [
-      `\nWrote ${result.configPath}`,
-      ...result.installs.flatMap((r) => [`${r.harness}:`, ...r.files.map((f) => `  ${f.status}  ${f.path}`), ...r.warnings.map((w) => `  warning: ${w}`), ...r.next.flatMap((n) => n.split("\n")).map((n) => `  ${n}`)]),
-      ...(conflicts.length ? [`Not replaced (not written by brain; rerun brain agent install <harness> --force): ${conflicts.join(", ")}`] : []),
-      result.profile ? (result.profile.added ? `Added to ${result.profile.file}: ${result.profile.line}` : `${result.profile.file} already sets BRAIN_VAULT`) : "",
-      "",
-      "Next: brain doctor (checks this machine) · brain search \"something you know is in there\"",
-    ]
-      .filter((l) => l !== "")
-      .join("\n"),
-  );
-  return 0;
-}
-
-async function feedbackCommand(
-  args: string[],
-  flags: Record<string, unknown>,
-  out: Out,
-): Promise<number> {
-  const [sub, ...rest] = args;
-
-  if (sub === "list") {
-    const drafts = listDrafts();
-    print(out, "feedback.list", { drafts }, null, () =>
-      drafts.length
-        ? drafts.map((d) => `${d.id}  ${d.status.padEnd(9)} ${d.kind.padEnd(4)} ${d.title}`).join("\n")
-        : "no feedback drafts",
-    );
-    return 0;
-  }
-
-  if (sub === "show" || sub === "submit") {
-    const id = rest[0] ?? "";
-    const draft = getDraft(id);
-    if (!draft) throw new CliError("not_found", `no feedback draft '${id}' (brain feedback list)`, 3);
-    if (sub === "show") {
-      print(out, "feedback.show", { ...draft, url: draft.url ?? issueUrl(draft) }, null, () =>
-        `${draft.title}\n\n${draft.body}\n\n${Object.entries(draft.diagnostics).map(([k, v]) => `${k}: ${v}`).join("\n")}`,
-      );
-      return 0;
-    }
-    if (!flags.post) {
-      // The default: a person opens the page, reads it, and submits it.
-      const url = issueUrl(draft);
-      print(out, "feedback.submit", { id: draft.id, posted: false, url }, null, () =>
-        `Open this link, review the report, and click "Submit new issue":\n${url}`,
-      );
-      return 0;
-    }
-    // Posting without a person in the loop needs their say-so: either they
-    // allowed it on this machine, or they asked for this report to be posted.
-    const allowed = userSettings().feedbackPost === "allow";
-    if (!allowed && !flags["user-approved"]) {
-      throw new CliError(
-        "not_permitted",
-        'posting needs the user\'s permission: they asked for it (--user-approved) or allowed it ("feedback": { "post": "allow" } in ~/.config/brain/config.json)',
-        6,
-      );
-    }
-    let posted: string;
-    try {
-      posted = postWithGh(draft);
-    } catch (err) {
-      throw new CliError("post_failed", `gh issue create failed (${(err as Error).message.split("\n")[0]}); submit by link instead: brain feedback submit ${draft.id}`, 1);
-    }
-    const done = markSubmitted(draft, posted);
-    print(out, "feedback.submit", { id: done.id, posted: true, url: posted }, null, () => posted);
-    return 0;
-  }
-
-  // Create a draft: brain feedback "<what happened>" [--kind] [--title] [--from-last-error]
-  const text = (sub === "add" ? rest : args).join(" ").trim();
-  const last = flags["from-last-error"] ? lastError() : null;
-  if (flags["from-last-error"] && !last) throw new CliError("not_found", "no recorded error on this machine", 3);
-  if (!text && !last) {
-    throw new CliError("usage", 'usage: brain feedback "<what happened>" [--kind bug|idea|docs] [--title …] [--from-last-error]', 2);
-  }
-  const kind = (flags.kind as string | undefined) ?? "bug";
-  if (!(KINDS as readonly string[]).includes(kind)) throw new CliError("usage", `--kind must be one of: ${KINDS.join(", ")}`, 2);
-
-  // Redact against this vault when there is one: its path and every note's
-  // path and title become placeholders.
-  let vault: string | null = null;
-  let notes: { path: string; title: string }[] = [];
-  let s: Store | null = null;
-  try {
-    vault = findVault(flags.vault as string | undefined);
-    s = Store.open(vault);
-    s.refresh();
-    notes = s.db.prepare("SELECT path, title FROM notes").all() as { path: string; title: string }[];
-  } catch {
-    vault = null;
-  } finally {
-    s?.close();
-  }
-  const redact = redactor({ vault, notes });
-  const body = [
-    text || "(no description)",
-    ...(last
-      ? ["", "### What failed", "", "```", `brain ${last.args.join(" ")}`, `exit ${last.exit} · ${last.code}`, last.message, "```"]
-      : []),
-  ].join("\n");
-  const title = (flags.title as string | undefined)?.trim() || (last ? `${last.command}: ${last.code}` : text.split("\n")[0]!.slice(0, 80));
-  const draft = createDraft(
-    {
-      kind: kind as Kind,
-      title,
-      body,
-      diagnostics: diagnostics(VERSION, last ? { command: last.command, error: last.code, exit: String(last.exit) } : {}),
-      fingerprintSeed: last ? `${last.command}|${last.code}|${VERSION}` : `${kind}|${title.toLowerCase()}`,
-    },
-    redact,
-  );
-  print(out, "feedback.add", { draft, repo: repo() }, null, () =>
-    [
-      `drafted ${draft.id} (${draft.kind}) — redacted preview:`,
-      "",
-      `  ${draft.title}`,
-      ...draft.body.split("\n").map((l) => `  ${l}`),
-      "",
-      `review: brain feedback show ${draft.id}`,
-      `submit: brain feedback submit ${draft.id}   (prints a link for a person to submit)`,
-    ].join("\n"),
-  );
-  return 0;
 }
 
 // Each check names what it found and, when it warns, what to do. Nothing here
