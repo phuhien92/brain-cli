@@ -1,0 +1,16 @@
+$ brain path
+--- exit 0
+--- stdout
+vault            <TMP>/vault
+log              <TMP>/vault/log  (not created yet)
+sources          <TMP>/vault/sources  (not created yet)
+config           <TMP>/vault/brain.json  (not created yet)
+user-config      <TMP>/home/.config/brain/config.json  (not created yet)
+extensions       <TMP>/home/.local/share/brain/extensions  (not created yet)
+state            <TMP>/state/vault-<ID>  (not created yet)
+index            <TMP>/state/vault-<ID>/index.db  (not created yet)
+telemetry-queue  <TMP>/state/telemetry-queue.jsonl  (not created yet)
+update-check     <TMP>/state/update-check.json  (not created yet)
+<<END stdout>>
+--- stderr
+<<END stderr>>

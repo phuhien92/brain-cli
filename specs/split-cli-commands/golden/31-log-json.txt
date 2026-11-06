@@ -1,0 +1,7 @@
+$ brain log --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"log","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":7,"offline":0,"ms":<N>},"data":{"entries":[{"path":"log/decision/<DATE>-golden-use-pnpm-2.md","kind":"decision","title":"Use pnpm","created":"<TIME>","machine":"golden","tags":[],"body":"faster installs"},{"path":"log/decision/<DATE>-golden-use-pnpm.md","kind":"decision","title":"Use pnpm","created":"<TIME>","machine":"golden","tags":[],"body":"faster installs"}]}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

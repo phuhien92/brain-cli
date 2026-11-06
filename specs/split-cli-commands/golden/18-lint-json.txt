@@ -1,0 +1,7 @@
+$ brain lint --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"lint","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":5,"offline":0,"ms":<N>},"data":{"findings":[{"rule":"broken-link","severity":"warn","path":"notes/broken.md","message":"[[nowhere]] does not resolve to any note"},{"rule":"orphan","severity":"info","path":"a/dup.md","message":"no note links here"},{"rule":"orphan","severity":"info","path":"notes/broken.md","message":"no note links here"},{"rule":"orphan","severity":"info","path":"notes/dup.md","message":"no note links here"}],"counts":{"warn":1,"info":3}}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

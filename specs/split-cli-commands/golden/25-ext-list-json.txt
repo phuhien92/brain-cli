@@ -1,0 +1,7 @@
+$ brain ext list --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"ext.list","ok":true,"data":{"extensions":[]}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

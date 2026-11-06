@@ -1,0 +1,7 @@
+$ brain hasOwnProperty --json
+--- exit 2
+--- stdout
+{"schema":"brain.v1","command":"hasOwnProperty","ok":false,"error":{"code":"usage","message":"invalid extension name 'hasOwnProperty'"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

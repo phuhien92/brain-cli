@@ -1,0 +1,7 @@
+$ brain --limit 3 constructor --json
+--- exit 2
+--- stdout
+{"schema":"brain.v1","command":"constructor","ok":false,"error":{"code":"usage","message":"unknown command 'constructor' — run 'brain help'"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

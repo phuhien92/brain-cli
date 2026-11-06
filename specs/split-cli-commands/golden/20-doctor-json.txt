@@ -1,0 +1,7 @@
+$ brain doctor --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"doctor","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":5,"offline":0,"ms":<N>},"data":{"checks":[{"check":"vault","status":"ok","detail":"<TMP>/vault (5 notes)"},{"check":"index","status":"ok","detail":"<TMP>/state/vault-<ID> (outside the vault, never synced)"},{"check":"update","status":"ok","detail":"0.12.0; daily check off (BRAIN_NO_UPDATE_CHECK is set)"},{"check":"sync","status":"ok","detail":"auto → none"}]}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

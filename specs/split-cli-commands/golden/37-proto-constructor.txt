@@ -1,0 +1,7 @@
+$ brain constructor
+--- exit 2
+--- stdout
+<<END stdout>>
+--- stderr
+brain: unknown command 'constructor' — run 'brain help'
+<<END stderr>>

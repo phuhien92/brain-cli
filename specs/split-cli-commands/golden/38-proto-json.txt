@@ -1,0 +1,7 @@
+$ brain __proto__ --json
+--- exit 2
+--- stdout
+{"schema":"brain.v1","command":"__proto__","ok":false,"error":{"code":"usage","message":"invalid extension name '__proto__'"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

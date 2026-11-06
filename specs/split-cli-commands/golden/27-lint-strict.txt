@@ -1,0 +1,14 @@
+$ brain lint --strict
+--- exit 7
+--- stdout
+WARN broken-link (1)
+  notes/broken.md: [[nowhere]] does not resolve to any note
+
+INFO orphan (3)
+  a/dup.md: no note links here
+  notes/broken.md: no note links here
+  notes/dup.md: no note links here
+<<END stdout>>
+--- stderr
+brain: 1 warning(s)
+<<END stderr>>

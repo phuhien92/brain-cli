@@ -1,0 +1,7 @@
+$ brain log list --json
+--- exit 2
+--- stdout
+{"schema":"brain.v1","command":"log","ok":false,"error":{"code":"usage","message":"usage: brain log [n] [--kind k] | log add <kind> <title> | log import <kind> <file> | log retire <entry-id> | log replace <entry-id> --text <title> [--body <text>]"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

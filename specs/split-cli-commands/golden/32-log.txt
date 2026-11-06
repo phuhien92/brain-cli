@@ -1,0 +1,8 @@
+$ brain log
+--- exit 0
+--- stdout
+2026-11-06  decision   golden       Use pnpm
+2026-11-06  decision   golden       Use pnpm
+<<END stdout>>
+--- stderr
+<<END stderr>>

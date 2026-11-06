@@ -1,0 +1,7 @@
+$ brain search cache --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"search","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":5,"offline":0,"ms":<N>},"data":{"query":"cache","results":[{"path":"notes/deploy.md","title":"Deploy gotchas","score":1.661,"snippet":"# Deploy gotchas ## [Cache] pnpm [cache] breaks on the mac mini. ## Links [[runbook]]","tags":["ops"],"lifecycle":null}]}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

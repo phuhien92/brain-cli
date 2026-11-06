@@ -1,0 +1,7 @@
+$ brain lifecycle status --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"lifecycle.status","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":7,"offline":0,"ms":<N>},"data":{"today":"2026-01-15","notes":[]}}
+<<END stdout>>
+--- stderr
+<<END stderr>>
