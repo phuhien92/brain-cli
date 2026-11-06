@@ -244,3 +244,118 @@ Two of the three unsound entries sit in the router's dispatch: how a name become
 ## Next step
 
 Before 03, 04 or 06 start, redo the table lookup from the first unsound entry (own entries only, exit code always a number) and make one list decide which vault commands exist. Then rerun this gate.
+
+# Check 3: slices 03 to 07
+
+Scope: the commits after ea9b3ed: 9083e81 (03, ext), adf8ed2 (04, log and export), 138fb64 (05, the other vault commands and the `route()` fix), fc3f4a6 (06, the early commands), 596eacd (07, HELP and the thin router) and 490a7fd (the AGENTS.md doc). Run by `decision-checker` in Check mode with no user present (rule 7): the baseline is this spec (`README.md` plus `slices/03` to `07`), every confidence is capped at medium, and the ledger was saved without asking. The only implementer report is the six commit messages. Calls the slices delegate (file grouping, where the format helpers live, whether `commandPosition` moves, small tidy-ups in `cli.ts`) are judged only where they change behaviour.
+
+Ran at 490a7fd: `npm run compile`, then `golden.sh check` (no diff, exit 0, 42 cases); `npm test`: `# pass 149`, `# fail 0` (`package.test` passed here too); `grep -l '\.\./cli' src/commands/*.ts` (nothing); `git diff --stat ea9b3ed..HEAD -- test/` (empty); `wc -l < src/cli.ts` is 388; the slice 05 and 06 greps print 0. `dist/` matched a fresh compile, so the tree stayed clean. Every moved block was diffed against its original in ea9b3ed's `cli.ts`, ignoring whitespace: the bodies are the same apart from the handler wrapper, `out` becoming `ctx`, `tError = …` becoming `ctx.report({error})`, and `VERSION`/`SCHEMA` coming from the context. A probe ran 40 edge commands against the ea9b3ed build and this one, with telemetry queued locally to a dead local URL: no-vault `context`, extension-scope refusals, usage errors for `agent`, `ext`, `telemetry`, `feedback`, `update` and `setup`, failures in each vault command, `BRAIN_AS` scoping, and the queued telemetry events. Output, exit codes, envelope `command` names and every telemetry event matched, apart from random draft and install IDs and the intended `--limit 3 toString` fix. Probes ran outside the repo and were deleted.
+
+## Check 2 entries: did these commits fix them?
+
+- **Command tables are plain objects:** fixed in 138fb64. `route()` only looks up a table's own entries (`Object.hasOwn`). `brain --limit 3 toString --json` now gives `usage` / exit 2 instead of a crash, and its telemetry event has a numeric `exit`. Golden cases 37 to 41 record prototype names, and 41 is recorded on the pre-split code. Only 41 actually reaches the tables: 37 to 40 take the extension path.
+- **Two lists of vault commands:** partly fixed. The hard-coded allowlist is gone, so `VAULT` now decides between vault commands. But `COMMANDS` still gates what reaches either table; see the unsound entry below.
+- **`ctx.vault.index` write-back that nothing reads:** fixed. The comment now says a handler keeps its own copy and nothing reads it back, which is what the code does.
+- **`print` stays in `cli.ts`** (needs-you) and the three sound entries: unchanged by the code, so still settled. The extension runner, the only `ctx.report` caller, reports only `{error}`, so the "replaces the context" concern never comes up.
+
+## Check these first
+
+1. **`COMMANDS` is still a second list that every new command must join** (unsound, low)
+2. **Slice 04's "update the index through the vault context" was not followed** (needs-you, medium)
+3. **Doc comments for moved code were left behind in `cli.ts`** (unsound, medium)
+
+## needs-you
+
+### Slice 04's "update the index through the vault context" was not followed
+
+- **When:** adf8ed2, `src/commands/log.ts` (`let index = ctx.vault!.index`), `VaultContext.index` comment in `shared.ts`
+- **Slice:** 04, also 05 (`ingest`, `sync`, `lifecycle` do the same)
+- **What happens now:** after `brain log add`, the handler refreshes the index again and prints the new counts from its own local copy. `ctx.vault.index` keeps the counts from when the router opened the vault, and the router never reads it back. Slice 04's **Decided** says the handler should update the index "through the vault context, so the router's telemetry still sees the right counts". The worker did not, and the reason holds up: telemetry's `notes` count is `store.count()`, taken in the router before any handler runs, both before and after the split. Writing back through the context would change nothing a user, a test or telemetry can see. The probe showed identical telemetry events for `log add`, `ingest` and `sync`.
+- **The gap:** the spec decided a mechanism whose stated reason was not true of the code. The worker picked the faithful move over the literal instruction and did not mark the deviation in the spec.
+- **Reach:** a future change that wants post-write counts in telemetry has to add that on purpose. The spec still says the opposite of the code, so a later reader may "fix" it.
+- **Verdict:** needs-you. It departs from a spec decision, for a sound reason. **Recommended call:** keep the code. Change slice 04's **Decided** line to "a handler that refreshes keeps its own stats; telemetry counts are taken before the handler runs, as before the split." **To reverse:** have the handlers assign `ctx.vault.index = store.refresh()` and print from it (no visible effect unless the router starts reading it).
+- **Confidence:** medium.
+
+## unsound
+
+### `COMMANDS` is still a second list that every new command must join
+
+- **When:** 138fb64 and 596eacd, `src/cli.ts` (`COMMANDS`, `BUILT_INS`, the extension pre-dispatch in `run()`)
+- **Slice:** 05, 07
+- **What happens now:** the 05 commit says "the VAULT table is the one list". It isn't quite. `run()` first sends any leading name that is not in `BUILT_INS` (built from the hand-written `COMMANDS` array) to the extension runner. So someone who adds `brain stats` to `VAULT` but not to `COMMANDS` gets "unknown command 'stats'" from the extension path, and telemetry records it as `unknown`. Passing a flag first (`brain --limit 3 stats`) skips that path and runs the handler, so whether the command exists depends on where the flags are. Before the split the same trap existed, and it was one of three lists. Now that the tables exist, the obvious alternative builds `COMMANDS` from `Object.keys(EARLY)`, `Object.keys(VAULT)` and `"help"`. That keeps today's behaviour and leaves one place to register a command.
+- **The gap:** the Check 2 redo asked for one list to decide which commands exist. The slices removed the allowlist the redo pointed at, but not the older gate in front of it.
+- **Reach:** this is the pattern the next command copies. The AGENTS.md note on `src/commands/` doesn't mention `COMMANDS` or `SUBCOMMANDS`, so a new command's telemetry name and dispatch fail quietly.
+- **Verdict:** unsound. Two hand-kept lists still decide whether a command exists, and the commit message claims one. **Redo from:** a command exists for dispatch, for the extension pre-dispatch and for telemetry naming because it has a table entry (or is `help`), with nothing else to keep in step, and every current name keeps today's output.
+- **Confidence:** low.
+
+### Doc comments for moved code were left behind in `cli.ts`
+
+- **When:** 138fb64 (left behind), 596eacd (the tidy-up that missed them)
+- **Slice:** 05, 07
+- **What happens now:** `cli.ts` ends with the four-line comment that explains `extractSections` ("A section is its heading line plus everything up to the next heading…"), followed by no code at all. `extractSections` now lives in `src/commands/format.ts` without it. The comment that explained `doctor`'s checks ("Each check names what it found… doctor only reads") now sits above `findVault`, where it reads as describing vault discovery. Seven blank lines remain where the early `if` blocks used to be (`cli.ts:225-231`). A reader of `format.ts` loses the rules for matching sections (prefix, case-insensitive, fenced code ignored), and a reader of `cli.ts` gets a wrong description. The obvious alternative moves each comment with its function.
+- **The gap:** a "pure move" said nothing about comments. Tidy-ups in `cli.ts` were delegated to slice 07, which missed these.
+- **Reach:** small, but `extractSections` is the one moved function a test imports, and its matching rules are in no other comment.
+- **Verdict:** unsound. A move that strands a comment on the wrong code makes the docs wrong. **Redo from:** every comment sits beside the code it describes, and `cli.ts` has no comment for code it no longer holds.
+- **Confidence:** medium.
+
+## sound
+
+### Table entries can name what a failure is reported as (`failAs`)
+
+- **When:** 9083e81 (introduced for `ext`), fc3f4a6 (`telemetry`, `feedback`, `agent`)
+- **Slice:** 03, 06
+- **What happens now:** an `EARLY` entry is a bare handler, whose failures are reported under the command name, or `{ handler, failAs }`. `ext`, `telemetry` and `feedback` fail under their telemetry name (`ext.install`, `telemetry`, `feedback.show`), and `agent` always fails as `agent.install`, exactly as the old `fail(out, tCommand, …)` and `fail(out, "agent.install", …)` calls did. The name matters three ways: it is the `command` in the `--json` error envelope, it goes into the last-error record, and `fail()` skips saving the last error for names starting with `feedback`. `VAULT` entries take no `failAs`, so vault commands still fail as `log`, not `log.add`, as before. The probe matched envelope names for every one of these. The obvious alternative, always failing under the telemetry name, would have changed `setup`, `update`, `path` and every vault command's envelope.
+- **The gap:** the spec said only that error mapping stays in the router.
+- **Reach:** a new early command with subcommands gets the bare name unless its author adds `failAs`. That is the safe default, but the option is easy to miss.
+- **Verdict:** sound.
+- **Confidence:** medium.
+
+### The table fix landed inside a refactor slice and restores the pre-split behaviour
+
+- **When:** 138fb64, `route()` in `src/cli.ts`, golden cases 37 to 41
+- **Slice:** 05
+- **What happens now:** a refactor slice made a behaviour change: `brain --limit 3 toString --json` no longer crashes. Measured against `main` it is no change, because slice 02 caused the crash and the pre-split `if`/`switch` gave `usage` / exit 2. The worker recorded the new golden cases on the pre-split code (fbf78f7), so the gate compares against `main`, not against 02. The obvious alternative, a separate fix commit before 05, would have been easier to review on its own.
+- **The gap:** the spec has no slot for fixing a bug that a slice introduced. Check 2 asked for the redo before 03, 04 and 06. It came in 05, after 03 had already copied the table pattern.
+- **Reach:** only 41 reaches the tables past a flag, and only for `constructor`. A future table without `route()` would be caught for that name only.
+- **Verdict:** sound. It meets the Check 2 redo property, and the baseline is the right one.
+- **Confidence:** medium.
+
+### Moved code is verbatim; the context grew `schema` and `version`
+
+- **When:** 9083e81, adf8ed2, 138fb64, fc3f4a6, 596eacd
+- **Slice:** 03, 04, 05, 06, 07
+- **What happens now:** every moved block matches its original, ignoring whitespace. The few changes are mechanical. Handlers take `ctx` instead of `out`. The extension runner reports `extension_failed` through `ctx.report({error})` instead of setting `tError`. `doctor`, `update`, `feedback` and the runner read `ctx.version` and `ctx.schema` instead of the router's `VERSION` and `SCHEMA`, which remain the only definitions, so `update.test`'s version check still holds. The extension pre-dispatch now builds a full context with `makeCtx`, the same as the table path, and its failure still goes to `fail(out, leading, …)`. The extension-scope checks in `main()` and `run()` are unchanged. The router still opens and closes the store around every vault handler (`finally`). `context` opens and closes its own store, as before. `cli.ts` still re-exports `VERSION`, `telemetryName` and `extractSections`, everything the tests import. The obvious alternative, handlers importing the constants from `cli.ts`, is ruled out by the no-cycle gate.
+- **The gap:** none. These follow slice 02's shape.
+- **Reach:** `ctx.bin` is now used by no handler (the runner never needed it). Harmless, but it is a context field nothing reads.
+- **Verdict:** sound.
+- **Confidence:** medium.
+
+### `context` keeps its own catch-all, now inside the router's `try`
+
+- **When:** fc3f4a6, `src/commands/context.ts`, `EARLY.context`
+- **Slice:** 06
+- **What happens now:** `brain context` still catches every error itself, prints nothing (or an empty `context` envelope with `--json`) and exits 0. The probe matched this outside a vault, with a bad `--limit` and under an extension scope. One thing is new: the handler now runs inside the router's `try`/`fail`. Before, nothing wrapped it, so only a throw from its own `catch` or `finally` (a failing `print` or `close`) could escape, and that crashed the process. Now the same throw becomes an error envelope with exit 1. Both break invariant 11 in that corner, and neither is reachable in normal use. Strict flag parsing and the extension-scope check still run before `context`, as they did before the split.
+- **The gap:** slice 06 decided only that `context` keeps its catch-all.
+- **Reach:** none in practice.
+- **Verdict:** sound.
+- **Confidence:** medium.
+
+### The slice 03 check was rewritten from "16/16" to "all its tests (18)"
+
+- **When:** 9083e81, `slices/03-extensions.md` and the README slice graph
+- **Slice:** 03
+- **What happens now:** the worker edited the spec's own check. `extensions.test.js` has 18 tests, not the 16 the plan guessed, so the check now reads "passes all its tests (18 at the time of the split)". A count-free check could pass if tests were deleted, but the gate's "no test changes" line forbids that. The obvious alternative leaves the spec alone and reports the mismatch.
+- **The gap:** the plan's number was wrong, and the spec didn't say who may correct it.
+- **Reach:** none on code.
+- **Verdict:** sound. It corrects a fact and keeps the check just as strict.
+- **Confidence:** medium.
+
+Trivial and delegated (file names, `format.ts` as the helpers' home, export helpers in `log.ts` imported by `sync.ts`, the `setupHandler`/`feedbackHandler` adapters and the `ext` lambda wrapper, `commandPosition` staying in the router, the AGENTS.md note landing a commit late because `CLAUDE.md` is a symlink): 1 line, not listed.
+
+## Pattern
+
+The open items are about how a command gets registered, not about the moved code, which is faithful. Slices 02 to 07 replaced the `if`/`switch` with tables but left `COMMANDS`/`SUBCOMMANDS` as hand-kept lists in front of them, and the spec's slice 04 decision rested on a wrong premise about telemetry. Neither needs another slice. One small follow-up before the PR covers both: derive the lists from the tables, fix the slice 04 text, move the stranded comments.
+
+## Next step
+
+Before the draft PR, derive `COMMANDS` from the tables (behaviour unchanged, the golden check proves it) and move the two stranded comments, then amend slice 04's **Decided** line and rerun the gate.

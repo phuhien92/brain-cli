@@ -13,6 +13,8 @@ export const doctorCommand = (args, flags, ctx) => {
     print(out, command, { checks }, { vault, index }, () => checks.map((c) => `${c.status === "ok" ? "ok  " : "WARN"}  ${c.check}: ${c.detail}`).join("\n"));
     return 0;
 };
+// Each check names what it found and, when it warns, what to do. Nothing here
+// changes anything: doctor only reads.
 export function doctor(vault, cfg, index, notes, version) {
     const checks = [];
     const state = brainPaths(vault, cfg.logDir).state;

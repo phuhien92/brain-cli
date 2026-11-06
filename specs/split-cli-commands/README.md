@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: all seven slices built. 07 moved HELP to `src/commands/help.ts`; `cli.ts` is 388 lines and holds only parsing, the command tables, extension pre-dispatch, vault discovery, `print`, `fail`, telemetry wiring, and the re-exports tests use. `CLAUDE.md` documents `src/commands/`. Next: a decisions-ledger check over 03 to 07, the after-scorecard, then a draft PR.
+Status: done. All seven slices built and checked by three decisions ledgers (`decisions.md`). After the third: `COMMANDS` is derived from the two router tables (one list), two stranded comments moved to the code they describe, and slice 04's text now matches the code (provisional; the user's call). After-scorecard: `scorecards/2026-11-06-2.md` (Modularity 3 → 4).
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.

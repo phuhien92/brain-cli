@@ -9,7 +9,7 @@
 **Must stay green:** Every test; the golden check.
 
 **Decided:**
-- A handler that refreshes the index updates it through the vault context, so the router's telemetry still sees the right counts.
+- A handler that refreshes the index keeps its own copy of the stats. The router's telemetry counts are taken before the handler runs, so they don't depend on it. (Corrected after the third decisions ledger; the user can revisit.)
 
 **Delegated to the worker:**
 - File grouping of `export` with `log`.

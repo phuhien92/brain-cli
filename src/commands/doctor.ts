@@ -25,6 +25,8 @@ export interface Check {
   detail: string;
 }
 
+// Each check names what it found and, when it warns, what to do. Nothing here
+// changes anything: doctor only reads.
 export function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number, version: string): Check[] {
   const checks: Check[] = [];
   const state = brainPaths(vault, cfg.logDir).state;

@@ -44,6 +44,10 @@ export function formatMeta(note) {
 export function stem(path) {
     return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
 }
+// A section is its heading line plus everything up to the next heading of the
+// same or higher level. Headings inside fenced code are not headings. Requests
+// match a heading's text case-insensitively by prefix, so "Outcome Log"
+// finds "## Outcome Log (pending first)". Sections come back in note order.
 export function extractSections(markdown, wanted, maxLines) {
     const lines = markdown.split("\n");
     const headings = [];

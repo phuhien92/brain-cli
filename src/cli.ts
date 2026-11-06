@@ -41,10 +41,9 @@ export const VERSION = "0.12.0";
 export const SCHEMA = "brain.v1";
 
 
-// Telemetry records a command by a name from these lists only. Anything else
-// a user typed (a query, a note, feedback text) can never become a name.
-const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "update", "ext", "help"];
-const BUILT_INS = new Set(COMMANDS);
+// Telemetry records a command by a name from these lists only (COMMANDS is
+// built from the router tables below). Anything else a user typed (a query, a
+// note, feedback text) can never become a name.
 const EXTENSION_CHILD_COMMANDS = new Set(["help", "search", "get", "log", "view", "lifecycle"]);
 const SUBCOMMANDS: Record<string, string[]> = {
   log: ["add", "import", "retire", "replace"],
@@ -106,6 +105,10 @@ const VAULT: Record<string, Handler> = {
   lifecycle: lifecycleCommand,
   lint: lintCommand,
 };
+
+// Every built-in command, from the two tables: one list to change, not three.
+const COMMANDS = [...Object.keys(EARLY), ...Object.keys(VAULT), "help"];
+const BUILT_INS = new Set(COMMANDS);
 
 /** The context the router hands every handler. */
 function makeCtx(out: Out): Ctx {
@@ -284,8 +287,6 @@ function commandPosition(argv: string[]): number {
   return -1;
 }
 
-// Each check names what it found and, when it warns, what to do. Nothing here
-// changes anything: doctor only reads.
 // Always the real path: on macOS /var is a symlink to /private/var, and a vault
 // found via the shell's cwd and one named in $BRAIN_VAULT must not be reported as
 // two different vaults.
@@ -381,8 +382,3 @@ function fail(out: Out, command: string, err: unknown): number {
   }
   return e.exit;
 }
-
-// A section is its heading line plus everything up to the next heading of the
-// same or higher level. Headings inside fenced code are not headings. Requests
-// match a heading's text case-insensitively by prefix, so "Outcome Log"
-// finds "## Outcome Log (pending first)". Sections come back in note order.
