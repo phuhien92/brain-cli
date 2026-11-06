@@ -1,0 +1,16 @@
+$ brain get deploy
+--- exit 0
+--- stdout
+---
+tags: [ops]
+aliases: [deploys]
+---
+# Deploy gotchas
+
+## Cache
+pnpm cache breaks on the mac mini.
+
+## Links
+[[runbook]]
+--- stderr
+

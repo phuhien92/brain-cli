@@ -1,0 +1,6 @@
+$ brain get no-such-note --json
+--- exit 3
+--- stdout
+{"schema":"brain.v1","command":"get","ok":false,"error":{"code":"not_found","message":"no note matches 'no-such-note'"}}
+--- stderr
+

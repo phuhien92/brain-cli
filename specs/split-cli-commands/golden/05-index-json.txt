@@ -1,0 +1,6 @@
+$ brain index --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"index","ok":true,"vault":"<TMP>/vault","index":{"added":4,"updated":0,"removed":0,"unchanged":0,"offline":0,"ms":<N>},"data":{"notes":4,"added":4,"updated":0,"removed":0,"unchanged":0,"offline":0,"ms":<N>}}
+--- stderr
+

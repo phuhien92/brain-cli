@@ -1,0 +1,6 @@
+$ brain bogus-command
+--- exit 2
+--- stdout
+
+--- stderr
+brain: unknown command 'bogus-command' — run 'brain help'

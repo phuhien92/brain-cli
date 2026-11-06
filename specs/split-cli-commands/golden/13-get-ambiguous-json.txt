@@ -1,0 +1,6 @@
+$ brain get dup --json
+--- exit 4
+--- stdout
+{"schema":"brain.v1","command":"get","ok":false,"error":{"code":"ambiguous","message":"'dup' matches 2 notes — use a path","candidates":["a/dup.md","notes/dup.md"]}}
+--- stderr
+

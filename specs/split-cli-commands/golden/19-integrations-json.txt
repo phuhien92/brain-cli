@@ -1,0 +1,6 @@
+$ brain integrations --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"integrations","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":4,"offline":0,"ms":<N>},"data":{"integrations":[],"as":null}}
+--- stderr
+

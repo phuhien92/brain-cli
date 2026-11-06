@@ -1,0 +1,7 @@
+$ brain search cache
+--- exit 0
+--- stdout
+1. notes/deploy.md  (1.308)
+   Deploy gotchas — # Deploy gotchas ## [Cache] pnpm [cache] breaks on the mac mini. ## Links [[runbook]]
+--- stderr
+

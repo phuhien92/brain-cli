@@ -1,0 +1,6 @@
+$ brain path --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"path","ok":true,"data":{"paths":{"vault":{"path":"<TMP>/vault","exists":true},"log":{"path":"<TMP>/vault/log","exists":false},"sources":{"path":"<TMP>/vault/sources","exists":false},"config":{"path":"<TMP>/vault/brain.json","exists":false},"user-config":{"path":"<TMP>/home/.config/brain/config.json","exists":false},"extensions":{"path":"<TMP>/home/.local/share/brain/extensions","exists":false},"state":{"path":"<TMP>/state/vault-<ID>","exists":false},"index":{"path":"<TMP>/state/vault-<ID>/index.db","exists":false},"telemetry-queue":{"path":"<TMP>/state/telemetry-queue.jsonl","exists":false},"update-check":{"path":"<TMP>/state/update-check.json","exists":false}}}}
+--- stderr
+

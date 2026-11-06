@@ -1,0 +1,6 @@
+$ brain view
+--- exit 2
+--- stdout
+
+--- stderr
+brain: usage: brain view <kind>

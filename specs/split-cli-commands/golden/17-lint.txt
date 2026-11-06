@@ -1,0 +1,8 @@
+$ brain lint
+--- exit 0
+--- stdout
+INFO orphan (2)
+  a/dup.md: no note links here
+  notes/dup.md: no note links here
+--- stderr
+
