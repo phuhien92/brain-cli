@@ -74,6 +74,9 @@ holds the rules an agent changing the code must not break.
   person at a terminal, and `brain update`. Never shown with `--json`, `--quiet`, in CI or hooks.
 - `src/agent.ts` — `brain context` (the session primer) and `brain agent install` per harness.
 - `src/cli.ts` — argument parsing, vault discovery, output and exit codes.
+- `src/commands/` — one file per command (or small group). A handler takes the positional
+  args, the parsed flags and a context from the router (`shared.ts`), returns the exit code,
+  and throws to fail; the router maps errors to exit codes. Nothing here imports `cli.ts`.
 - `skills/brain/SKILL.md` — the skill every harness installs; its `description` decides
   when an agent reaches for brain, so change it deliberately.
 - `agents/pi/brain-memory.ts` — the Pi extension (not compiled here; Pi loads it).
