@@ -91,6 +91,12 @@ run_case 33-view view decision
 run_case 34-view-json view decision --json
 run_case 35-lifecycle-status-json lifecycle status --json
 run_case 36-lifecycle-status lifecycle status
+# Command names that are also object-prototype properties must stay unknown commands.
+run_case 37-proto-constructor constructor
+run_case 38-proto-json __proto__ --json
+run_case 39-tostring-json toString --json
+run_case 40-hasownproperty-json hasOwnProperty --json
+run_case 41-constructor-limit-json --limit 3 constructor --json
 
 if [ "$MODE" = capture ]; then
   rm -rf "$OUT" && mkdir -p "$OUT" && cp "$TMP"/cases/*.txt "$OUT"/

@@ -1,0 +1,7 @@
+$ brain toString --json
+--- exit 2
+--- stdout
+{"schema":"brain.v1","command":"toString","ok":false,"error":{"code":"usage","message":"invalid extension name 'toString'"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

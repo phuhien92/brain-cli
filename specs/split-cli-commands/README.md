@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: 01 to 04 built. 04 moved `log` (all subcommands) and `export` to `src/commands/log.ts` with `runExports`, `resolveLogEntry`, `formatExports`, and `driftMessage`; `cli.ts` imports the export helpers back for the commands that still use them. `cli.ts` is at 1,148 lines. Next: 05 (remaining vault commands) and 06 (early commands).
+Status: 01 to 05 built. 05 moved the last nine vault commands to one file each under `src/commands/` (formatting helpers in `format.ts`, `doctor`'s checks with `doctor.ts`); the vault `switch` and the duplicate list of vault commands are gone. It also fixes a slice 02 bug the second ledger found: the router's tables were plain objects, so `constructor` or `__proto__` reached an inherited property (a crash, and user text could reach telemetry). Lookups now use own properties only, and the golden check gained five cases recorded on the pre-split code (`fbf78f7`). `cli.ts` is at 813 lines. Next: 06 (early commands), then 07.
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.

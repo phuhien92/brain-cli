@@ -39,6 +39,16 @@ import { pathCommand } from "./commands/path.js";
 import { viewCommand } from "./commands/view.js";
 import { extensionManagementCommand, runExtensionCommand } from "./commands/ext.js";
 import { driftMessage, exportCommand, formatExports, logCommand, runExports } from "./commands/log.js";
+import { ingestCommand } from "./commands/ingest.js";
+import { indexCommand } from "./commands/index.js";
+import { searchCommand } from "./commands/search.js";
+import { getCommand } from "./commands/get.js";
+import { syncCommand } from "./commands/sync.js";
+import { lifecycleCommand } from "./commands/lifecycle.js";
+import { lintCommand } from "./commands/lint.js";
+import { integrationsCommand } from "./commands/integrations.js";
+import { doctorCommand } from "./commands/doctor.js";
+export { extractSections } from "./commands/format.js";
 
 export const VERSION = "0.12.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
@@ -210,11 +220,30 @@ const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "br
 // command, and the last-error record); the default is the command itself.
 type Route = Handler | { handler: Handler; failAs: (command: string, named: string) => string };
 const byTelemetryName = (_command: string, named: string) => named;
+// Look up only a table's own entries: a command named "constructor" or
+// "__proto__" must be unknown, not an inherited property.
+function route<T>(table: Record<string, T>, command: string): T | undefined {
+  return Object.hasOwn(table, command) ? table[command] : undefined;
+}
+
 const EARLY: Record<string, Route> = {
   path: pathCommand,
   ext: { handler: (args, flags, ctx) => extensionManagementCommand(args, flags, ctx), failAs: byTelemetryName },
 };
-const VAULT: Record<string, Handler> = { view: viewCommand, log: logCommand, export: exportCommand };
+const VAULT: Record<string, Handler> = {
+  ingest: ingestCommand,
+  index: indexCommand,
+  search: searchCommand,
+  get: getCommand,
+  log: logCommand,
+  view: viewCommand,
+  export: exportCommand,
+  sync: syncCommand,
+  integrations: integrationsCommand,
+  doctor: doctorCommand,
+  lifecycle: lifecycleCommand,
+  lint: lintCommand,
+};
 
 /** The context the router hands every handler. */
 function makeCtx(out: Out): Ctx {
@@ -222,6 +251,7 @@ function makeCtx(out: Out): Ctx {
     out,
     print,
     schema: SCHEMA,
+    version: VERSION,
     bin: BIN,
     findVault,
     report: (r) => {
@@ -459,7 +489,7 @@ async function run(argv: string[]): Promise<number> {
     }
   }
 
-  const early = EARLY[command];
+  const early = route(EARLY, command);
   if (early) {
     const handler = typeof early === "function" ? early : early.handler;
     try {
@@ -471,7 +501,8 @@ async function run(argv: string[]): Promise<number> {
 
   let store: Store | null = null;
   try {
-    if (!["index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "lifecycle", "lint"].includes(command)) {
+    const handler = route(VAULT, command);
+    if (!handler) {
       throw new CliError("usage", `unknown command '${command}' — run 'brain help'`, 2);
     }
     const vault = findVault(flags.vault);
@@ -481,7 +512,7 @@ async function run(argv: string[]): Promise<number> {
       if (!ok) throw new CliError("not_permitted", `integration '${cfg.as!.name}' may not ${what}`, 6);
     };
     store = Store.open(vault, { rebuild: command === "index" && flags.rebuild });
-    let index = store.refresh({ verify: command === "index" && flags.verify });
+    const index = store.refresh({ verify: command === "index" && flags.verify });
     tContext = {
       notes: store.count(),
       sync: typeof cfg.sync === "object" ? "command" : cfg.sync,
@@ -489,237 +520,8 @@ async function run(argv: string[]): Promise<number> {
       scoped: !!cfg.as,
     };
 
-    const handler = VAULT[command];
-    if (handler) {
-      ctx.vault = { vault, cfg, scope, permit, store, index };
-      return await handler(args, flags, ctx);
-    }
-
-    switch (command) {
-      case "ingest": {
-        if (args.length !== 1) throw new CliError("usage", "usage: brain ingest <file> [--title <title>] [--tag <tag>]", 2);
-        if (cfg.as) permit(false, "ingest sources");
-        const file = resolve(args[0]!);
-        if (!existsSync(file)) throw new CliError("not_found", `no file at ${file}`, 3);
-        const result = ingest(vault, cfg, { file, title: flags.title, tags: flags.tag });
-        index = store.refresh();
-        print(out, command, result, { vault, index }, () => result.new ? result.path : `${result.path} (already ingested)`);
-        return 0;
-      }
-
-      case "index": {
-        const data = { notes: store.count(), ...index };
-        print(out, command, data, { vault, index }, () =>
-          `${vault}\n${data.notes} notes · +${index.added} ~${index.updated} -${index.removed} · ${index.ms}ms`,
-        );
-        return 0;
-      }
-
-      case "search": {
-        const query = args.join(" ").trim();
-        if (!query) throw new CliError("usage", "search needs a query: brain search <query>", 2);
-        const limit = flags.limit === undefined ? 10 : Number(flags.limit);
-        if (!Number.isInteger(limit) || limit < 1) throw new CliError("usage", "--limit must be a positive integer", 2);
-        let hits;
-        try {
-          const states = lifecycleStates(store, cfg);
-          const hidden = [...states.values()].filter((st) => st.archived && !flags["include-archived"]).map((st) => st.path);
-          hits = store
-            .search(query, { limit, path: flags.path, tag: flags.tag?.[0], raw: flags.raw, scope, exclude: hidden, excludePrefix: `${cfg.logDir}/${LIFECYCLE_KIND}/` })
-            .map((h) => ({ ...h, lifecycle: brief(states.get(h.path)) }));
-        } catch (err) {
-          if (flags.raw) throw new CliError("bad_query", `invalid FTS5 query: ${(err as Error).message}`, 2);
-          throw err;
-        }
-        print(out, command, { query, results: hits }, { vault, index }, () =>
-          hits.length
-            ? hits
-                .map((h, i) => `${i + 1}. ${h.path}  (${h.score})${staleMark(h)}\n   ${h.title !== stem(h.path) ? h.title + " — " : ""}${h.snippet}`)
-                .join("\n")
-            : `no results for '${query}'`,
-        );
-        return 0;
-      }
-
-      case "get": {
-        const ref = args.join(" ").trim();
-        if (!ref) throw new CliError("usage", "get needs a note: brain get <path|name|title>", 2);
-        // Out-of-scope notes are reported as not found, not as forbidden:
-        // a restricted caller should not learn what else the vault holds.
-        const matches = store.resolve(ref).filter((p) => inReadScope(store!, cfg, p, scope));
-        if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
-        if (matches.length > 1) {
-          throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, {
-            candidates: matches,
-          });
-        }
-        const note = { ...store.get(matches[0]!)!, lifecycle: brief(lifecycleStates(store, cfg).get(matches[0]!)) };
-        const maxLines = flags.lines === undefined ? undefined : Number(flags.lines);
-        if (maxLines !== undefined && (!Number.isInteger(maxLines) || maxLines < 1)) {
-          throw new CliError("usage", "--lines must be a positive integer", 2);
-        }
-        if (maxLines !== undefined && !flags.section?.length) {
-          const all = note.content.split("\n");
-          const content = all.slice(0, maxLines).join("\n") + "\n";
-          const truncated = all.length > maxLines;
-          print(out, command, { ...note, content, truncated }, { vault, index }, () => content);
-          return 0;
-        }
-        if (flags.section?.length) {
-          const { content, found, missing } = extractSections(note.content, flags.section, maxLines);
-          if (!found.length) {
-            throw new CliError("not_found", `no section in ${note.path} matches ${flags.section.map((x) => `'${x}'`).join(", ")}`, 3, {
-              headings: note.headings,
-            });
-          }
-          const data = { ...note, content, sections: found, missing };
-          print(out, command, data, { vault, index }, () =>
-            content + (missing.length ? `\n(no section matched: ${missing.join(", ")})` : ""),
-          );
-          return 0;
-        }
-        const data = flags.meta ? { ...note, content: undefined } : note;
-        print(out, command, data, { vault, index }, () => (flags.meta ? formatMeta(note) : note.content));
-        return 0;
-      }
-
-      case "sync": {
-        const result = sync(vault, cfg, { push: !flags["no-push"] });
-        index = store.refresh();
-        const exports = runExports(store, cfg, false);
-        print(out, command, { ...result, machine: cfg.machine, exports }, { vault, index }, () =>
-          [
-            result.mode === "none"
-              ? `${cfg.machine}: sync mode "none" — files are moved by your sync service; index refreshed`
-              : result.mode === "command"
-                ? `${cfg.machine}: ran the configured sync command`
-                : `${cfg.machine}: committed ${result.committed} · pulled ${result.pulled} · ` +
-                  (result.remote ? (result.pushed ? "pushed" : "nothing to push") : "no upstream — local commit only"),
-            formatExports(exports),
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        );
-        // The sync itself succeeded; unrecorded edits to an export are surfaced
-        // in data.exports and on stderr rather than failing the whole sync.
-        const drift = exports.filter((e) => e.status === "drift");
-        if (drift.length && !out.json) process.stderr.write(`brain: ${driftMessage(drift)}\n`);
-        return 0;
-      }
-
-      case "lifecycle": {
-        const [sub, ...rest] = args;
-        const states = lifecycleStates(store, cfg);
-        if (sub === "status") {
-          if (rest.length) throw new CliError("usage", "usage: brain lifecycle status [--due]", 2);
-          const list = [...states.values()]
-            .filter((st) => inReadScope(store!, cfg, st.path, scope))
-            .filter((st) => !flags.due || st.overdue)
-            .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999") || a.path.localeCompare(b.path));
-          print(out, "lifecycle.status", { today: today(), notes: list }, { vault, index }, () =>
-            list.length
-              ? list
-                  .map((st) =>
-                    `${st.overdue ? "OVERDUE " : st.archived ? "archived" : "        "} ${(st.category ?? "-").padEnd(13)} due ${st.due ?? "-         "}  ${st.path}` +
-                    (st.problems.length ? `\n         ! ${st.problems.join("; ")}` : ""),
-                  )
-                  .join("\n")
-              : flags.due
-                ? "nothing is overdue"
-                : "no notes have lifecycle data yet — start with: brain lifecycle set <note> --category <category>",
-          );
-          return 0;
-        }
-        if (!["set", "review", "archive", "restore"].includes(sub ?? "")) {
-          throw new CliError("usage", "usage: brain lifecycle set|review|archive|restore <note> … | lifecycle status [--due]", 2);
-        }
-        const ref = rest.join(" ").trim();
-        if (!ref) throw new CliError("usage", `usage: brain lifecycle ${sub} <note>`, 2);
-        const matches = store.resolve(ref).filter((p) => inReadScope(store!, cfg, p, scope));
-        if (matches.length === 0) throw new CliError("not_found", `no note matches '${ref}'`, 3);
-        if (matches.length > 1) {
-          throw new CliError("ambiguous", `'${ref}' matches ${matches.length} notes — use a path`, 4, { candidates: matches });
-        }
-        const target = matches[0]!;
-        if (cfg.as) permit(cfg.as.write.includes(LIFECYCLE_KIND), `record lifecycle changes (add "${LIFECYCLE_KIND}" to its write kinds)`);
-        const date = (flag: string, v: string | undefined) => {
-          if (v !== undefined && !isDate(v)) throw new CliError("usage", `--${flag} must be a YYYY-MM-DD date`, 2);
-          return v;
-        };
-        let change;
-        if (sub === "set") {
-          const category = flags.category;
-          if (!category || !(CATEGORIES as readonly string[]).includes(category)) {
-            throw new CliError("usage", `--category must be one of: ${CATEGORIES.join(", ")}`, 2);
-          }
-          const asOf = date("as-of", flags["as-of"]);
-          const w = windows(cfg)[category as Category];
-          if (w !== null && !asOf && !states.get(target)?.asOf) {
-            throw new CliError("usage", `${category} is time-bound: give --as-of YYYY-MM-DD (when the note was true)`, 2);
-          }
-          change = { action: "set" as const, category: category as Category, asOf };
-        } else if (sub === "review") {
-          change = { action: "review" as const, on: date("on", flags.on) ?? today(), asOf: date("as-of", flags["as-of"]) };
-        } else if (sub === "archive") {
-          if (!flags.reason?.trim()) throw new CliError("usage", 'archive needs --reason "..." (why it is no longer active)', 2);
-          change = { action: "archive" as const, reason: flags.reason.trim().replace(/\s+/g, " ") };
-        } else {
-          change = { action: "restore" as const };
-        }
-        const entry = recordLifecycle(vault, cfg, target, change);
-        index = store.refresh();
-        const st = lifecycleStates(store, cfg).get(target)!;
-        print(out, `lifecycle.${sub}`, { entry, state: st }, { vault, index }, () =>
-          `${target}: ${st.archived ? "archived" : st.category ?? "no category"}${st.due ? `, next review ${st.due}` : ""}  (${entry})`,
-        );
-        return 0;
-      }
-
-      case "lint": {
-        const findings = lint(store, cfg);
-        const counts = { warn: findings.filter((f) => f.severity === "warn").length, info: findings.filter((f) => f.severity === "info").length };
-        if (flags.strict && counts.warn) {
-          if (!out.json && !out.quiet) process.stdout.write(formatFindings(findings) + "\n");
-          throw new CliError("lint_failed", `${counts.warn} warning(s)`, 7, { findings, counts });
-        }
-        print(out, command, { findings, counts }, { vault, index }, () => (findings.length ? formatFindings(findings) : "no findings"));
-        return 0;
-      }
-
-      case "integrations": {
-        const list = Object.values(cfg.integrations).map((i) => ({
-          name: i.name,
-          read: i.read ?? ["*"],
-          write: i.write,
-          views: i.views.map((v) => ({ kind: v.kind, path: v.path })),
-          acting: cfg.as?.name === i.name,
-        }));
-        print(out, command, { integrations: list, as: cfg.as?.name ?? null }, { vault, index }, () =>
-          list.length
-            ? list
-                .map((i) =>
-                  [
-                    `${i.acting ? "* " : ""}${i.name}`,
-                    `    read:  ${i.read.join(", ") || "(only its own log)"}`,
-                    `    write: ${i.write.join(", ") || "(nothing)"}`,
-                    ...(i.views.length ? i.views.map((v) => `    view:  ${v.kind} → ${v.path}`) : ["    view:  (none on this machine)"]),
-                  ].join("\n"),
-                )
-                .join("\n")
-            : 'no integrations yet — declare one under "integrations" in brain.json (see docs/integrations.md)',
-        );
-        return 0;
-      }
-
-      case "doctor": {
-        const checks = doctor(vault, cfg, index, store.count());
-        print(out, command, { checks }, { vault, index }, () =>
-          checks.map((c) => `${c.status === "ok" ? "ok  " : "WARN"}  ${c.check}: ${c.detail}`).join("\n"),
-        );
-        return 0;
-      }
-    }
-    return 0;
+    ctx.vault = { vault, cfg, scope, permit, store, index };
+    return await handler(args, flags, ctx);
   } catch (err) {
     return fail(out, command, err);
   } finally {
@@ -907,92 +709,8 @@ async function feedbackCommand(
   return 0;
 }
 
-function brief(st: LifecycleState | undefined) {
-  if (!st) return null;
-  return { category: st.category, asOf: st.asOf, reviewed: st.reviewed, due: st.due, overdue: st.overdue, archived: st.archived, reason: st.reason };
-}
-
-function staleMark(h: { lifecycle?: ReturnType<typeof brief> }): string {
-  if (!h.lifecycle) return "";
-  if (h.lifecycle.archived) return "  [archived]";
-  return h.lifecycle.overdue ? `  [stale: review was due ${h.lifecycle.due}]` : "";
-}
-
-function formatFindings(findings: { rule: string; severity: string; path: string; message: string }[]): string {
-  const lines: string[] = [];
-  let rule = "";
-  for (const f of findings) {
-    if (f.rule !== rule) {
-      rule = f.rule;
-      const n = findings.filter((x) => x.rule === rule).length;
-      lines.push(`${lines.length ? "\n" : ""}${f.severity.toUpperCase()} ${rule} (${n})`);
-    }
-    lines.push(`  ${f.path}: ${f.message}`);
-  }
-  return lines.join("\n");
-}
-
-interface Check {
-  check: string;
-  status: "ok" | "warn";
-  detail: string;
-}
-
 // Each check names what it found and, when it warns, what to do. Nothing here
 // changes anything: doctor only reads.
-function doctor(vault: string, cfg: Config, index: RefreshStats, notes: number): Check[] {
-  const checks: Check[] = [];
-  const state = brainPaths(vault, cfg.logDir).state;
-  const synced = /\/Library\/Mobile Documents\/|\/Library\/CloudStorage\/|\/Dropbox\/|\/OneDrive\//.test(vault + "/");
-  const mode = resolveSyncMode(vault, cfg);
-  checks.push({ check: "vault", status: "ok", detail: `${vault} (${notes} notes)` });
-  checks.push({
-    check: "index",
-    status: state.startsWith(vault + "/") ? "warn" : "ok",
-    detail: `${state}${state.startsWith(vault + "/") ? " is inside the vault; set BRAIN_STATE_DIR outside it" : " (outside the vault, never synced)"}`,
-  });
-  const up = update.status(VERSION, userSettings().updateCheck);
-  checks.push({
-    check: "update",
-    status: up.available ? "warn" : "ok",
-    detail: up.available
-      ? `brain ${up.latest} is available (you have ${up.current}): ${up.command}`
-      : !up.enabled
-        ? `${up.current}; daily check off (${up.reason})`
-        : up.latest
-          ? `${up.current} is the latest release`
-          : `${up.current}; no release checked yet (brain update --check)`,
-  });
-  checks.push({
-    check: "sync",
-    status: "ok",
-    detail: typeof cfg.sync === "object" ? `command: ${cfg.sync.command}` : `${cfg.sync}${cfg.sync === "auto" ? ` → ${mode}` : ""}${synced ? " (vault is in a cloud-synced folder)" : ""}`,
-  });
-  if (synced && isGitRepo(vault)) {
-    checks.push({
-      check: "git in a synced folder",
-      status: "warn",
-      detail:
-        "the vault is a git repository inside iCloud/Dropbox/OneDrive. Two sync systems on one folder can corrupt .git. " +
-        "Keep git out of the synced copy (a separate clone, or .git moved to .git.nosync with a .git symlink for iCloud), " +
-        'or pick one: "sync": "none" if the cloud folder is the sync.',
-    });
-  }
-  if (index.offline) {
-    checks.push({
-      check: "offline notes",
-      status: "warn",
-      detail: `${index.offline} note(s) are cloud placeholders on this machine; search uses what was last indexed, get cannot read them. ` +
-        'Turn off "Optimize Mac Storage" for the vault folder, or keep it downloaded.',
-    });
-  }
-  for (const v of cfg.exports) {
-    checks.push({ check: `view ${v.kind}`, status: existsSync(dirname(v.path)) ? "ok" : "warn", detail: existsSync(dirname(v.path)) ? v.path : `${dirname(v.path)} does not exist on this machine` });
-  }
-  if (cfg.as) checks.push({ check: "acting as", status: "ok", detail: cfg.as.name });
-  return checks;
-}
-
 // Always the real path: on macOS /var is a symlink to /private/var, and a vault
 // found via the shell's cwd and one named in $BRAIN_VAULT must not be reported as
 // two different vaults.
@@ -1089,60 +807,7 @@ function fail(out: Out, command: string, err: unknown): number {
   return e.exit;
 }
 
-function formatMeta(note: NonNullable<ReturnType<Store["get"]>>): string {
-  const lines = [`${note.path}`, `title: ${note.title}`];
-  if (note.aliases.length) lines.push(`aliases: ${note.aliases.join(", ")}`);
-  if (note.tags.length) lines.push(`tags: ${note.tags.join(", ")}`);
-  for (const [k, v] of Object.entries(note.frontmatter)) {
-    if (["title", "tags", "aliases", "alias"].includes(k)) continue;
-    lines.push(`${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`);
-  }
-  if (note.headings.length) lines.push("headings:", ...note.headings.map((h) => `  ${h}`));
-  if (note.links.length) {
-    lines.push("links:", ...note.links.map((l) => `  [[${l.target}${l.heading ? "#" + l.heading : ""}]]`));
-  }
-  return lines.join("\n");
-}
-
 // A section is its heading line plus everything up to the next heading of the
 // same or higher level. Headings inside fenced code are not headings. Requests
 // match a heading's text case-insensitively by prefix, so "Outcome Log"
 // finds "## Outcome Log (pending first)". Sections come back in note order.
-export function extractSections(
-  markdown: string,
-  wanted: string[],
-  maxLines?: number,
-): { content: string; found: string[]; missing: string[] } {
-  const lines = markdown.split("\n");
-  const headings: { line: number; level: number; text: string }[] = [];
-  let fence: string | null = null;
-  lines.forEach((line, i) => {
-    const f = /^(```|~~~)/.exec(line);
-    if (f) fence = fence === f[1] ? null : (fence ?? f[1]!);
-    if (fence) return;
-    const h = /^(#{1,6})[ \t]+(.+?)[ \t#]*$/.exec(line);
-    if (h) headings.push({ line: i, level: h[1]!.length, text: h[2]!.trim() });
-  });
-  const norm = (t: string) => t.toLowerCase().replace(/\s+/g, " ").trim();
-  const picked = new Map<number, string>();
-  const missing: string[] = [];
-  for (const w of wanted) {
-    const exact = headings.findIndex((h) => norm(h.text) === norm(w));
-    const idx = exact >= 0 ? exact : headings.findIndex((h) => norm(h.text).startsWith(norm(w)));
-    if (idx < 0) missing.push(w);
-    else picked.set(idx, headings[idx]!.text);
-  }
-  const order = [...picked.keys()].sort((a, b) => a - b);
-  const blocks = order.map((idx) => {
-    const h = headings[idx]!;
-    const next = headings.slice(idx + 1).find((n) => n.level <= h.level);
-    const end = next ? next.line : lines.length;
-    const stop = maxLines === undefined ? end : Math.min(end, h.line + maxLines);
-    return lines.slice(h.line, stop).join("\n").trimEnd();
-  });
-  return { content: blocks.join("\n\n") + (blocks.length ? "\n" : ""), found: order.map((i) => picked.get(i)!), missing };
-}
-
-function stem(path: string): string {
-  return (path.split("/").pop() ?? path).replace(/\.md$/i, "");
-}

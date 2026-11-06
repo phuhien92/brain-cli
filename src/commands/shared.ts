@@ -91,7 +91,8 @@ export interface VaultContext {
   /** Throws not_permitted when a scoped integration may not do `what`. */
   permit: (ok: boolean, what: string) => void;
   store: Store;
-  /** Refresh stats; a handler that refreshes again stores the new stats here. */
+  /** Refresh stats from opening the vault. A handler that refreshes again
+   * keeps its own copy; nothing reads this back after the handler runs. */
   index: RefreshStats;
 }
 
@@ -100,6 +101,8 @@ export interface Ctx {
   print: Print;
   /** The --json envelope's schema name (SCHEMA in the router). */
   schema: string;
+  /** brain's version (VERSION in the router). */
+  version: string;
   /** Path to bin/brain.js, computed once by the router. */
   bin: string;
   /** The router's vault discovery (--vault, BRAIN_VAULT, or the working folder). */

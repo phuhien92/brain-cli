@@ -127,3 +127,120 @@ Four of the five non-sound entries sit in one area: what the golden check actual
 ## Next step
 
 Before slice 02 starts, redo the golden capture from the three low-confidence entries (byte-exact capture, success cases for `log`, `view`, `lifecycle status`, cases for exit 1 and 7 and, if reachable, 5 and 6) and recapture; the code under test has not changed yet, so this is the cheapest moment to widen the net.
+
+# Check 2: slice 02 (commits 030ddec, ea9b3ed)
+
+Run by `decision-checker` in Check mode with no user present (rule 7): the baseline is this spec (`README.md` plus `slices/02-handler-shape.md`), every confidence is capped at medium, and the ledger was saved without asking. The only implementer report is the two commit messages. Exact context field names were delegated to the worker (slice 02), as were the homes of shared helpers (README), so they are judged only where they change behaviour.
+
+Ran at ea9b3ed: `npm run compile`, then `golden.sh check` (no diff, exit 0); `grep -l '\.\./cli' src/commands/*.ts` (nothing); `git diff --stat 5390bbf..ea9b3ed -- test/` (empty); the slice check grep (0). `npm test` ran three times: `# pass 148`, `# fail 1` each time. `package.test.js` "a global install from a git URL" fails every run because `node_modules` in this worktree is a symlink and `cpSync` refuses to copy it. That is the check's environment, not slice 02. One run also failed `lifecycle.test.js` "log retire and replace…" (empty stdout); it passed 6 of 6 times alone and in the other two full runs, so it looks flaky under load, but it does call `view`, so watch it. `dist/` was restored afterwards. Probes ran outside the repo and were deleted.
+
+## Check 1 entries: did 030ddec fix them?
+
+- **Machine name baked in:** fixed. `BRAIN_MACHINE=golden` is pinned, and so is `BRAIN_TODAY=2026-01-15`.
+- **`log`, `lifecycle`, `view` only as usage errors:** mostly fixed. There are success cases for `log add`, `log`, `view decision` and `lifecycle status`, and log file dates are normalized. Still open: `lifecycle status` records `"notes":[]`, because the fixture has no note with a lifecycle category, so the per-note state output that slice 05 moves is still never recorded.
+- **Exit codes 1 and 7:** fixed (`28-no-vault-json`, `27-lint-strict`). Still open: no case for 5 or 6, and nothing says why they can't be reached. The Check 1 redo asked for one or the other.
+- **Trailing newlines invisible:** fixed. Output goes straight to files with `<<END …>>` markers.
+- **README next-agent prompt:** fixed in 030ddec and updated again for 02.
+
+## Check these first
+
+1. **Command tables are plain objects, so `constructor` and `toString` become commands** (unsound, low)
+2. **The vault-command allowlist and the `VAULT` table are two lists** (unsound, low)
+3. **`ctx.vault.index` is documented as a write-back that nothing reads** (unsound, medium)
+
+## needs-you
+
+### `print` stays in `cli.ts`; the flag table moves to `shared.ts`
+
+- **When:** ea9b3ed, `src/commands/shared.ts`, `src/cli.ts`
+- **Slice:** 02
+- **What happens now:** slice 02's seam lists `print` among what `shared.ts` holds. The worker kept `print` (and `SCHEMA`) in `cli.ts` and hands it to handlers as `ctx.print`, so the envelope stays where CLAUDE.md invariant 6 says `SCHEMA` lives. It also moved something the slice did not list: the whole `parseArgs` options table, now `parseFlags()` and the `Flags` type in `shared.ts`. The router still calls it. The obvious alternatives are to follow the seam literally (put `print` in `shared.ts`), or to leave the options table in `cli.ts` and write a `Flags` type by hand. The gate's grep forbids even a type import of `../cli`, so a derived `Flags` type has to live outside `cli.ts`.
+- **The gap:** the README hands "the home of shared helpers" to the worker, while the slice names `print` for `shared.ts`. The two disagree, and the flag table was not mentioned anywhere.
+- **Reach:** every later handler gets output through `ctx.print`. Criterion 1 ("cli.ts holds only argument parsing…") is still met in substance, because the parse call and its error mapping stay in the router; only the option list moved.
+- **Verdict:** needs-you. The slice said one thing and the worker did another, for a stated reason. **Recommended call:** keep it as built. Output and `SCHEMA` belong to the router, and `Flags` needs a home that isn't `cli.ts`. **To reverse:** move `print` and `SCHEMA` into `shared.ts` and update the docs that name `src/cli.ts` for `SCHEMA`.
+- **Confidence:** medium.
+
+## unsound
+
+### Command tables are plain objects, so `constructor` and `toString` become commands
+
+- **When:** ea9b3ed, `src/cli.ts` (`EARLY`, `VAULT`, `const early = EARLY[command]`)
+- **Slice:** 02
+- **What happens now:** `EARLY` and `VAULT` are object literals, so `EARLY[command]` also finds what every object inherits from its prototype. Unknown names that look like extensions are routed elsewhere, but any call whose first argument is a flag brain doesn't skip (`--limit`, `--rebuild`, …) reaches the table. A probe on both builds:
+  - `brain --limit 3 constructor --json`: before, `usage` / unknown command / exit 2. Now `EARLY.constructor` is `Object`, so it "runs" and returns the args array as the exit code. Node then crashes with `ERR_INVALID_ARG_TYPE` and exits 1 with a stack trace on stderr.
+  - `toString` crashes the same way. `__proto__` and `hasOwnProperty` give `internal` / exit 1 instead of `usage` / exit 2.
+  - With telemetry on, `brain --limit 3 constructor my-private-query` queued `"exit":["my-private-query"]`. That puts user-typed text in a telemetry event, which CLAUDE.md invariant 12 forbids.
+
+  `VAULT` isn't reachable this way today, only because the old allowlist rejects unknown names first. The obvious alternative is a lookup that only sees the table's own entries.
+- **The gap:** the slice said "one name→handler table" but not how unknown names behave; the old `if`/`switch` gave that for free.
+- **Reach:** slice 06 moves every early command into `EARLY`, and 05 and 07 retire the allowlist that now shields `VAULT`. The pattern gets copied, and its protection goes away. No golden case or test covers it.
+- **Verdict:** unsound. The unknown-command path and the telemetry privacy rule both changed. **Redo from:** a command name dispatches only if it is an own entry of the table, so every other name keeps today's `usage` / exit 2 result, and an exit code is always a number before it reaches `main`'s caller or telemetry.
+- **Confidence:** low.
+
+### The vault-command allowlist and the `VAULT` table are two lists
+
+- **When:** ea9b3ed, `src/cli.ts`, the `!["index", "search", …, "view", …].includes(command)` check before `VAULT[command]`
+- **Slice:** 02
+- **What happens now:** a vault command is accepted only if its name is in the old hard-coded list, and only then is `VAULT` consulted. `view` sits in both. If slice 04 or 05 registers a handler in `VAULT` and forgets the list, `brain <name>` reports "unknown command" (exit 2). That is easy to miss when a test happens to cover the name only through another path. The obvious alternative accepts a name if it is in `VAULT` or still handled by the `switch`, so one list shrinks as the other grows.
+- **The gap:** the slice asked for "one name→handler table", not what happens to the existing gate.
+- **Reach:** slices 03 to 05 each add to `VAULT`; slice 07 is meant to delete the list.
+- **Verdict:** unsound. Two sources of truth for which commands exist. **Redo from:** whether a vault command exists is decided by one list (the table plus the commands the `switch` still owns), not by a second list that must be kept in step.
+- **Confidence:** low.
+
+### `ctx.vault.index` is documented as a write-back that nothing reads
+
+- **When:** ea9b3ed, `VaultContext.index` in `src/commands/shared.ts`
+- **Slice:** 02
+- **What happens now:** the doc comment says "a handler that refreshes again stores the new stats here". The router copies its local `index` into `ctx.vault` and never reads it back, and neither moved handler refreshes. Commands in the `switch` that refresh again (log writes, for example) reassign the router's local `let index` and print it themselves. A slice 04 worker who follows the comment and writes `ctx.vault.index = store.refresh()` gets nothing from it, unless the handler prints with that value itself. The obvious alternative is a comment that says the handler owns its refreshed stats, or a router that reads them back if it ever needs them.
+- **The gap:** context field names were delegated, but not the semantics of a field the comment promises.
+- **Reach:** the log block (slice 04) is the first handler that refreshes twice.
+- **Verdict:** unsound. A contract is stated that the code does not keep. **Redo from:** what the context says about `index` matches who reads it. Either the handler prints its own refreshed stats and the field is read-only, or the router reads the field back after the handler returns.
+- **Confidence:** medium.
+
+## sound
+
+### `ctx.report` replaces the telemetry context and can only set an error
+
+- **When:** ea9b3ed, `ctx.report` in `run()`
+- **Slice:** 02
+- **What happens now:** `report({context})` replaces `tContext` outright, and `report({error})` sets `tError` only when the value is truthy. Neither moved handler calls it. The router still sets `tContext` itself in the vault preamble, and `fail()` still sets `tError`, so slice 02's telemetry matches the old code exactly, and the golden and telemetry tests agree. The obvious alternative, merging the context, would only matter once a handler reports one.
+- **The gap:** the planning decision fixed that telemetry goes through `ctx.report`, not whether it merges.
+- **Reach:** in slice 03, an extension handler that reports `{context}` would wipe the `notes`/`sync` fields the preamble set. Reporting only `{error: "extension_failed"}`, which is what `cli.ts:1181` does today, is safe.
+- **Verdict:** sound for this slice.
+- **Confidence:** medium.
+
+### Handlers may return a number or a promise of one
+
+- **When:** ea9b3ed, `Handler` in `shared.ts`
+- **Slice:** 02
+- **What happens now:** the slice decided `(args, flags, ctx) => Promise<number>`. The type also allows a plain `number`, so `path` and `view` are synchronous, and the router `await`s either one inside the same `try` that maps errors through `fail()` and closes the store in `finally`. A synchronous throw and a rejected promise both reach `fail()`.
+- **The gap:** none that matters. It is a widening of the decided signature.
+- **Reach:** none on behaviour; handlers can be plain functions.
+- **Verdict:** sound.
+- **Confidence:** medium.
+
+### Moved code keeps its order, its error path and the store's lifetime
+
+- **When:** ea9b3ed, `path.ts`, `view.ts`, the dispatch in `run()`
+- **Slice:** 02
+- **What happens now:**
+  - `path` is dispatched at the same point as before: after the other early commands, before `Store.open`, inside its own `try`/`fail`. It still finds the vault and loads config without creating the index.
+  - `view` runs inside the vault `try` after the preamble has opened the store, refreshed, and set `tContext`. Its throws reach the same `fail()`, and `store.close()` still runs in `finally`.
+  - The extension-scope checks in `main()` and `run()` run before either table and are unchanged.
+  - `CliError` now lives in `shared.ts` and `cli.ts` imports it, so `instanceof` in `fail()` still sees one class.
+
+  The obvious alternative, letting handlers open or close the store, was ruled out by the slice.
+- **The gap:** the slice said the router opens and closes the vault context.
+- **Reach:** later vault handlers inherit store closing and error mapping for free. `view` reads `ctx.vault!`, which assumes it is only ever registered in `VAULT`.
+- **Verdict:** sound.
+- **Confidence:** medium.
+
+Trivial naming and delegated fields (`pathCommand`/`viewCommand`, `EARLY`/`VAULT`, `ctx.findVault` and `ctx.print` as context fields, `permit` on the vault context): 1 line, not listed.
+
+## Pattern
+
+Two of the three unsound entries sit in the router's dispatch: how a name becomes a handler, and who decides which names exist. Slices 05, 06 and 07 all build on that lookup, so fix it before 06 widens `EARLY`. Consider adding a golden case for an unknown name reached past a flag (for example `--limit 3 constructor --json`), so the property is gated, not just argued.
+
+## Next step
+
+Before 03, 04 or 06 start, redo the table lookup from the first unsound entry (own entries only, exit code always a number) and make one list decide which vault commands exist. Then rerun this gate.
