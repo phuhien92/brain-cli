@@ -5,7 +5,6 @@ import { hostname } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { parseArgs } from "node:util";
 import { ConfigError, inReadScope, inScope, loadConfig, readScope, readUserConfig, slug, userSettings, type Config } from "./config.js";
 import { applySetup, detectHarnesses, findVaultCandidates, interactiveSetup, recommendSync, type SetupChoices } from "./setup.js";
 import {
@@ -29,9 +28,9 @@ import { context, HARNESSES, install, type Harness } from "./agent.js";
 import { CATEGORIES, isDate, lifecycleStates, recordLifecycle, today, windows, type Category, type LifecycleState } from "./lifecycle.js";
 import { lint } from "./lint.js";
 import { contextHookLines, dispatchLogAddedHooks } from "./hooks.js";
-import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, renderView, type Entry, type ExportResult } from "./log.js";
+import { addEntry, addEntryOnce, exportView, importFile, LIFECYCLE_KIND, listEntries, recordRetirement, type Entry, type ExportResult } from "./log.js";
 import { OfflineNoteError, Store, type RefreshStats } from "./store.js";
-import { brainPaths, describePaths, PATH_NAMES, type PathName } from "./paths.js";
+import { brainPaths, PATH_NAMES } from "./paths.js";
 import { isGitRepo, resolveSyncMode, sync, SyncError } from "./sync.js";
 import { ingest } from "./source.js";
 import {
@@ -48,6 +47,9 @@ import {
   resolveLauncher,
   type ExtensionManifest,
 } from "./extensions.js";
+import { CliError, parseFlags, type Ctx, type Handler, type Out } from "./commands/shared.js";
+import { pathCommand } from "./commands/path.js";
+import { viewCommand } from "./commands/view.js";
 
 export const VERSION = "0.12.0";
 // Bumped only on a breaking change to the --json envelope or a command's data shape.
@@ -185,22 +187,6 @@ EXIT CODES
   6 not permitted: outside the acting integration's scope · 7 lint --strict found warnings
 `;
 
-class CliError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly exit: number,
-    readonly details?: Record<string, unknown>,
-  ) {
-    super(message);
-  }
-}
-
-interface Out {
-  json: boolean;
-  quiet: boolean;
-}
-
 // Telemetry records a command by a name from these lists only. Anything else
 // a user typed (a query, a note, feedback text) can never become a name.
 const COMMANDS = ["setup", "index", "search", "get", "ingest", "log", "view", "export", "sync", "integrations", "doctor", "path", "lifecycle", "lint", "context", "agent", "feedback", "telemetry", "update", "ext", "help"];
@@ -230,6 +216,11 @@ function extensionChildCommandAllowed(command: string, sub: string | undefined):
 }
 
 const BIN = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "bin", "brain.js");
+
+// Commands that never open the vault, and commands that read it. The router
+// owns parsing, vault discovery, output and exit codes; handlers do the rest.
+const EARLY: Record<string, Handler> = { path: pathCommand };
+const VAULT: Record<string, Handler> = { view: viewCommand };
 
 // Filled in while a command runs, read once it finishes, for telemetry.
 let tCommand = "unknown";
@@ -302,54 +293,7 @@ async function run(argv: string[]): Promise<number> {
 
   let parsed;
   try {
-    parsed = parseArgs({
-      args: argv,
-      allowPositionals: true,
-      strict: true,
-      options: {
-        vault: { type: "string" },
-        json: { type: "boolean", default: false },
-        quiet: { type: "boolean", short: "q", default: false },
-        version: { type: "boolean", default: false },
-        help: { type: "boolean", short: "h", default: false },
-        rebuild: { type: "boolean", default: false },
-        verify: { type: "boolean", default: false },
-        limit: { type: "string" },
-        path: { type: "string" },
-        raw: { type: "boolean", default: false },
-        meta: { type: "boolean", default: false },
-        section: { type: "string", multiple: true },
-        lines: { type: "string" },
-        body: { type: "string" },
-        "source-id": { type: "string" },
-        "source-created": { type: "string" },
-        tag: { type: "string", multiple: true },
-        kind: { type: "string" },
-        force: { type: "boolean", default: false },
-        "no-push": { type: "boolean", default: false },
-        "dry-run": { type: "boolean", default: false },
-        as: { type: "string" },
-        category: { type: "string" },
-        "as-of": { type: "string" },
-        on: { type: "string" },
-        reason: { type: "string" },
-        text: { type: "string" },
-        due: { type: "boolean", default: false },
-        strict: { type: "boolean", default: false },
-        "include-archived": { type: "boolean", default: false },
-        title: { type: "string" },
-        "from-last-error": { type: "boolean", default: false },
-        post: { type: "boolean", default: false },
-        yes: { type: "boolean", default: false },
-        machine: { type: "string" },
-        agents: { type: "string" },
-        telemetry: { type: "string" },
-        profile: { type: "boolean", default: false },
-        "user-approved": { type: "boolean", default: false },
-        check: { type: "boolean", default: false },
-        "update-check": { type: "string" },
-      },
-    });
+    parsed = parseFlags(argv);
   } catch (err) {
     const json = argv.includes("--json");
     return fail({ json, quiet: false }, "unknown", new CliError("usage", (err as Error).message, 2));
@@ -359,6 +303,16 @@ async function run(argv: string[]): Promise<number> {
   const out: Out = { json: flags.json ?? false, quiet: flags.quiet ?? false };
   const [command = "help", ...args] = positionals;
   tCommand = telemetryName(command, args[0]);
+  const ctx: Ctx = {
+    out,
+    print,
+    bin: BIN,
+    findVault,
+    report: (r) => {
+      if (r.context) tContext = r.context;
+      if (r.error) tError = r.error;
+    },
+  };
 
   const extensionCaller = process.env.BRAIN_EXTENSION_SCOPE;
   if (extensionCaller && !flags.version && !flags.help && !extensionChildCommandAllowed(command, args[0])) {
@@ -512,27 +466,10 @@ async function run(argv: string[]): Promise<number> {
     }
   }
 
-  if (command === "path") {
-    // Before Store.open on purpose: printing a location must not create it.
+  const early = EARLY[command];
+  if (early) {
     try {
-      const name = args[0];
-      if (args.length > 1 || (name !== undefined && !(PATH_NAMES as readonly string[]).includes(name))) {
-        throw new CliError("usage", `usage: brain path [${PATH_NAMES.join("|")}]`, 2, { names: [...PATH_NAMES] });
-      }
-      const vault = findVault(flags.vault);
-      const cfg = loadConfig(vault, { as: flags.as });
-      const all = describePaths(brainPaths(vault, cfg.logDir));
-      const as = cfg.as ? { as: cfg.as.name } : {};
-      if (name) {
-        const p = all[name as PathName];
-        print(out, command, { name, ...p, ...as }, null, () => p.path);
-      } else {
-        const width = Math.max(...PATH_NAMES.map((n) => n.length));
-        print(out, command, { paths: all, ...as }, null, () =>
-          PATH_NAMES.map((n) => `${n.padEnd(width)}  ${all[n].path}${all[n].exists ? "" : "  (not created yet)"}`).join("\n"),
-        );
-      }
-      return 0;
+      return await early(args, flags, ctx);
     } catch (err) {
       return fail(out, command, err);
     }
@@ -557,6 +494,12 @@ async function run(argv: string[]): Promise<number> {
       integrations: Object.keys(cfg.integrations).length,
       scoped: !!cfg.as,
     };
+
+    const handler = VAULT[command];
+    if (handler) {
+      ctx.vault = { vault, cfg, scope, permit, store, index };
+      return await handler(args, flags, ctx);
+    }
 
     switch (command) {
       case "ingest": {
@@ -813,16 +756,6 @@ async function run(argv: string[]): Promise<number> {
             ? entries.map((e) => `${e.created.slice(0, 10)}  ${e.kind.padEnd(10)} ${e.machine.padEnd(12)} ${e.title}`).join("\n")
             : "no entries yet — add one with: brain log add <kind> <title>",
         );
-        return 0;
-      }
-
-      case "view": {
-        const kind = slug(args[0] ?? "");
-        if (!kind) throw new CliError("usage", "usage: brain view <kind>", 2);
-        if (cfg.as) permit(inScope(`${cfg.logDir}/${kind}/`, scope), `read '${kind}' entries`);
-        const entries = listEntries(store, cfg, { kind }).filter((entry) => inReadScope(store!, cfg, entry.path, scope));
-        const markdown = renderView(entries);
-        print(out, command, { kind, entries: entries.length, markdown }, { vault, index }, () => markdown);
         return 0;
       }
 
