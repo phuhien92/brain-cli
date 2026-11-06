@@ -12,5 +12,6 @@ pnpm cache breaks on the mac mini.
 
 ## Links
 [[runbook]]
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

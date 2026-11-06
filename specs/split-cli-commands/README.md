@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: planned, nothing built. Start with 01. Baseline: 149 tests pass at `fbf78f7`.
+Status: 01 built and fixed after its decisions-ledger check (37 golden cases, exit codes 0, 1, 2, 3, 4, 7; byte-exact; machine and date pinned; baseline captured on the pre-split code). 02 built: `src/commands/shared.ts`, `path.ts`, `view.ts`, and the router tables. Next: 03 (extensions), 04 (log and export), and 06 (early commands) can start.
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.

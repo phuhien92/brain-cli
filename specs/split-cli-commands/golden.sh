@@ -8,7 +8,8 @@
 # first. Everything happens in a throwaway home, state dir and vault, with the update
 # check and telemetry off. Only values that differ run to run are normalized: the temp
 # paths, the state-folder ID (a hash of the temp vault path), timestamps, file mtimes,
-# and timings. Anything else that differs is a real change.
+# timings, and the real date in new log file names. The machine name and the
+# lifecycle date are pinned. Output is captured byte for byte, trailing newlines included. Anything else that differs is a real change.
 set -u
 cd "$(dirname "$0")/../.."
 REPO=$(pwd)
@@ -25,24 +26,29 @@ printf -- '---\ntags: [ops]\naliases: [deploys]\n---\n# Deploy gotchas\n\n## Cac
 printf -- '# Runbook\nRestart the worker, then [[deploy]].\n' > "$VAULT/notes/runbook.md"
 printf 'one\n' > "$VAULT/notes/dup.md"
 printf 'two\n' > "$VAULT/a/dup.md"
+printf -- '# Broken\nSee [[nowhere]].\n' > "$VAULT/notes/broken.md"
 
-run_case() { # name, then brain args
+run_case() { # name, then brain args; CASE_CWD overrides the working folder (default: the vault)
   local name=$1; shift
-  local stdout stderr code
-  stdout=$(cd "$VAULT" && env -i PATH="$PATH" HOME="$TMP/home" BRAIN_STATE_DIR="$TMP/state" \
-    BRAIN_NO_UPDATE_CHECK=1 BRAIN_TELEMETRY=0 BRAIN_VAULT="" CI=1 \
-    node --no-warnings=ExperimentalWarning "$REPO/bin/brain.js" "$@" 2>"$TMP/stderr")
+  local code
+  # stdout and stderr go straight to files, so trailing newlines are kept byte for byte.
+  (cd "${CASE_CWD:-$VAULT}" && env -i PATH="$PATH" HOME="$TMP/home" BRAIN_STATE_DIR="$TMP/state" \
+    BRAIN_NO_UPDATE_CHECK=1 BRAIN_TELEMETRY=0 BRAIN_VAULT="" BRAIN_MACHINE=golden BRAIN_TODAY=2026-01-15 CI=1 \
+    node --no-warnings=ExperimentalWarning "$REPO/bin/brain.js" "$@" >"$TMP/stdout" 2>"$TMP/stderr")
   code=$?
-  stderr=$(cat "$TMP/stderr")
   {
-    printf '$ brain %s\n' "$*"
-    printf -- '--- exit %s\n--- stdout\n%s\n--- stderr\n%s\n' "$code" "$stdout" "$stderr"
+    printf '$ brain %s\n--- exit %s\n--- stdout\n' "$*" "$code"
+    cat "$TMP/stdout"
+    printf -- '<<END stdout>>\n--- stderr\n'
+    cat "$TMP/stderr"
+    printf -- '<<END stderr>>\n'
   } | sed -E \
       -e "s#$TMP#<TMP>#g" \
       -e 's#[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z#<TIME>#g' \
       -e 's#"(durationMs|ms|took|elapsedMs)":[0-9]+#"\1":<N>#g' \
       -e 's#vault-[0-9a-f]{12}#vault-<ID>#g' \
       -e 's#"mtime":[0-9.]+#"mtime":<N>#g' \
+      -e 's#[0-9]{4}-[0-9]{2}-[0-9]{2}-golden-#<DATE>-golden-#g' \
       > "$TMP/cases/$name.txt"
 }
 
@@ -75,6 +81,16 @@ run_case 23-export-json export --json
 run_case 24-sync-none-json sync --json
 run_case 25-ext-list-json ext list --json
 run_case 26-context context
+run_case 27-lint-strict lint --strict
+CASE_CWD="$TMP/home" run_case 28-no-vault-json search cache --json
+run_case 29-log-add-json log add decision "Use pnpm" --body "faster installs" --json
+run_case 30-log-add log add decision "Use pnpm" --body "faster installs"
+run_case 31-log-json log --json
+run_case 32-log log
+run_case 33-view view decision
+run_case 34-view-json view decision --json
+run_case 35-lifecycle-status-json lifecycle status --json
+run_case 36-lifecycle-status lifecycle status
 
 if [ "$MODE" = capture ]; then
   rm -rf "$OUT" && mkdir -p "$OUT" && cp "$TMP"/cases/*.txt "$OUT"/

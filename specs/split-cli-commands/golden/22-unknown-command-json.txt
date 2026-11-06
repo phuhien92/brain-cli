@@ -2,5 +2,6 @@ $ brain bogus-command --json
 --- exit 2
 --- stdout
 {"schema":"brain.v1","command":"bogus-command","ok":false,"error":{"code":"usage","message":"unknown command 'bogus-command' — run 'brain help'"}}
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

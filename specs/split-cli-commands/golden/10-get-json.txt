@@ -1,6 +1,7 @@
 $ brain get deploy --json
 --- exit 0
 --- stdout
-{"schema":"brain.v1","command":"get","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":4,"offline":0,"ms":<N>},"data":{"path":"notes/deploy.md","title":"Deploy gotchas","frontmatter":{"tags":["ops"],"aliases":["deploys"]},"tags":["ops"],"aliases":["deploys"],"headings":["Deploy gotchas","Cache","Links"],"links":[{"target":"runbook","heading":null}],"mtime":<N>,"content":"---\ntags: [ops]\naliases: [deploys]\n---\n# Deploy gotchas\n\n## Cache\npnpm cache breaks on the mac mini.\n\n## Links\n[[runbook]]\n","lifecycle":null}}
+{"schema":"brain.v1","command":"get","ok":true,"vault":"<TMP>/vault","index":{"added":0,"updated":0,"removed":0,"unchanged":5,"offline":0,"ms":<N>},"data":{"path":"notes/deploy.md","title":"Deploy gotchas","frontmatter":{"tags":["ops"],"aliases":["deploys"]},"tags":["ops"],"aliases":["deploys"],"headings":["Deploy gotchas","Cache","Links"],"links":[{"target":"runbook","heading":null}],"mtime":<N>,"content":"---\ntags: [ops]\naliases: [deploys]\n---\n# Deploy gotchas\n\n## Cache\npnpm cache breaks on the mac mini.\n\n## Links\n[[runbook]]\n","lifecycle":null}}
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

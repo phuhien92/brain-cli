@@ -1,0 +1,7 @@
+$ brain lifecycle status
+--- exit 0
+--- stdout
+no notes have lifecycle data yet — start with: brain lifecycle set <note> --category <category>
+<<END stdout>>
+--- stderr
+<<END stderr>>

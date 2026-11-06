@@ -1,0 +1,7 @@
+$ brain log add decision Use pnpm --body faster installs --json
+--- exit 0
+--- stdout
+{"schema":"brain.v1","command":"log.add","ok":true,"vault":"<TMP>/vault","index":{"added":1,"updated":0,"removed":0,"unchanged":5,"offline":0,"ms":<N>},"data":{"path":"log/decision/<DATE>-golden-use-pnpm.md","added":true,"machine":"golden","kind":"decision"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>

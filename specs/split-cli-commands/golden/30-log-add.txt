@@ -1,0 +1,7 @@
+$ brain log add decision Use pnpm --body faster installs
+--- exit 0
+--- stdout
+log/decision/<DATE>-golden-use-pnpm-2.md
+<<END stdout>>
+--- stderr
+<<END stderr>>

@@ -2,5 +2,6 @@ $ brain lifecycle --json
 --- exit 2
 --- stdout
 {"schema":"brain.v1","command":"lifecycle","ok":false,"error":{"code":"usage","message":"usage: brain lifecycle set|review|archive|restore <note> … | lifecycle status [--due]"}}
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

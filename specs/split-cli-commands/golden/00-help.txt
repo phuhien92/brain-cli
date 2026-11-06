@@ -131,5 +131,6 @@ EXIT CODES
   0 ok · 1 error · 2 usage · 3 note not found · 4 ambiguous note reference
   5 conflict: sync hit notes edited on two machines, or export found unrecorded edits
   6 not permitted: outside the acting integration's scope · 7 lint --strict found warnings
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

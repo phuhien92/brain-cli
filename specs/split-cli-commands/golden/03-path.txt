@@ -11,5 +11,6 @@ state            <TMP>/state/vault-<ID>  (not created yet)
 index            <TMP>/state/vault-<ID>/index.db  (not created yet)
 telemetry-queue  <TMP>/state/telemetry-queue.jsonl  (not created yet)
 update-check     <TMP>/state/update-check.json  (not created yet)
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

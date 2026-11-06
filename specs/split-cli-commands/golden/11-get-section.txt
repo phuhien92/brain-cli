@@ -3,5 +3,6 @@ $ brain get deploy --section Cache
 --- stdout
 ## Cache
 pnpm cache breaks on the mac mini.
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

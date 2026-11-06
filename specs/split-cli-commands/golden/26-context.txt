@@ -2,10 +2,11 @@ $ brain context
 --- exit 0
 --- stdout
 <brain>
-The user's notes and long-term memory are in a markdown vault (4 notes) searchable with the `brain` CLI.
+The user's notes and long-term memory are in a markdown vault (5 notes) searchable with the `brain` CLI.
 Before answering anything about their notes, decisions, preferences or past work, run `brain search "<question>" --json`
 and read the top results with `brain get <path> --json`; rephrase and search again before concluding something is not recorded.
 Record durable lessons with `brain log add learning "<one line>"`. See the `brain` skill for details.
 </brain>
+<<END stdout>>
 --- stderr
-
+<<END stderr>>

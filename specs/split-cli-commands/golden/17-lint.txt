@@ -1,8 +1,13 @@
 $ brain lint
 --- exit 0
 --- stdout
-INFO orphan (2)
-  a/dup.md: no note links here
-  notes/dup.md: no note links here
---- stderr
+WARN broken-link (1)
+  notes/broken.md: [[nowhere]] does not resolve to any note
 
+INFO orphan (3)
+  a/dup.md: no note links here
+  notes/broken.md: no note links here
+  notes/dup.md: no note links here
+<<END stdout>>
+--- stderr
+<<END stderr>>

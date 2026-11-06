@@ -1,0 +1,7 @@
+$ brain search cache --json
+--- exit 1
+--- stdout
+{"schema":"brain.v1","command":"search","ok":false,"error":{"code":"no_vault","message":"no vault found: run brain setup, pass --vault <dir>, set BRAIN_VAULT, or run inside a folder with .obsidian/ or brain.json"}}
+<<END stdout>>
+--- stderr
+<<END stderr>>
