@@ -4,7 +4,7 @@
 
 **Seam:** `src/commands/ext.ts`: `ext`, `extensionManagementCommand`, `confirmExtensionInstall`, `runExtensionCommand`, `killExtensionTree`, `extensionInvocation`, and the extension constants. The pre-parse extension dispatch in `run()` stays in the router and calls into it.
 
-**Check:** Gate, plus `node --no-warnings=ExperimentalWarning --test dist/test/extensions.test.js` passes all 16 tests.
+**Check:** Gate, plus `node --no-warnings=ExperimentalWarning --test dist/test/extensions.test.js` passes all its tests (18 at the time of the split; the plan's "16" was a drafting estimate).
 
 **Must stay green:** Every test; the golden check.
 

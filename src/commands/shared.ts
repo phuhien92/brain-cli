@@ -98,6 +98,8 @@ export interface VaultContext {
 export interface Ctx {
   out: Out;
   print: Print;
+  /** The --json envelope's schema name (SCHEMA in the router). */
+  schema: string;
   /** Path to bin/brain.js, computed once by the router. */
   bin: string;
   /** The router's vault discovery (--vault, BRAIN_VAULT, or the working folder). */

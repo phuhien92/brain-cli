@@ -36,7 +36,7 @@ This is the first real end-to-end run of the factory loop: `codebase-rubric` bef
 |---|---|---|---|---|
 | 01 | golden-capture | Can we prove output is byte-identical beyond what tests assert? | `golden.sh capture` twice: identical | none |
 | 02 | handler-shape | Does one handler shape serve a no-vault and a vault command? | Gate + `path`, `view` gone from cli.ts | 01 |
-| 03 | extensions | Does the riskiest code (spawn, timeouts, binary path, telemetry error) survive the move? | Gate + `extensions.test.js` 16/16 | 02 |
+| 03 | extensions | Does the riskiest code (spawn, timeouts, binary path, telemetry error) survive the move? | Gate + `extensions.test.js` all pass (18) | 02 |
 | 04 | log-export | Does the largest block move whole? | Gate + `log.test.js` passes | 02 |
 | 05 | vault-commands | Do the remaining vault commands fit the shape? | Gate + vault `switch` gone | 04 |
 | 06 | early-commands | Can the no-vault branch become table lookups? | Gate + early `if (command ===` gone | 02 |
@@ -66,6 +66,6 @@ Build order comes from **Depends on**. 03, 04, and 06 can run in parallel after 
 
 ## Next agent prompt
 
-Status: 01 built and fixed after its decisions-ledger check (37 golden cases, exit codes 0, 1, 2, 3, 4, 7; byte-exact; machine and date pinned; baseline captured on the pre-split code). 02 built: `src/commands/shared.ts`, `path.ts`, `view.ts`, and the router tables. Next: 03 (extensions), 04 (log and export), and 06 (early commands) can start.
+Status: 01 to 03 built. 03 moved `ext` and the extension runner to `src/commands/ext.ts`; the router's table entries can now name what a failure is reported as (`ext` fails as `ext.<sub>`, as before). The context gained `schema`, and one `makeCtx` serves both the extension pre-dispatch and the normal path. `cli.ts` is at 1,376 lines. Next: 04 (log and export) and 06 (early commands).
 
 Before reporting a slice done, follow the `decision-checker` skill in Check mode on this branch and save `decisions.md` here. Update this prompt before you end.
